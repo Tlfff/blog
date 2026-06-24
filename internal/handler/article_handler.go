@@ -7,10 +7,9 @@ import (
 	arcticleDto "blog/internal/dto/article"
 	"blog/internal/model"
 	"blog/internal/service"
-	"encoding/json"
-	"net/http"
-	"strconv"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 type ArticleHandler struct {
@@ -22,24 +21,16 @@ func NewArticleHandler(article *service.ArticleService) *ArticleHandler {
 }
 
 // 创建文章
-func (h *ArticleHandler) CreateArticle(w http.ResponseWriter, r *http.Request) {
+func (h *ArticleHandler) CreateArticle(c *gin.Context) {
 	var req arcticleDto.CreateArticleRequest
 	// 1. 解析请求体并放进req
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		common.WriteResponse(w, common.CodeBadRequestFormat, common.ErrInvalidRequestBody.Error(), nil)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(common.ErrInvalidRequestBody)
 		return
 	}
-	// 2. 校验注册请求参数
-	if err := req.Validate(); err != nil {
-		common.WriteResponse(w, common.GetCodeByError(err), err.Error(), nil)
-		return
-	}
-	// 3. 从上下文中获取用户信息
-	user, ok := auth.GetUserContext(r.Context())
-	if !ok {
-		common.WriteResponse(w, common.CodeUnauthorized, common.ErrAuthorizationRequired.Error(), nil)
-		return
-	}
+
+	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
+	user := c.MustGet("currentUser").(*auth.UserContext)
 
 	article := &model.Article{
 		Title:      req.Title,
@@ -52,32 +43,22 @@ func (h *ArticleHandler) CreateArticle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.article.CreateArticle(article); err != nil {
-		common.WriteResponse(w, common.CodeInternalServerError, err.Error(), nil)
+		c.Error(err)
 		return
 	}
-
-	common.WriteResponse(w, common.CodeSuccess, "文章创建成功", nil)
+	common.OK(c, "文章创建成功", nil)
 }
 
 // 更新文章
-func (h *ArticleHandler) UpdateArticle(w http.ResponseWriter, r *http.Request) {
+func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 	var req arcticleDto.UpdateArticleRequest
 	// 1. 解析请求体并放进req
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		common.WriteResponse(w, common.CodeBadRequestFormat, common.ErrInvalidRequestBody.Error(), nil)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(common.ErrInvalidRequestBody)
 		return
 	}
-	// 2. 校验更新请求参数
-	if err := req.Validate(); err != nil {
-		common.WriteResponse(w, common.GetCodeByError(err), err.Error(), nil)
-		return
-	}
-	// 3. 从上下文中获取用户信息
-	user, ok := auth.GetUserContext(r.Context())
-	if !ok {
-		common.WriteResponse(w, common.CodeUnauthorized, common.ErrAuthorizationRequired.Error(), nil)
-		return
-	}
+	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
+	user := c.MustGet("currentUser").(*auth.UserContext)
 
 	article := &model.Article{
 		ID:         req.ID,
@@ -91,166 +72,135 @@ func (h *ArticleHandler) UpdateArticle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.article.UpdateArticle(article); err != nil {
-		common.WriteResponse(w, common.CodeInternalServerError, err.Error(), nil)
+		c.Error(err)
 		return
 	}
 
-	common.WriteResponse(w, common.CodeSuccess, "文章更新成功", nil)
+	common.OK(c, "文章更新成功", nil)
 }
 
 // 删除文章
-func (h *ArticleHandler) DeleteArticle(w http.ResponseWriter, r *http.Request) {
+func (h *ArticleHandler) DeleteArticle(c *gin.Context) {
 	var req arcticleDto.DeleteArticleRequest
 	// 1. 解析请求体并放进req
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		common.WriteResponse(w, common.CodeBadRequestFormat, common.ErrInvalidRequestBody.Error(), nil)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(common.ErrInvalidRequestBody)
 		return
 	}
-	// 2. 校验删除请求参数
-	if err := req.Validate(); err != nil {
-		common.WriteResponse(w, common.GetCodeByError(err), err.Error(), nil)
-		return
-	}
-	// 3. 从上下文中获取用户信息
-	user, ok := auth.GetUserContext(r.Context())
-	if !ok {
-		common.WriteResponse(w, common.CodeUnauthorized, common.ErrAuthorizationRequired.Error(), nil)
-		return
-	}
+	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
+	user := c.MustGet("currentUser").(*auth.UserContext)
 
 	if err := h.article.DeleteArticle(req.ID, user.UserID); err != nil {
-		common.WriteResponse(w, common.CodeInternalServerError, err.Error(), nil)
+		c.Error(err)
 		return
 	}
 
-	common.WriteResponse(w, common.CodeSuccess, "文章删除成功", nil)
+	common.OK(c, "文章删除成功", nil)
 }
 
 // 发表文章
-func (h *ArticleHandler) PublishArticle(w http.ResponseWriter, r *http.Request) {
+func (h *ArticleHandler) PublishArticle(c *gin.Context) {
 	var req arcticleDto.PublishArticleRequest
 	// 1. 解析请求体并放进req
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		common.WriteResponse(w, common.CodeBadRequestFormat, common.ErrInvalidRequestBody.Error(), nil)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(common.ErrInvalidRequestBody)
 		return
 	}
-	// 2. 校验发表请求参数
-	if err := req.Validate(); err != nil {
-		common.WriteResponse(w, common.GetCodeByError(err), err.Error(), nil)
-		return
-	}
-	// 3. 从上下文中获取用户信息
-	user, ok := auth.GetUserContext(r.Context())
-	if !ok {
-		common.WriteResponse(w, common.CodeUnauthorized, common.ErrAuthorizationRequired.Error(), nil)
-		return
-	}
+
+	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
+	user := c.MustGet("currentUser").(*auth.UserContext)
 
 	if err := h.article.PublishArticle(req.ID, user.UserID); err != nil {
-		common.WriteResponse(w, common.CodeInternalServerError, err.Error(), nil)
+		c.Error(err)
 		return
 	}
-
-	common.WriteResponse(w, common.CodeSuccess, "文章发表成功", nil)
+	common.OK(c, "文章发表成功", nil)
 }
 
 // 获取文章详情
 // 场景A（公开接口）：仅允许查看已发表的文章
-func (h *ArticleHandler) GetArticleDetail(w http.ResponseWriter, r *http.Request) {
-	// 1. 从 URL Query 解析并构造 DTO
-	idStr := r.URL.Query().Get("id")
-	id, _ := strconv.ParseInt(idStr, 10, 64)
-	req := article.GetDetailRequest{ID: id}
-
-	// 2. 校验参数
-	if err := req.Validate(); err != nil {
-		common.WriteResponse(w, common.CodeBadRequestFormat, err.Error(), nil)
+func (h *ArticleHandler) GetArticleDetail(c *gin.Context) {
+	var req article.GetDetailRequest
+	// 1. 自动去 Query 拿 ?id=xxx，自动转成 int64，自动校验 min=1
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.Error(common.ErrArticleIDInvalid)
 		return
 	}
-	// 3. 获取详情
+
+	// 2. 获取详情
 	article, err := h.article.GetArticle(req.ID)
 	if err != nil {
-		common.WriteResponse(w, common.CodeInternalServerError, err.Error(), nil)
+		c.Error(err)
 		return
 	}
-	// 4. 只能看见已发表的文章
+	// 3. 只能看见已发表的文章
 	if article.Status != model.Published {
-		common.WriteResponse(w, common.CodeArticleNotFound, common.ErrArticleNotFound.Error(), nil)
+		c.Error(common.ErrArticleNotFound)
 		return
 	}
 	res := arcticleDto.NewArticleDetailResponse(article)
-	common.WriteResponse(w, common.CodeSuccess, "查询成功", res)
+	common.OK(c, "查询成功", res)
 }
 
 // 场景 B（需要登录）：创作者看自己未发表的文章，如草稿
-func (h *ArticleHandler) GetArticleDetailForMe(w http.ResponseWriter, r *http.Request) {
-	// 1. 从 URL Query 解析并构造 DTO
-	idStr := r.URL.Query().Get("id")
-	id, _ := strconv.ParseInt(idStr, 10, 64)
-	req := article.GetDetailRequest{ID: id}
-	// 2. 校验参数
-	if err := req.Validate(); err != nil {
-		common.WriteResponse(w, common.CodeBadRequestFormat, err.Error(), nil)
+func (h *ArticleHandler) GetArticleDetailForMe(c *gin.Context) {
+	var req article.GetDetailRequest
+	// 1. 自动去 Query 拿 ?id=xxx，自动转成 int64，自动校验 min=1
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.Error(common.ErrArticleIDInvalid)
 		return
 	}
-	// 3. 获取登录用户信息
-	userCtx, ok := auth.GetUserContext(r.Context())
-	if !ok {
-		common.WriteResponse(w, common.CodeUnauthorized, common.ErrAuthorizationRequired.Error(), nil)
-		return
-	}
+
+	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
+	userCtx := c.MustGet("currentUser").(*auth.UserContext)
+
 	// 4. 获取详情
 	articleData, err := h.article.GetArticle(req.ID)
 	if err != nil {
-		common.WriteResponse(w, common.GetCodeByError(err), err.Error(), nil)
+		c.Error(err)
 		return
 	}
 
 	// 5. 判断自己是否是作者
 	if articleData.AuthorID != userCtx.UserID {
-		common.WriteResponse(w, common.CodeArticlePermission, common.ErrArticlePermissionDenied.Error(), nil)
+		c.Error(common.ErrArticlePermissionDenied)
 		return
 	}
 
 	res := article.NewArticleDetailResponse(articleData)
-	common.WriteResponse(w, common.CodeSuccess, "查询成功", res)
+	common.OK(c, "查询成功", res)
 }
 
 // 获取用户已发表文章列表
-func (h *ArticleHandler) GetPublishedList(w http.ResponseWriter, r *http.Request) {
-	// 1. 从 URL Query 解析并构造 DTO
-	authorIDStr := r.URL.Query().Get("author_id")
-	authorID, _ := strconv.ParseInt(authorIDStr, 10, 64)
-	req := article.GetPublishListRequest{AuthorID: authorID}
-
-	// 2. 校验参数
-	if err := req.Validate(); err != nil {
-		common.WriteResponse(w, common.CodeBadRequestFormat, err.Error(), nil)
+func (h *ArticleHandler) GetPublishedList(c *gin.Context) {
+	var req article.GetPublishListRequest
+	// 1. 自动去 Query 拿 ?id=xxx，自动转成 int64，自动校验 min=1
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.Error(common.ErrUserNotFound)
 		return
 	}
+
 	articleList, err := h.article.GetPublishedList(req.AuthorID)
 	if err != nil {
-		common.WriteResponse(w, common.CodeInternalServerError, err.Error(), nil)
+		c.Error(err)
 		return
 	}
 	resList := arcticleDto.NewArticleListResponse(articleList)
-	common.WriteResponse(w, common.CodeSuccess, "获取发表列表成功", resList)
+	common.OK(c, "获取发表列表成功", resList)
 }
 
 // 获取用户草稿文章列表
-func (h *ArticleHandler) GetDraftedList(w http.ResponseWriter, r *http.Request) {
-	//  从上下文中获取用户信息
-	user, ok := auth.GetUserContext(r.Context())
-	if !ok {
-		common.WriteResponse(w, common.CodeUnauthorized, common.ErrAuthorizationRequired.Error(), nil)
-		return
-	}
+func (h *ArticleHandler) GetDraftedList(c *gin.Context) {
+	// 1. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
+	user := c.MustGet("currentUser").(*auth.UserContext)
+
 	articleList, err := h.article.GetDraftedList(user.UserID)
 	if err != nil {
-		common.WriteResponse(w, common.CodeInternalServerError, err.Error(), nil)
+
+		c.Error(err)
 		return
 	}
 
 	resList := arcticleDto.NewArticleListResponse(articleList)
-	common.WriteResponse(w, common.CodeSuccess, "获取草稿列表成功", resList)
+	common.OK(c, "获取草稿列表成功", resList)
 }

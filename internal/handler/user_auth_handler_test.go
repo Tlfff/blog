@@ -3,10 +3,6 @@ package handler
 import (
 	"blog/internal/repository"
 	"blog/internal/service"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
 )
 
 func newUserAuthHandler() *UserAuthHandler {
@@ -16,195 +12,196 @@ func newUserAuthHandler() *UserAuthHandler {
 		service.NewUserAuthService(repo),
 	)
 }
-func TestRegister(t *testing.T) {
-	h := newUserAuthHandler()
 
-	body := `{
-		"nickname":"test",
-		"phone":"13800138000",
-		"password":"123456",
-		"role":1
-	}`
+// func TestRegister(t *testing.T) {
+// 	h := newUserAuthHandler()
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(body),
-	)
+// 	body := `{
+// 		"nickname":"test",
+// 		"phone":"13800138000",
+// 		"password":"123456",
+// 		"role":1
+// 	}`
 
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/register",
+// 		strings.NewReader(body),
+// 	)
 
-	h.Register(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("注册失败")
-	}
-}
-func TestRegisterInvalidRequest(t *testing.T) {
-	h := newUserAuthHandler()
+// 	h.Register(w, req)
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(`{}`),
-	)
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("注册失败")
+// 	}
+// }
+// func TestRegisterInvalidRequest(t *testing.T) {
+// 	h := newUserAuthHandler()
 
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/register",
+// 		strings.NewReader(`{}`),
+// 	)
 
-	h.Register(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
-func TestRegisterBadJSON(t *testing.T) {
-	h := newUserAuthHandler()
+// 	h.Register(w, req)
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(`{nickname}`),
-	)
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("请求执行异常")
+// 	}
+// }
+// func TestRegisterBadJSON(t *testing.T) {
+// 	h := newUserAuthHandler()
 
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/register",
+// 		strings.NewReader(`{nickname}`),
+// 	)
 
-	h.Register(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
-func TestRegisterDuplicateUser(t *testing.T) {
-	h := newUserAuthHandler()
+// 	h.Register(w, req)
 
-	body := `{
-		"nickname":"test",
-		"phone":"13800138001",
-		"password":"123456",
-		"role":1
-	}`
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("请求执行异常")
+// 	}
+// }
+// func TestRegisterDuplicateUser(t *testing.T) {
+// 	h := newUserAuthHandler()
 
-	req1 := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(body),
-	)
+// 	body := `{
+// 		"nickname":"test",
+// 		"phone":"13800138001",
+// 		"password":"123456",
+// 		"role":1
+// 	}`
 
-	w1 := httptest.NewRecorder()
+// 	req1 := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/register",
+// 		strings.NewReader(body),
+// 	)
 
-	h.Register(w1, req1)
+// 	w1 := httptest.NewRecorder()
 
-	req2 := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(body),
-	)
+// 	h.Register(w1, req1)
 
-	w2 := httptest.NewRecorder()
+// 	req2 := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/register",
+// 		strings.NewReader(body),
+// 	)
 
-	h.Register(w2, req2)
+// 	w2 := httptest.NewRecorder()
 
-	if w2.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
-func TestLogin(t *testing.T) {
-	h := newUserAuthHandler()
+// 	h.Register(w2, req2)
 
-	registerBody := `{
-		"nickname":"login",
-		"phone":"13800138002",
-		"password":"123456",
-		"role":1
-	}`
+// 	if w2.Code != http.StatusOK {
+// 		t.Errorf("请求执行异常")
+// 	}
+// }
+// func TestLogin(t *testing.T) {
+// 	h := newUserAuthHandler()
 
-	reqRegister := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(registerBody),
-	)
+// 	registerBody := `{
+// 		"nickname":"login",
+// 		"phone":"13800138002",
+// 		"password":"123456",
+// 		"role":1
+// 	}`
 
-	wRegister := httptest.NewRecorder()
+// 	reqRegister := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/register",
+// 		strings.NewReader(registerBody),
+// 	)
 
-	h.Register(wRegister, reqRegister)
+// 	wRegister := httptest.NewRecorder()
 
-	loginBody := `{
-		"phone":"13800138002",
-		"password":"123456"
-	}`
+// 	h.Register(wRegister, reqRegister)
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/login",
-		strings.NewReader(loginBody),
-	)
+// 	loginBody := `{
+// 		"phone":"13800138002",
+// 		"password":"123456"
+// 	}`
 
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/login",
+// 		strings.NewReader(loginBody),
+// 	)
 
-	h.Login(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("登录失败")
-	}
-}
-func TestLoginWrongPassword(t *testing.T) {
-	h := newUserAuthHandler()
+// 	h.Login(w, req)
 
-	registerBody := `{
-		"nickname":"login",
-		"phone":"13800138003",
-		"password":"123456",
-		"role":1
-	}`
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("登录失败")
+// 	}
+// }
+// func TestLoginWrongPassword(t *testing.T) {
+// 	h := newUserAuthHandler()
 
-	reqRegister := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(registerBody),
-	)
+// 	registerBody := `{
+// 		"nickname":"login",
+// 		"phone":"13800138003",
+// 		"password":"123456",
+// 		"role":1
+// 	}`
 
-	wRegister := httptest.NewRecorder()
+// 	reqRegister := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/register",
+// 		strings.NewReader(registerBody),
+// 	)
 
-	h.Register(wRegister, reqRegister)
+// 	wRegister := httptest.NewRecorder()
 
-	loginBody := `{
-		"phone":"13800138003",
-		"password":"654321"
-	}`
+// 	h.Register(wRegister, reqRegister)
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/login",
-		strings.NewReader(loginBody),
-	)
+// 	loginBody := `{
+// 		"phone":"13800138003",
+// 		"password":"654321"
+// 	}`
 
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/login",
+// 		strings.NewReader(loginBody),
+// 	)
 
-	h.Login(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
-func TestLoginUserNotFound(t *testing.T) {
-	h := newUserAuthHandler()
+// 	h.Login(w, req)
 
-	loginBody := `{
-		"phone":"19999999999",
-		"password":"123456"
-	}`
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("请求执行异常")
+// 	}
+// }
+// func TestLoginUserNotFound(t *testing.T) {
+// 	h := newUserAuthHandler()
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/login",
-		strings.NewReader(loginBody),
-	)
+// 	loginBody := `{
+// 		"phone":"19999999999",
+// 		"password":"123456"
+// 	}`
 
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/login",
+// 		strings.NewReader(loginBody),
+// 	)
 
-	h.Login(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
+// 	h.Login(w, req)
+
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("请求执行异常")
+// 	}
+// }

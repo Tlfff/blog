@@ -7,7 +7,7 @@ const (
 	CodeInvalidParameter    = 1001 // 参数校验失败
 	CodeUnauthorized        = 1002 //未登录/认证失败
 	CodeForbidden           = 1003 // 无权限
-	CodeDuplicateSubmission = 1004
+	CodeDuplicateSubmission = 1004 //重复提交
 	CodeInternalServerError = 5000 // 系统异常
 
 	//------------------------- 用户模块 ---------------------------------

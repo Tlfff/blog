@@ -2,35 +2,57 @@ package routes
 
 import (
 	"blog/internal/handler"
-	"blog/internal/middleware"
-	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
-func InitUserRoutes(mux *http.ServeMux, userHandler *handler.UserHandler, userAuthHandler *handler.UserAuthHandler) {
+// func InitUserRoutes(r *gin.Engine, userHandler *handler.UserHandler, userAuthHandler *handler.UserAuthHandler) {
 
-	// ----------------------- 公开接口 -----------------------
-	mux.HandleFunc("POST /user/register", userAuthHandler.Register)
-	mux.HandleFunc("POST /user/login", userAuthHandler.Login)
-	// ----------------------- 用户中心 -----------------------
+// 	// ----------------------- 公开接口 -----------------------
+// 	r.POST("/user/register", userAuthHandler.Register)
+// 	r.POST("/user/login", userAuthHandler.Login)
+// 	// ----------------------- 用户中心 -----------------------
 
-	mux.Handle(
-		"GET /user/profile",
-		wrap(userHandler.GetProfile, middleware.AuthMiddleware),
-	)
+// 	r.GET(
+// 		"/user/profile",
+// 		middleware.AuthMiddleware(),
+// 		userHandler.GetProfile,
+// 	)
 
-	mux.Handle(
-		"POST /user/profile/update",
-		wrap(userHandler.UpdateProfile, middleware.AuthMiddleware),
-	)
+// 	r.POST(
+// 		"/user/profile/update",
+// 		middleware.AuthMiddleware(),
+// 		userHandler.UpdateProfile,
+// 	)
 
-	mux.Handle(
-		"POST /user/account/update",
-		wrap(userHandler.UpdateAccount, middleware.AuthMiddleware),
-	)
+// 	r.POST(
+// 		"/user/account/update",
+// 		middleware.AuthMiddleware(),
+// 		userHandler.UpdateAccount,
+// 	)
 
-	mux.Handle(
-		"POST /user/logout",
-		wrap(userHandler.Logout, middleware.AuthMiddleware),
-	)
+// 	r.POST(
+// 		"/user/logout",
+// 		middleware.AuthMiddleware(),
+// 		userHandler.Logout,
+// 	)
 
+// }
+
+// 用户公开接口
+func InitUserPublicRoutes(r *gin.Engine, userAuthHandler *handler.UserAuthHandler) {
+	r.POST("/user/register", userAuthHandler.Register)
+	r.POST("/user/login", userAuthHandler.Login)
+}
+
+// 用户私密接口
+func InitUserPrivateRoutes(r *gin.RouterGroup, userHandler *handler.UserHandler) {
+	// 获取个人资料
+	r.GET("/user/profile", userHandler.GetProfile)
+	// 更新个人资料
+	r.POST("/user/profile/update", userHandler.UpdateProfile)
+	// 更新账户
+	r.POST("/user/account/update", userHandler.UpdateAccount)
+	// 退出登录
+	r.POST("/user/logout", userHandler.Logout)
 }

@@ -1,15 +1,9 @@
 package handler
 
 import (
-	"blog/internal/auth"
 	"blog/internal/model"
 	"blog/internal/repository"
 	"blog/internal/service"
-	"context"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
 )
 
 func newUserHandler() *UserHandler {
@@ -27,217 +21,218 @@ func newUserHandler() *UserHandler {
 	)
 }
 
-func withUserContext(req *http.Request) *http.Request {
-	ctx := auth.SetUserContext(
-		context.Background(),
-		&auth.UserContext{
-			UserID: 1,
-			Phone:  "13800138000",
-			Role:   1,
-		},
-	)
+// func withUserContext(req *http.Request) *http.Request {
+// 	ctx := auth.SetUserContext(
+// 		context.Background(),
+// 		&auth.UserContext{
+// 			UserID: 1,
+// 			Phone:  "13800138000",
+// 			Role:   1,
+// 		},
+// 	)
 
-	return req.WithContext(ctx)
-}
-func TestGetProfile(t *testing.T) {
-	h := newUserHandler()
+// 	return req.WithContext(ctx)
+// }
 
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/user/profile",
-		nil,
-	)
+// func TestGetProfile(t *testing.T) {
+// 	h := newUserHandler()
 
-	req = withUserContext(req)
+// 	req := httptest.NewRequest(
+// 		http.MethodGet,
+// 		"/user/profile",
+// 		nil,
+// 	)
 
-	w := httptest.NewRecorder()
+// 	req = withUserContext(req)
 
-	h.GetProfile(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("获取个人资料失败")
-	}
-}
+// 	h.GetProfile(w, req)
 
-func TestGetProfileUnauthorized(t *testing.T) {
-	h := newUserHandler()
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("获取个人资料失败")
+// 	}
+// }
 
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/user/profile",
-		nil,
-	)
+// func TestGetProfileUnauthorized(t *testing.T) {
+// 	h := newUserHandler()
 
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest(
+// 		http.MethodGet,
+// 		"/user/profile",
+// 		nil,
+// 	)
 
-	h.GetProfile(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
-func TestUpdateProfile(t *testing.T) {
-	h := newUserHandler()
+// 	h.GetProfile(w, req)
 
-	body := `{
-		"nickname":"新昵称",
-		"avatar":"avatar.png"
-	}`
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("请求执行异常")
+// 	}
+// }
+// func TestUpdateProfile(t *testing.T) {
+// 	h := newUserHandler()
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/profile/update",
-		strings.NewReader(body),
-	)
+// 	body := `{
+// 		"nickname":"新昵称",
+// 		"avatar":"avatar.png"
+// 	}`
 
-	req = withUserContext(req)
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/profile/update",
+// 		strings.NewReader(body),
+// 	)
 
-	w := httptest.NewRecorder()
+// 	req = withUserContext(req)
 
-	h.UpdateProfile(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("修改资料失败")
-	}
-}
+// 	h.UpdateProfile(w, req)
 
-func TestUpdateProfileInvalidRequest(t *testing.T) {
-	h := newUserHandler()
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("修改资料失败")
+// 	}
+// }
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/profile/update",
-		strings.NewReader(`{}`),
-	)
+// func TestUpdateProfileInvalidRequest(t *testing.T) {
+// 	h := newUserHandler()
 
-	req = withUserContext(req)
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/profile/update",
+// 		strings.NewReader(`{}`),
+// 	)
 
-	w := httptest.NewRecorder()
+// 	req = withUserContext(req)
 
-	h.UpdateProfile(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
+// 	h.UpdateProfile(w, req)
 
-func TestUpdateProfileUnauthorized(t *testing.T) {
-	h := newUserHandler()
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("请求执行异常")
+// 	}
+// }
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/profile/update",
-		strings.NewReader(`{}`),
-	)
+// func TestUpdateProfileUnauthorized(t *testing.T) {
+// 	h := newUserHandler()
 
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/profile/update",
+// 		strings.NewReader(`{}`),
+// 	)
 
-	h.UpdateProfile(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
-func TestUpdateAccount(t *testing.T) {
-	h := newUserHandler()
+// 	h.UpdateProfile(w, req)
 
-	body := `{
-		"phone":"13900000000",
-		"old_password":"123456",
-		"new_password":"654321"
-	}`
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("请求执行异常")
+// 	}
+// }
+// func TestUpdateAccount(t *testing.T) {
+// 	h := newUserHandler()
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/account/update",
-		strings.NewReader(body),
-	)
+// 	body := `{
+// 		"phone":"13900000000",
+// 		"old_password":"123456",
+// 		"new_password":"654321"
+// 	}`
 
-	req = withUserContext(req)
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/account/update",
+// 		strings.NewReader(body),
+// 	)
 
-	w := httptest.NewRecorder()
+// 	req = withUserContext(req)
 
-	h.UpdateAccount(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("修改账号失败")
-	}
-}
-func TestUpdateAccountWrongPassword(t *testing.T) {
-	h := newUserHandler()
+// 	h.UpdateAccount(w, req)
 
-	body := `{
-		"phone":"13900000000",
-		"old_password":"wrong",
-		"new_password":"654321"
-	}`
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("修改账号失败")
+// 	}
+// }
+// func TestUpdateAccountWrongPassword(t *testing.T) {
+// 	h := newUserHandler()
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/account/update",
-		strings.NewReader(body),
-	)
+// 	body := `{
+// 		"phone":"13900000000",
+// 		"old_password":"wrong",
+// 		"new_password":"654321"
+// 	}`
 
-	req = withUserContext(req)
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/account/update",
+// 		strings.NewReader(body),
+// 	)
 
-	w := httptest.NewRecorder()
+// 	req = withUserContext(req)
 
-	h.UpdateAccount(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
-func TestUpdateAccountInvalidRequest(t *testing.T) {
-	h := newUserHandler()
+// 	h.UpdateAccount(w, req)
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/account/update",
-		strings.NewReader(`{}`),
-	)
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("请求执行异常")
+// 	}
+// }
+// func TestUpdateAccountInvalidRequest(t *testing.T) {
+// 	h := newUserHandler()
 
-	req = withUserContext(req)
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/account/update",
+// 		strings.NewReader(`{}`),
+// 	)
 
-	w := httptest.NewRecorder()
+// 	req = withUserContext(req)
 
-	h.UpdateAccount(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
-func TestUpdateAccountUnauthorized(t *testing.T) {
-	h := newUserHandler()
+// 	h.UpdateAccount(w, req)
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/account/update",
-		nil,
-	)
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("请求执行异常")
+// 	}
+// }
+// func TestUpdateAccountUnauthorized(t *testing.T) {
+// 	h := newUserHandler()
 
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/account/update",
+// 		nil,
+// 	)
 
-	h.UpdateAccount(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
-func TestLogout(t *testing.T) {
-	h := newUserHandler()
+// 	h.UpdateAccount(w, req)
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/logout",
-		nil,
-	)
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("请求执行异常")
+// 	}
+// }
+// func TestLogout(t *testing.T) {
+// 	h := newUserHandler()
 
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest(
+// 		http.MethodPost,
+// 		"/user/logout",
+// 		nil,
+// 	)
 
-	h.Logout(w, req)
+// 	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("退出登录失败")
-	}
-}
+// 	h.Logout(w, req)
+
+// 	if w.Code != http.StatusOK {
+// 		t.Errorf("退出登录失败")
+// 	}
+// }

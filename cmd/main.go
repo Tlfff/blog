@@ -1,12 +1,12 @@
 package main
 
 import (
-	"net/http"
-
 	"blog/internal/handler"
 	"blog/internal/repository"
 	"blog/internal/routes"
 	"blog/internal/service"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -26,8 +26,10 @@ func main() {
 		Article:  articleHandler,
 	}
 
-	// 4. 传给总路由
-	mux := routes.InitRoute(appHandler)
-
-	http.ListenAndServe(":8080", mux)
+	// 4. 创建路由引擎
+	// mux := routes.InitRoute(appHandler)
+	// http.ListenAndServe(":8080", mux)
+	r := gin.New()
+	routes.InitRoute(r, appHandler)
+	r.Run(":8080")
 }
