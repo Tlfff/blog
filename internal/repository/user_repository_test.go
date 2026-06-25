@@ -26,7 +26,7 @@ func TestUserRepository_CreateUser(t *testing.T) {
 		t.Fatalf("创建用户失败: %v", err)
 	}
 
-	got, err := repo.GetUserByPhone("13800138000")
+	got, err := repo.GetUserByAccount("13800138000")
 	if err != nil {
 		t.Fatalf("查询用户失败: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestUserRepository_CreateUser(t *testing.T) {
 func TestUserRepository_GetUserByPhone_NotFound(t *testing.T) {
 	repo := NewUserRepository()
 
-	_, err := repo.GetUserByPhone("not-exist")
+	_, err := repo.GetUserByAccount("not-exist")
 	if err == nil {
 		t.Fatalf("期望用户不存在错误，但没有返回")
 	}
@@ -50,7 +50,7 @@ func TestUserRepository_GetUserByPhone_Disabled(t *testing.T) {
 
 	repo.CreateUser(newTestUser(1, "13800138000", 0)) // status=0 禁用
 
-	_, err := repo.GetUserByPhone("13800138000")
+	_, err := repo.GetUserByAccount("13800138000")
 	if err == nil {
 		t.Fatalf("期望禁用用户错误，但没有返回")
 	}
@@ -93,7 +93,7 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 		t.Fatalf("更新失败: %v", err)
 	}
 
-	user, _ := repo.GetUserByPhone("13800138000")
+	user, _ := repo.GetUserByAccount("13800138000")
 
 	if user.Nickname != "updated-name" {
 		t.Fatalf("更新未生效")

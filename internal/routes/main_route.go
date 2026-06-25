@@ -17,18 +17,24 @@ type AppHandler struct {
 func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 	// 1. 挂载全局错误中间件
 	r.Use(middleware.GlobalErrorMiddleware())
-
 	// 2.不需要登录的接口
+	publicGroup := r.Group("")
 	{
-		InitArticlePublicRoutes(r, appHandler.Article)
-		InitUserPublicRoutes(r, appHandler.UserAuth)
+		InitArticlePublicRoutes(publicGroup, appHandler.Article)
+		InitUserPublicRoutes(publicGroup, appHandler.UserAuth, appHandler.User)
 	}
 	// 3.需要登录的接口
-	authGroup := r.Group("")
-	authGroup.Use(middleware.AuthMiddleware())
+	privateGroup := r.Group("/my")
+	privateGroup.Use(middleware.AuthMiddleware())
+	{
+		InitUserPrivateRoutes(privateGroup, appHandler.User)
+	}
+	// 4.管理员管理的接口
+	authGroup := r.Group("/admin")
+	authGroup.Use(middleware.AuthMiddleware(), middleware.AdminCheckMiddleware())
 	{
 		InitArticlePrivateRoutes(authGroup, appHandler.Article)
-		InitUserPrivateRoutes(authGroup, appHandler.User)
+
 	}
 
 }

@@ -18,7 +18,7 @@ func NewUserHandler(user *service.UserService) *UserHandler {
 }
 
 // 获取个人资料
-func (h *UserHandler) GetProfile(c *gin.Context) {
+func (h *UserHandler) GetMyProfile(c *gin.Context) {
 	// 1. 从Gin 上下文获取用户信息
 	userCtx := c.MustGet("currentUser").(*auth.UserContext)
 
@@ -26,6 +26,24 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 	user, err := h.user.GetProfile(userCtx.UserID)
 	if err != nil {
 
+		c.Error(err)
+		return
+	}
+	common.OK(c, "获取成功", userDto.NewUserProfileResponse(user))
+}
+
+// 查看他人主页
+func (h *UserHandler) GetPublicProfile(c *gin.Context) {
+	// 1.获取用户ID
+	var req userDto.GetPublicProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(common.ErrUserNotFound)
+		return
+	}
+
+	// 2. 获取用户主页信息
+	user, err := h.user.GetProfile(req.UserId)
+	if err != nil {
 		c.Error(err)
 		return
 	}
@@ -57,25 +75,45 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 }
 
 // 修改账户信息（电话、密码）
-func (h *UserHandler) UpdateAccount(c *gin.Context) {
+func (h *UserHandler) UpdatePassword(c *gin.Context) {
 	// 1. 解析请求体并放进req
-	var req userDto.UpdateAccountRequest
+	var req userDto.UpdatePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-
 		c.Error(common.ErrInvalidRequestBody)
 		return
 	}
 	// 2. 从Gin 上下文获取用户信息
 	userCtx := c.MustGet("currentUser").(*auth.UserContext)
 
-	// 3. 更新资料
-	err := h.user.UpdateAccount(userCtx.UserID, req.Phone, req.OldPassword, req.NewPassword)
+	// 3. 更新密码
+	err := h.user.UpdatePassword(userCtx.UserID, req.OldPassword, req.NewPassword)
 	if err != nil {
 		c.Error(err)
 		return
 	}
 
-	common.OK(c, "账号信息修改成功", nil)
+	common.OK(c, "密码修改成功", nil)
+}
+
+// 修改账户信息（电话）
+func (h *UserHandler) UpdateAccount(c *gin.Context) {
+	// 1. 解析请求体并放进req
+	var req userDto.UpdateAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(common.ErrInvalidRequestBody)
+		return
+	}
+	// 2. 从Gin 上下文获取用户信息
+	userCtx := c.MustGet("currentUser").(*auth.UserContext)
+
+	// 3. 更新密码
+	err := h.user.UpdateAccount(userCtx.UserID, req.Phone)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+
+	common.OK(c, "电话修改成功", nil)
 }
 
 // 退出登录

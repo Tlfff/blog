@@ -38,6 +38,14 @@ func (a *ArticleRepository) DeleteArticle(acticleId int64, userId int64) error {
 	return nil
 }
 
+// 硬删除文章
+func (a *ArticleRepository) ClearArticle(acticleId int64, userId int64) error {
+	if a.articles[acticleId].AuthorID == userId {
+		delete(a.articles, acticleId)
+	}
+	return nil
+}
+
 // 根据id查找文章
 func (a *ArticleRepository) FindArticleByID(id int64) (*model.Article, error) {
 	for _, article := range a.articles {

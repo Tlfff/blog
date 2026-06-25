@@ -33,14 +33,16 @@ func (h *UserAuthHandler) Register(c *gin.Context) {
 
 	// 2. 创建新用户
 	user := &model.User{
-		ID:         0,
-		Nickname:   req.Nickname,
-		Phone:      req.Phone,
-		Avatar:     "https://example.com/default-avatar.png",
-		Role:       int8(model.RoleUser),
-		Status:     1,
-		AddTime:    time.Now(),
-		UpdateTime: time.Now(),
+		ID:            0,
+		Nickname:      req.Nickname,
+		Phone:         req.Phone,
+		Avatar:        "https://example.com/default-avatar.png",
+		Role:          int8(model.RoleUser),
+		Status:        1,
+		AddTime:       time.Now(),
+		UpdateTime:    time.Now(),
+		LastLoginIp:   c.ClientIP(),
+		LastLoginTime: time.Now(),
 	}
 	// 3. 调用服务层进行注册
 	err = h.userAuth.Register(user, req.Password)
@@ -60,14 +62,17 @@ func (h *UserAuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// 2. 验证用户登录
-	dbUser, err := h.userAuth.Login(req.Phone, req.Password)
+	// 2. 验证用户登录，更新登录状态
+	dbUser, err := h.userAuth.Login(req.Account, req.Password)
 	if err != nil {
-
 		c.Error(err)
 		return
 	}
-
+	err = h.userAuth.UpdateLoginInfo(dbUser.ID, c.ClientIP(), time.Now())
+	if err != nil {
+		c.Error(err)
+		return
+	}
 	// 3. 生成JWT令牌
 	token, err := auth.GenerateToken(dbUser.Phone, dbUser.Role, dbUser.ID)
 	if err != nil {

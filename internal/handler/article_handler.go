@@ -117,8 +117,7 @@ func (h *ArticleHandler) PublishArticle(c *gin.Context) {
 	common.OK(c, "文章发表成功", nil)
 }
 
-// 获取文章详情
-// 场景A（公开接口）：仅允许查看已发表的文章
+// 公开：获取文章详情
 func (h *ArticleHandler) GetArticleDetail(c *gin.Context) {
 	var req article.GetDetailRequest
 	// 1. 自动去 Query 拿 ?id=xxx，自动转成 int64，自动校验 min=1
@@ -138,11 +137,12 @@ func (h *ArticleHandler) GetArticleDetail(c *gin.Context) {
 		c.Error(common.ErrArticleNotFound)
 		return
 	}
-	res := arcticleDto.NewArticleDetailResponse(article)
+
+	res := arcticleDto.NewArticleDetailResponse(article, "林风")
 	common.OK(c, "查询成功", res)
 }
 
-// 场景 B（需要登录）：创作者看自己未发表的文章，如草稿
+// 管理者：查看文章详情
 func (h *ArticleHandler) GetArticleDetailForMe(c *gin.Context) {
 	var req article.GetDetailRequest
 	// 1. 自动去 Query 拿 ?id=xxx，自动转成 int64，自动校验 min=1
@@ -167,7 +167,7 @@ func (h *ArticleHandler) GetArticleDetailForMe(c *gin.Context) {
 		return
 	}
 
-	res := article.NewArticleDetailResponse(articleData)
+	res := article.NewArticleDetailResponse(articleData, "林风")
 	common.OK(c, "查询成功", res)
 }
 
@@ -189,18 +189,74 @@ func (h *ArticleHandler) GetPublishedList(c *gin.Context) {
 	common.OK(c, "获取发表列表成功", resList)
 }
 
-// 获取用户草稿文章列表
-func (h *ArticleHandler) GetDraftedList(c *gin.Context) {
-	// 1. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
+// 管理者：获取文章列表
+func (h *ArticleHandler) GetAdminList(c *gin.Context) {
+	var req article.GetAdminListRequest
+	// 1. 获取想要查看的文章状态
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.Error(common.ErrArticleStatusError)
+		return
+	}
+	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
 	user := c.MustGet("currentUser").(*auth.UserContext)
 
-	articleList, err := h.article.GetDraftedList(user.UserID)
+	articleList, err := h.article.GetList(user.UserID, req.Status)
 	if err != nil {
-
 		c.Error(err)
 		return
 	}
 
-	resList := arcticleDto.NewArticleListResponse(articleList)
-	common.OK(c, "获取草稿列表成功", resList)
+	resList := arcticleDto.NewAdminListResponse(articleList)
+	common.OK(c, "获取文章列表成功", resList)
+}
+
+// 管理者：获取垃圾箱列表，不需要传状态，因为固定为0
+func (h *ArticleHandler) GetTrashList(c *gin.Context) {
+	user := c.MustGet("currentUser").(*auth.UserContext)
+	// 2.获取已删除文章列表
+	articleList, err := h.article.GetList(user.UserID, model.Deleted)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	resList := arcticleDto.NewAdminListResponse(articleList)
+	common.OK(c, "获取垃圾箱列表成功", resList)
+}
+
+// 管理者：恢复垃圾箱中的文章
+func (h *ArticleHandler) RecoverArticle(c *gin.Context) {
+	var req article.RecoverArticleRequest
+
+	// 1. 获取文章id
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.Error(common.ErrArticleStatusError)
+		return
+	}
+	user := c.MustGet("currentUser").(*auth.UserContext)
+	// 2. 恢复文章
+	if err := h.article.RecoverArticle(req.ID, user.UserID); err != nil {
+		c.Error(err)
+		return
+	}
+
+	common.OK(c, "恢复文章成功", nil)
+}
+
+// 管理者：硬删除垃圾箱中的文章
+func (h *ArticleHandler) ClearArticle(c *gin.Context) {
+	var req article.RecoverArticleRequest
+
+	// 1. 获取文章id
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.Error(common.ErrArticleStatusError)
+		return
+	}
+	user := c.MustGet("currentUser").(*auth.UserContext)
+	// 2. 删除文章
+	if err := h.article.ClearArticle(req.ID, user.UserID); err != nil {
+		c.Error(err)
+		return
+	}
+
+	common.OK(c, "删除文章成功", nil)
 }

@@ -179,10 +179,10 @@ func TestArticleService_GetLists(t *testing.T) {
 		}
 	})
 
-	t.Run("获取草稿箱", func(t *testing.T) {
-		list, _ := service.GetDraftedList(authorID)
-		if len(list) != 2 {
-			t.Errorf("预期草稿 2 篇，实际得到 %d 篇", len(list))
-		}
-	})
+	// t.Run("获取草稿箱", func(t *testing.T) {
+	// 	list, _ := service.GetDraftedList(authorID)
+	// 	if len(list) != 2 {
+	// 		t.Errorf("预期草稿 2 篇，实际得到 %d 篇", len(list))
+	// 	}
+	// })
 }

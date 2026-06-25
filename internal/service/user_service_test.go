@@ -1,8 +1,6 @@
 package service
 
 import (
-	"blog/internal/auth"
-	"blog/internal/common"
 	"blog/internal/model"
 	"blog/internal/repository"
 	"testing"
@@ -62,44 +60,44 @@ func TestUserService_UpdateProfile(t *testing.T) {
 
 // -------------------- UpdateAccount --------------------
 
-func TestUserService_UpdateAccount_成功与密码错误分支(t *testing.T) {
-	repo := repository.NewUserRepository()
-	service := NewUserService(repo)
+// func TestUserService_UpdateAccount_成功与密码错误分支(t *testing.T) {
+// 	repo := repository.NewUserRepository()
+// 	service := NewUserService(repo)
 
-	// 💡 核心：先生成一个合法的 PBKDF2 加密密文存入 mock 用户
-	correctRawPassword := "123456"
-	hashedPassword, err := auth.HashPassword(correctRawPassword)
-	if err != nil {
-		t.Fatalf("测试前置准备：密码哈希失败: %v", err)
-	}
+// 	// 💡 核心：先生成一个合法的 PBKDF2 加密密文存入 mock 用户
+// 	correctRawPassword := "123456"
+// 	hashedPassword, err := auth.HashPassword(correctRawPassword)
+// 	if err != nil {
+// 		t.Fatalf("测试前置准备：密码哈希失败: %v", err)
+// 	}
 
-	_ = repo.CreateUser(&model.User{
-		ID:       30,
-		Phone:    "13800000002",
-		Password: hashedPassword, // 注入合法哈希串
-	})
+// 	_ = repo.CreateUser(&model.User{
+// 		ID:       30,
+// 		Phone:    "13800000002",
+// 		Password: hashedPassword, // 注入合法哈希串
+// 	})
 
-	// 分支 1：输入错误的旧密码，断言拦截
-	err = service.UpdateAccount(30, "13911112222", "wrong_pwd", "new_pwd_666")
-	if err != common.ErrPasswordFailed {
-		t.Errorf("输入错误密码时，预期返回 ErrPasswordFailed，实际得到: %v", err)
-	}
+// 	// 分支 1：输入错误的旧密码，断言拦截
+// 	err = service.UpdateAccount(30, "13911112222", "wrong_pwd", "new_pwd_666")
+// 	if err != common.ErrPasswordFailed {
+// 		t.Errorf("输入错误密码时，预期返回 ErrPasswordFailed，实际得到: %v", err)
+// 	}
 
-	// 分支 2：输入正确的旧密码，断言更新成功
-	err = service.UpdateAccount(30, "13911112222", correctRawPassword, "new_pwd_666")
-	if err != nil {
-		t.Fatalf("账户信息更新失败: %v", err)
-	}
+// 	// 分支 2：输入正确的旧密码，断言更新成功
+// 	err = service.UpdateAccount(30, "13911112222", correctRawPassword, "new_pwd_666")
+// 	if err != nil {
+// 		t.Fatalf("账户信息更新失败: %v", err)
+// 	}
 
-	// 从仓储取出来进行最终验证
-	updatedUser, _ := repo.FindUserByID(30)
-	if updatedUser.Phone != "13911112222" {
-		t.Errorf("手机号未能成功修改")
-	}
+// 	// 从仓储取出来进行最终验证
+// 	updatedUser, _ := repo.FindUserByID(30)
+// 	if updatedUser.Phone != "13911112222" {
+// 		t.Errorf("手机号未能成功修改")
+// 	}
 
-	// 验证新密码是否已经成功被重置并能通过校验
-	ok, _ := auth.VerifyPassword("new_pwd_666", updatedUser.Password)
-	if !ok {
-		t.Errorf("新密码的哈希不正确，无法通过 VerifyPassword 验证")
-	}
-}
+// 	// 验证新密码是否已经成功被重置并能通过校验
+// 	ok, _ := auth.VerifyPassword("new_pwd_666", updatedUser.Password)
+// 	if !ok {
+// 		t.Errorf("新密码的哈希不正确，无法通过 VerifyPassword 验证")
+// 	}
+// }

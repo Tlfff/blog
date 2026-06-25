@@ -38,9 +38,14 @@ func (s *ArticleService) UpdateArticle(article *model.Article) error {
 	return s.repo.UpdateArticle(article)
 }
 
-// 删除文章
+// 软删除文章
 func (s *ArticleService) DeleteArticle(articleId int64, userId int64) error {
 	return s.repo.DeleteArticle(articleId, userId)
+}
+
+// 硬删除文章
+func (s *ArticleService) ClearArticle(articleId int64, userId int64) error {
+	return s.repo.ClearArticle(articleId, userId)
 }
 
 // 查看文章详情
@@ -73,12 +78,24 @@ func (s *ArticleService) PublishArticle(articleId int64, userId int64) error {
 	return s.repo.UpdateArticle(article)
 }
 
-// 获取已发表文章列表
-func (s *ArticleService) GetPublishedList(AuthorID int64) ([]*model.Article, error) {
-	return s.repo.GetListByStatus(AuthorID, model.Published)
+// 恢复文章
+func (s *ArticleService) RecoverArticle(articleId int64, userId int64) error {
+	article, err := s.repo.FindArticleByID(articleId)
+	if err != nil {
+		return err
+	}
+	article.Status = model.Draft
+	article.AuthorID = userId
+	article.UpdateTime = time.Now()
+	return s.repo.UpdateArticle(article)
 }
 
-// 获取用户草稿文章列表
-func (s *ArticleService) GetDraftedList(AuthorID int64) ([]*model.Article, error) {
-	return s.repo.GetListByStatus(AuthorID, model.Draft)
+// 获取已发表文章列表
+func (s *ArticleService) GetPublishedList(authorID int64) ([]*model.Article, error) {
+	return s.repo.GetListByStatus(authorID, model.Published)
+}
+
+// 管理者：获取文章列表
+func (s *ArticleService) GetList(authorID int64, status int8) ([]*model.Article, error) {
+	return s.repo.GetListByStatus(authorID, status)
 }
