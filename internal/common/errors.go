@@ -14,6 +14,7 @@ var (
 	ErrInvalidAuthorizationHeader = errors.New("Authorization格式错误")
 	ErrTokenEmpty                 = errors.New("Token不能为空")
 	ErrDuplicateSubmission        = errors.New("请勿重复提交请求")
+	ErrForbidden                  = errors.New("权限不足")
 
 	//------------------------- 注册登录模块 ---------------------------------
 	ErrRegisterInputEmpty = errors.New("手机号、密码、昵称不能为空")
@@ -54,6 +55,8 @@ func GetCodeByError(err error) int {
 		return CodeUnauthorized
 	case ErrDuplicateSubmission:
 		return CodeDuplicateSubmission
+	case ErrForbidden:
+		return CodeForbidden
 
 	// 参数错误
 	case ErrRegisterInputEmpty,

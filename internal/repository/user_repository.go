@@ -24,11 +24,11 @@ func (m *UserRepository) CreateUser(user *model.User) error {
 	return nil
 }
 
-// 根据手机号获取用户信息
-func (m *UserRepository) GetUserByPhone(phone string) (*model.User, error) {
-	user, ok := m.users[phone]
+// 根据账户获取用户信息
+func (m *UserRepository) GetUserByAccount(account string) (*model.User, error) {
+	user, ok := m.users[account]
 	if !ok || user.Status != 1 {
-		log.Printf("用户%s不存在或已被禁用", phone)
+		log.Printf("用户%s不存在或已被禁用", account)
 		return nil, errors.New(common.ErrUserNotFound.Error())
 	}
 	return user, nil

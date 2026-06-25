@@ -76,9 +76,12 @@ type GetPublishListRequest struct {
 	AuthorID int64 `form:"author_id" binding:"required,min=1"`
 }
 
-// func (r *GetPublishListRequest) Validate() error {
-// 	if r.AuthorID <= 0 {
-// 		return common.ErrUserExists // 建议未来将该错误定义改为更精准的 ErrUserIDInvalid
-// 	}
-// 	return nil
-// }
+// 管理者：获取文章列表
+type GetAdminListRequest struct {
+	Status int8 `form:"status" binding:"required,min=1"`
+}
+
+// 获取文章详情
+type RecoverArticleRequest struct {
+	ID int64 `form:"id" binding:"required,min=1"` // form:"id" 告诉 Gin 去 URL 参数中找 ?id=xxx
+}

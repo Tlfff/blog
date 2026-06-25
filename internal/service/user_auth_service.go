@@ -7,6 +7,7 @@ import (
 	"blog/internal/repository"
 	"errors"
 	"log"
+	"time"
 )
 
 type UserAuthService struct {
@@ -25,7 +26,7 @@ func (s *UserAuthService) Register(user *model.User, password string) error {
 		log.Printf("密码哈希失败: %v", err)
 		return errors.New(common.ErrPasswordHashFailed.Error())
 	}
-	_, err = s.repo.GetUserByPhone(user.Phone)
+	_, err = s.repo.GetUserByAccount(user.Phone)
 	if err == nil {
 		log.Println("用户已存在")
 		return errors.New(common.ErrUserExists.Error())
@@ -36,9 +37,9 @@ func (s *UserAuthService) Register(user *model.User, password string) error {
 }
 
 // 登录验证
-func (s *UserAuthService) Login(Phone, Password string) (*model.User, error) {
-	log.Printf("Attempting login for phone: %s\n", Phone)
-	user, err := s.repo.GetUserByPhone(Phone)
+func (s *UserAuthService) Login(Account, Password string) (*model.User, error) {
+	log.Printf("Attempting login for phone: %s\n", Account)
+	user, err := s.repo.GetUserByAccount(Account)
 	if err != nil {
 		return nil, err
 	}
@@ -52,8 +53,22 @@ func (s *UserAuthService) Login(Phone, Password string) (*model.User, error) {
 		return nil, errors.New(common.ErrPasswordFailed.Error())
 	}
 	if user.Status != 1 {
-		log.Printf("用户%s不存在或已被禁用", Phone)
+		log.Printf("用户%s不存在或已被禁用", Account)
 		return nil, errors.New(common.ErrUserNotFound.Error())
 	}
 	return user, nil
+}
+
+// 更新用户登录信息
+func (s *UserAuthService) UpdateLoginInfo(userID int64, ip string, loginTime time.Time) error {
+
+	user, err := s.repo.FindUserByID(userID)
+	if err != nil {
+		return err
+	}
+
+	user.LastLoginIp = ip
+	user.LastLoginTime = loginTime
+
+	return s.repo.UpdateUser(user)
 }

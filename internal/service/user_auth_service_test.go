@@ -29,7 +29,7 @@ func TestUserAuthServiceRegister(t *testing.T) {
 		log.Printf("注册重复用户失败: %v", err)
 	}
 	// 3.校验手机号、用户名
-	savedUser, err := repo.GetUserByPhone("1234567890")
+	savedUser, err := repo.GetUserByAccount("1234567890")
 	if err != nil {
 		log.Printf("获取用户失败: %v", err)
 	}

@@ -36,8 +36,8 @@ func (s *UserService) UpdateProfile(userID int64, nickname string, avatar string
 	return s.repo.UpdateUser(user)
 }
 
-// 更新用户账户
-func (s *UserService) UpdateAccount(userID int64, phone string, oldPassword string, newPassword string) error {
+// 更新用户密码
+func (s *UserService) UpdatePassword(userID int64, oldPassword string, newPassword string) error {
 
 	user, err := s.repo.FindUserByID(userID)
 	if err != nil {
@@ -62,8 +62,21 @@ func (s *UserService) UpdateAccount(userID int64, phone string, oldPassword stri
 		return err
 	}
 
-	user.Phone = phone
 	user.Password = hash
+	user.UpdateTime = time.Now()
+
+	return s.repo.UpdateUser(user)
+}
+
+// 更新用户账户
+func (s *UserService) UpdateAccount(userID int64, phone string) error {
+
+	user, err := s.repo.FindUserByID(userID)
+	if err != nil {
+		return err
+	}
+
+	user.Phone = phone
 	user.UpdateTime = time.Now()
 
 	return s.repo.UpdateUser(user)
