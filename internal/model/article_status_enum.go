@@ -5,10 +5,10 @@ import "errors"
 type Status int8
 
 const (
-	Deleted   = 0 // 已删除
-	All       = 1 //全部，除已删除的
-	Draft     = 2 // 草稿
-	Published = 3 // 已发表
+	All       = 0  //全部，除已删除的
+	Draft     = 1  // 草稿
+	Published = 2  // 已发表
+	Deleted   = 99 // 已删除
 )
 
 // 实现fmt 包里的fmt.Stringer 接口，这样调用fmt的打印函数时会自动输出成对应的文字

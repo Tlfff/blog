@@ -33,7 +33,7 @@ func (a *ArticleRepository) UpdateArticle(acticle *model.Article) error {
 // 删除文章
 func (a *ArticleRepository) DeleteArticle(acticleId int64, userId int64) error {
 	if a.articles[acticleId].AuthorID == userId {
-		a.articles[acticleId].Status = 0
+		a.articles[acticleId].Status = model.Deleted
 	}
 	return nil
 }

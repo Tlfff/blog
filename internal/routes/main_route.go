@@ -34,7 +34,6 @@ func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 	authGroup.Use(middleware.AuthMiddleware(), middleware.AdminCheckMiddleware())
 	{
 		InitArticlePrivateRoutes(authGroup, appHandler.Article)
-
 	}
 
 }

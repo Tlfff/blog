@@ -29,14 +29,14 @@ func (h *UserHandler) GetMyProfile(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	common.OK(c, "获取成功", userDto.NewUserProfileResponse(user))
+	common.OK(c, "获取成功", userDto.NewMyProfileResponse(user))
 }
 
 // 查看他人主页
 func (h *UserHandler) GetPublicProfile(c *gin.Context) {
 	// 1.获取用户ID
 	var req userDto.GetPublicProfileRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindQuery(&req); err != nil {
 		c.Error(common.ErrUserNotFound)
 		return
 	}
@@ -74,7 +74,7 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	common.OK(c, "个人资料修改成功", nil)
 }
 
-// 修改账户信息（电话、密码）
+// 修改密码
 func (h *UserHandler) UpdatePassword(c *gin.Context) {
 	// 1. 解析请求体并放进req
 	var req userDto.UpdatePasswordRequest

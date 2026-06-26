@@ -7,6 +7,7 @@ import (
 	arcticleDto "blog/internal/dto/article"
 	"blog/internal/model"
 	"blog/internal/service"
+	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -31,8 +32,9 @@ func (h *ArticleHandler) CreateArticle(c *gin.Context) {
 
 	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
 	user := c.MustGet("currentUser").(*auth.UserContext)
-
+	log.Println("req =", req)
 	article := &model.Article{
+		ID:         req.ID,
 		Title:      req.Title,
 		Content:    req.Content,
 		Tags:       req.Tags,
@@ -41,7 +43,7 @@ func (h *ArticleHandler) CreateArticle(c *gin.Context) {
 		AddTime:    time.Now(),
 		UpdateTime: time.Now(),
 	}
-
+	log.Println("article =", article)
 	if err := h.article.CreateArticle(article); err != nil {
 		c.Error(err)
 		return
@@ -79,7 +81,7 @@ func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 	common.OK(c, "文章更新成功", nil)
 }
 
-// 删除文章
+// 删除文章(移去垃圾箱)
 func (h *ArticleHandler) DeleteArticle(c *gin.Context) {
 	var req arcticleDto.DeleteArticleRequest
 	// 1. 解析请求体并放进req
@@ -228,7 +230,7 @@ func (h *ArticleHandler) RecoverArticle(c *gin.Context) {
 	var req article.RecoverArticleRequest
 
 	// 1. 获取文章id
-	if err := c.ShouldBindQuery(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.Error(common.ErrArticleStatusError)
 		return
 	}
@@ -247,7 +249,7 @@ func (h *ArticleHandler) ClearArticle(c *gin.Context) {
 	var req article.RecoverArticleRequest
 
 	// 1. 获取文章id
-	if err := c.ShouldBindQuery(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.Error(common.ErrArticleStatusError)
 		return
 	}
