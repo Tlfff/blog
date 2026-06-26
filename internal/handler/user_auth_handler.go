@@ -25,19 +25,21 @@ func NewUserAuthHandler(userAuth *service.UserAuthService) *UserAuthHandler {
 func (h *UserAuthHandler) Register(c *gin.Context) {
 	var req user.RegisterRequest
 	// 1. 解析请求体并放进req
-	err := c.ShouldBind(&req)
-	if err := c.ShouldBindJSON(&req); err != nil {
+	err := c.ShouldBindJSON(&req)
+	if err != nil {
+		// fmt.Println(err)
 		c.Error(common.ErrInvalidRequestBody)
 		return
 	}
 
 	// 2. 创建新用户
 	user := &model.User{
-		ID:            0,
+		ID:            1,
 		Nickname:      req.Nickname,
 		Phone:         req.Phone,
+		Password:      req.Password,
 		Avatar:        "https://example.com/default-avatar.png",
-		Role:          int8(model.RoleUser),
+		Role:          int8(model.RoleAdmin),
 		Status:        1,
 		AddTime:       time.Now(),
 		UpdateTime:    time.Now(),

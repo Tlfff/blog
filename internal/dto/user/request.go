@@ -32,5 +32,5 @@ type UpdateAccountRequest struct {
 
 // 查看他人主页
 type GetPublicProfileRequest struct {
-	UserId int64 `json:"user_id" binding:"required"`
+	UserId int64 `form:"user_id" binding:"required"`
 }
