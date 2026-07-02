@@ -9,11 +9,12 @@ import (
 )
 
 func InitArticlePublicRoutes(r *gin.RouterGroup, articleHandler *handler.ArticleHandler) {
-	// 获取已发表文章详情
-	r.GET("/article/detail", articleHandler.GetArticleDetail)
-
 	// 获取已发表文章列表
 	r.GET("/article/list", articleHandler.GetPublishedList)
+}
+func InitArticleOptionalRoutes(r *gin.RouterGroup, articleHandler *handler.ArticleHandler) {
+	// 获取已发表文章详情
+	r.GET("/article/detail", articleHandler.GetArticleDetail)
 }
 func InitArticlePrivateRoutes(r *gin.RouterGroup, articleHandler *handler.ArticleHandler) {
 	//  创建文章,需要防重复

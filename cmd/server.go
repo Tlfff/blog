@@ -45,12 +45,16 @@ var serverCmd = &cobra.Command{
 		userAuthHandler := handler.NewUserAuthHandler(userAuthService)
 		userHandler := handler.NewUserHandler(userService)
 
-		// 4. 初始化文章模块
+		// 4. 初始化文章浏览历史模块
+		historyRepo := repository.NewArticleViewHistoryRepository(db)
+		historyService := service.NewArticleViewHistoryService(historyRepo)
+
+		// 5. 初始化文章模块
 		articleRepo := repository.NewArticleRepository(db)
-		articleService := service.NewArticleService(articleRepo)
+		articleService := service.NewArticleService(articleRepo, historyService)
 		articleHandler := handler.NewArticleHandler(articleService)
 
-		// 5. 组装成统一的路由容器
+		// 6. 组装成统一的路由容器
 		appHandler := &routes.AppHandler{
 			UserAuth: userAuthHandler,
 			User:     userHandler,
