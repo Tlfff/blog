@@ -1,13 +1,8 @@
 package handler
 
 import (
-	"time"
-
-	"blog/internal/auth"
 	"blog/internal/common"
 	"blog/internal/dto/user"
-	userDto "blog/internal/dto/user"
-	"blog/internal/model"
 	"blog/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -24,67 +19,46 @@ func NewUserAuthHandler(userAuth *service.UserAuthService) *UserAuthHandler {
 // Register 处理用户注册请求
 func (h *UserAuthHandler) Register(c *gin.Context) {
 	var req user.RegisterRequest
-	// 1. 解析请求体并放进req
-	err := c.ShouldBindJSON(&req)
-	if err != nil {
-		// fmt.Println(err)
+	// 1. 解析前端传来的 JSON 请求体
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.Error(common.ErrInvalidRequestBody)
 		return
 	}
 
-	// 2. 创建新用户
-	user := &model.User{
-		ID:            1,
-		Nickname:      req.Nickname,
-		Phone:         req.Phone,
-		Password:      req.Password,
-		Avatar:        "https://example.com/default-avatar.png",
-		Role:          int8(model.RoleAdmin),
-		Status:        1,
-		AddTime:       time.Now(),
-		UpdateTime:    time.Now(),
-		LastLoginIp:   c.ClientIP(),
-		LastLoginTime: time.Now(),
-	}
-	// 3. 调用服务层进行注册
-	err = h.userAuth.Register(user, req.Password)
+	// 2. 调用服务层进行注册
+	err := h.userAuth.Register(
+		req.Phone,
+		req.Password,
+		req.Nickname,
+		c.ClientIP(),
+	)
 	if err != nil {
-		c.Error(err)
+		c.Error(err) // 错误直接交给 Gin 的错误处理中间件
 		return
 	}
+
+	// 3. 返回成功响应
 	common.OK(c, "注册成功", nil)
 }
 
 // Login 处理用户登录请求
 func (h *UserAuthHandler) Login(c *gin.Context) {
 	var req user.LoginRequest
-	// 1. 解析请求体并放进req
+
+	// 1. 解析 JSON 请求体
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.Error(common.ErrInvalidRequestBody)
 		return
 	}
 
-	// 2. 验证用户登录，更新登录状态
-	dbUser, err := h.userAuth.Login(req.Account, req.Password)
+	// 2. 调用登录
+	res, err := h.userAuth.Login(req.Account, req.Password, c.ClientIP())
 	if err != nil {
 		c.Error(err)
 		return
 	}
-	err = h.userAuth.UpdateLoginInfo(dbUser.ID, c.ClientIP(), time.Now())
-	if err != nil {
-		c.Error(err)
-		return
-	}
-	// 3. 生成JWT令牌
-	token, err := auth.GenerateToken(dbUser.Phone, dbUser.Role, dbUser.ID)
-	if err != nil {
-		c.Error(common.ErrSystem)
-		return
-	}
-	// 4. 封装返回体
-	res := userDto.LoginResponse{
-		AccessToken: token,
-	}
+
+	// 3. 将 Service 已经封装好的包含 Token 的 res 完美吐给前端
 	common.OK(c, "登录成功", res)
 
 }

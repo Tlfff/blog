@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"blog/config"
 	"blog/internal/handler"
 	"blog/internal/repository"
 	"blog/internal/routes"
 	"blog/internal/service"
+	"blog/pkg/database"
 	"fmt"
 
 	"github.com/gin-gonic/gin"
@@ -18,26 +20,44 @@ var serverCmd = &cobra.Command{
 	// Long:  `blog server --port 9000`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("博客系统后端服务正在启动,监听窗口：%s...\n", port)
-		// 1. 初始化用户模块
-		userRepo := repository.NewUserRepository()
+		// 1. 加载配置文件
+		config, err := config.LoadConfig("config/config.yaml")
+		if err != nil {
+			fmt.Printf("加载配置文件失败：%v\n", err)
+			return
+		}
+		// 2. 初始化数据库连接
+		db, err := database.NewMySQLClient(config.Database.Username, config.Database.Password, config.Database.Host, config.Database.Port, config.Database.DBName)
+		if err != nil {
+			fmt.Printf("[error]:数据库连接初始化失败：%v\n", err)
+			return // 🚨 极其重要：连接失败必须立刻拦截并退出，不能往下传 nil！
+		}
+
+		// 3. 安全防御打印（上线后可删，现在帮你排查）
+		if db == nil {
+			fmt.Println("[error]: NewMySQLClient 返回的 db 对象居然是空的，请检查 pkg/database 里的内部实现！")
+			return
+		}
+		// 3. 初始化用户模块
+		userRepo := repository.NewUserRepository(db)
 		userAuthService := service.NewUserAuthService(userRepo)
 		userService := service.NewUserService(userRepo)
 		userAuthHandler := handler.NewUserAuthHandler(userAuthService)
 		userHandler := handler.NewUserHandler(userService)
 
-		// 2. 初始化文章模块
-		articleRepo := repository.NewArticleRepository()
+		// 4. 初始化文章模块
+		articleRepo := repository.NewArticleRepository(db)
 		articleService := service.NewArticleService(articleRepo)
 		articleHandler := handler.NewArticleHandler(articleService)
 
-		// 3. 组装成统一的路由容器
+		// 5. 组装成统一的路由容器
 		appHandler := &routes.AppHandler{
 			UserAuth: userAuthHandler,
 			User:     userHandler,
 			Article:  articleHandler,
 		}
 
-		// 4. 创建路由引擎
+		// 6. 创建路由引擎
 		r := gin.New()
 		routes.InitRoute(r, appHandler)
 

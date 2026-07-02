@@ -12,11 +12,12 @@ const (
 
 	//------------------------- 用户模块 ---------------------------------
 
-	CodeUserExists       = 1100 // 用户已存在
-	CodeUserNotFound     = 1101 // 用户不存在
-	CodePasswordFailed   = 1102 // 密码错误
-	CodeUserDisabled     = 1103 // 用户被禁用
-	CodeNickNameNotFound = 1104 //昵称缺失
+	CodeUserExists         = 1100 // 用户已存在
+	CodeUserNotFound       = 1101 // 用户不存在
+	CodePasswordFailed     = 1102 // 密码错误
+	CodeUserDisabled       = 1103 // 用户被禁用
+	CodeNickNameNotFound   = 1104 //昵称缺失
+	CodePhoneAlreadyExists = 1105 //手机号已被注册
 	//------------------------- JWT模块 ---------------------------------
 
 	CodeTokenInvalid = 1200 // Token无效

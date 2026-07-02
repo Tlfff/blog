@@ -7,8 +7,6 @@ import (
 	arcticleDto "blog/internal/dto/article"
 	"blog/internal/model"
 	"blog/internal/service"
-	"log"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,19 +30,15 @@ func (h *ArticleHandler) CreateArticle(c *gin.Context) {
 
 	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
 	user := c.MustGet("currentUser").(*auth.UserContext)
-	log.Println("req =", req)
-	article := &model.Article{
-		ID:         req.ID,
-		Title:      req.Title,
-		Content:    req.Content,
-		Tags:       req.Tags,
-		Status:     req.Status,
-		AuthorID:   user.UserID,
-		AddTime:    time.Now(),
-		UpdateTime: time.Now(),
-	}
-	log.Println("article =", article)
-	if err := h.article.CreateArticle(article); err != nil {
+	// 3. 调用service创建文章
+	err := h.article.CreateArticle(
+		uint64(user.UserID),
+		req.Title,
+		req.Content,
+		req.Tags,
+		req.Status,
+	)
+	if err != nil {
 		c.Error(err)
 		return
 	}
@@ -62,18 +56,16 @@ func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
 	user := c.MustGet("currentUser").(*auth.UserContext)
 
-	article := &model.Article{
-		ID:         req.ID,
-		Title:      req.Title,
-		Content:    req.Content,
-		Tags:       req.Tags,
-		Status:     req.Status,
-		AuthorID:   user.UserID,
-		AddTime:    time.Now(),
-		UpdateTime: time.Now(),
-	}
+	err := h.article.UpdateArticle(
+		req.ID,
+		uint64(user.UserID),
+		req.Title,
+		req.Content,
+		req.Tags,
+		req.Status,
+	)
 
-	if err := h.article.UpdateArticle(article); err != nil {
+	if err != nil {
 		c.Error(err)
 		return
 	}
@@ -92,7 +84,7 @@ func (h *ArticleHandler) DeleteArticle(c *gin.Context) {
 	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
 	user := c.MustGet("currentUser").(*auth.UserContext)
 
-	if err := h.article.DeleteArticle(req.ID, user.UserID); err != nil {
+	if err := h.article.DeleteArticle(req.ID, uint64(user.UserID)); err != nil {
 		c.Error(err)
 		return
 	}
@@ -112,14 +104,14 @@ func (h *ArticleHandler) PublishArticle(c *gin.Context) {
 	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
 	user := c.MustGet("currentUser").(*auth.UserContext)
 
-	if err := h.article.PublishArticle(req.ID, user.UserID); err != nil {
+	if err := h.article.PublishArticle(req.ID, uint64(user.UserID)); err != nil {
 		c.Error(err)
 		return
 	}
 	common.OK(c, "文章发表成功", nil)
 }
 
-// 公开：获取文章详情
+// 公开：查看文章详情
 func (h *ArticleHandler) GetArticleDetail(c *gin.Context) {
 	var req article.GetDetailRequest
 	// 1. 自动去 Query 拿 ?id=xxx，自动转成 int64，自动校验 min=1
@@ -129,18 +121,11 @@ func (h *ArticleHandler) GetArticleDetail(c *gin.Context) {
 	}
 
 	// 2. 获取详情
-	article, err := h.article.GetArticle(req.ID)
+	res, err := h.article.GetPublishedArticle(req.ID)
 	if err != nil {
 		c.Error(err)
 		return
 	}
-	// 3. 只能看见已发表的文章
-	if article.Status != model.Published {
-		c.Error(common.ErrArticleNotFound)
-		return
-	}
-
-	res := arcticleDto.NewArticleDetailResponse(article, "林风")
 	common.OK(c, "查询成功", res)
 }
 
@@ -153,23 +138,12 @@ func (h *ArticleHandler) GetArticleDetailForMe(c *gin.Context) {
 		return
 	}
 
-	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
-	userCtx := c.MustGet("currentUser").(*auth.UserContext)
-
-	// 4. 获取详情
-	articleData, err := h.article.GetArticle(req.ID)
+	// 2. 获取详情
+	res, err := h.article.GetArticle(req.ID)
 	if err != nil {
 		c.Error(err)
 		return
 	}
-
-	// 5. 判断自己是否是作者
-	if articleData.AuthorID != userCtx.UserID {
-		c.Error(common.ErrArticlePermissionDenied)
-		return
-	}
-
-	res := article.NewArticleDetailResponse(articleData, "林风")
 	common.OK(c, "查询成功", res)
 }
 
@@ -182,12 +156,11 @@ func (h *ArticleHandler) GetPublishedList(c *gin.Context) {
 		return
 	}
 
-	articleList, err := h.article.GetPublishedList(req.AuthorID)
+	resList, err := h.article.GetPublishedList(req.AuthorID)
 	if err != nil {
 		c.Error(err)
 		return
 	}
-	resList := arcticleDto.NewArticleListResponse(articleList)
 	common.OK(c, "获取发表列表成功", resList)
 }
 
@@ -202,13 +175,11 @@ func (h *ArticleHandler) GetAdminList(c *gin.Context) {
 	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
 	user := c.MustGet("currentUser").(*auth.UserContext)
 
-	articleList, err := h.article.GetList(user.UserID, req.Status)
+	resList, err := h.article.GetAdminList(uint64(user.UserID), req.Status)
 	if err != nil {
 		c.Error(err)
 		return
 	}
-
-	resList := arcticleDto.NewAdminListResponse(articleList)
 	common.OK(c, "获取文章列表成功", resList)
 }
 
@@ -216,12 +187,11 @@ func (h *ArticleHandler) GetAdminList(c *gin.Context) {
 func (h *ArticleHandler) GetTrashList(c *gin.Context) {
 	user := c.MustGet("currentUser").(*auth.UserContext)
 	// 2.获取已删除文章列表
-	articleList, err := h.article.GetList(user.UserID, model.Deleted)
+	resList, err := h.article.GetAdminList(uint64(user.UserID), model.Deleted)
 	if err != nil {
 		c.Error(err)
 		return
 	}
-	resList := arcticleDto.NewAdminListResponse(articleList)
 	common.OK(c, "获取垃圾箱列表成功", resList)
 }
 
@@ -236,7 +206,7 @@ func (h *ArticleHandler) RecoverArticle(c *gin.Context) {
 	}
 	user := c.MustGet("currentUser").(*auth.UserContext)
 	// 2. 恢复文章
-	if err := h.article.RecoverArticle(req.ID, user.UserID); err != nil {
+	if err := h.article.RecoverArticle(req.ID, uint64(user.UserID)); err != nil {
 		c.Error(err)
 		return
 	}
@@ -255,7 +225,7 @@ func (h *ArticleHandler) ClearArticle(c *gin.Context) {
 	}
 	user := c.MustGet("currentUser").(*auth.UserContext)
 	// 2. 删除文章
-	if err := h.article.ClearArticle(req.ID, user.UserID); err != nil {
+	if err := h.article.ClearArticle(req.ID, uint64(user.UserID)); err != nil {
 		c.Error(err)
 		return
 	}

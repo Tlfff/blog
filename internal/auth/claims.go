@@ -2,7 +2,7 @@ package auth
 
 // 存储JWT的Payload部分的结构体
 type Claims struct {
-	UserID int64  `json:"user_id"`
+	UserID uint64 `json:"user_id"`
 	Phone  string `json:"phone"`
 	Role   int8   `json:"role"`
 

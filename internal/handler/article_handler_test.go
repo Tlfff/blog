@@ -11,15 +11,26 @@ import (
 	"blog/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestArticleHandler_AllRoutes(t *testing.T) {
-	// 1. 🟢 组装真实的内存链路
-	articleRepo := repository.NewArticleRepository()
+	// 1. 核心修复：创建一个临时的纯内存 SQLite 数据库，用来给测试代码发泄数据
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("无法启动内存测试数据库: %v", err)
+	}
+
+	// 2.  自动迁移：让 GORM 默默在内存里把 users 表建出来
+	_ = db.AutoMigrate(&model.User{})
+
+	// 3.  完美对齐升级后的构造函数
+	articleRepo := repository.NewArticleRepository(db)
 	articleService := service.NewArticleService(articleRepo)
 	h := NewArticleHandler(articleService)
 
-	// 2. 🎯 大表格：覆盖增、删、改、查、发布、垃圾箱等所有 if 分支
+	// 4. 🎯 大表格：覆盖增、删、改、查、发布、垃圾箱等所有 if 分支
 	tests := []struct {
 		name           string
 		run            func(c *gin.Context)

@@ -23,13 +23,13 @@ func (h *UserHandler) GetMyProfile(c *gin.Context) {
 	userCtx := c.MustGet("currentUser").(*auth.UserContext)
 
 	// 2. 获取用户个人资料
-	user, err := h.user.GetProfile(userCtx.UserID)
+	res, err := h.user.GetMyProfile(userCtx.UserID)
 	if err != nil {
 
 		c.Error(err)
 		return
 	}
-	common.OK(c, "获取成功", userDto.NewMyProfileResponse(user))
+	common.OK(c, "获取成功", res)
 }
 
 // 查看他人主页
@@ -42,12 +42,12 @@ func (h *UserHandler) GetPublicProfile(c *gin.Context) {
 	}
 
 	// 2. 获取用户主页信息
-	user, err := h.user.GetProfile(req.UserId)
+	res, err := h.user.GetUserProfile(req.UserId)
 	if err != nil {
 		c.Error(err)
 		return
 	}
-	common.OK(c, "获取成功", userDto.NewUserProfileResponse(user))
+	common.OK(c, "获取成功", res)
 }
 
 // 修改基础资料

@@ -22,10 +22,11 @@ var (
 	ErrRoleInvalid        = errors.New("用户角色非法")
 	ErrPasswordTooShort   = errors.New("密码长度不能少于6位")
 	//------------------------- 用户模块 ---------------------------------
-	ErrUserExists       = errors.New("用户已存在")
-	ErrUserNotFound     = errors.New("用户不存在或已被禁用")
-	ErrPasswordFailed   = errors.New("密码错误")
-	ErrNickNameNotFound = errors.New("昵称缺失")
+	ErrUserExists         = errors.New("用户已存在")
+	ErrUserNotFound       = errors.New("用户不存在或已被禁用")
+	ErrPasswordFailed     = errors.New("密码错误")
+	ErrNickNameNotFound   = errors.New("昵称缺失")
+	ErrPhoneAlreadyExists = errors.New("手机号已被注册")
 	//------------------------- JWT模块 ---------------------------------
 	ErrTokenInvalid   = errors.New("Token无效")
 	ErrTokenExpired   = errors.New("Token已过期")
@@ -79,6 +80,8 @@ func GetCodeByError(err error) int {
 		return CodePasswordFailed
 	case ErrNickNameNotFound:
 		return CodeNickNameNotFound
+	case ErrPhoneAlreadyExists:
+		return CodePhoneAlreadyExists
 
 	// JWT
 	case ErrTokenInvalid,

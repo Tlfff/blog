@@ -14,6 +14,8 @@ import (
 	"blog/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // 调试开关：让 Gin 在测试时保持安静，不喷出一堆启动日志
@@ -45,20 +47,25 @@ func makeTestContext(method, path string, body interface{}, ctxUser *auth.UserCo
 	return c, w
 }
 func TestUserHandler_AllRoutes(t *testing.T) {
-	// 1.  组装真实的内存链路（不要再用 nil 啦！）
+	// 1. 核心修复：创建一个临时的纯内存 SQLite 数据库，用来给测试代码发泄数据
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("无法启动内存测试数据库: %v", err)
+	}
+
+	// 2.  自动迁移：让 GORM 默默在内存里把 users 表建出来
+	_ = db.AutoMigrate(&model.User{})
+
+	// 3.  完美对齐升级后的构造函数
 	// 这一步和你的 main.go 逻辑完全一致，利用内存模式原地起飞
-	userRepo := repository.NewUserRepository()
+	userRepo := repository.NewUserRepository(db)
 	userService := service.NewUserService(userRepo) // 如果你写的是 NewUserService(userRepo) 就用那个
 	userAuthService := service.NewUserAuthService(userRepo)
 
 	// 把真实组装好的服务喂给 Handler
 	h := NewUserHandler(userService)
 
-	_ = userAuthService.Register(&model.User{
-		ID:       1,
-		Nickname: "初始林风",
-		Phone:    "13800000000",
-	}, "123456")
+	_ = userAuthService.Register("13800000000", "123456", "测试用户", "120.0.0.1")
 	// 2.  定义大表格
 	tests := []struct {
 		name           string

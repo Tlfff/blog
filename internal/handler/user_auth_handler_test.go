@@ -6,19 +6,31 @@ import (
 
 	"blog/internal/auth"
 	"blog/internal/dto/user"
+	"blog/internal/model"
 	"blog/internal/repository"
 	"blog/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestUserAuthHandler_AllRoutes(t *testing.T) {
-	// 1. 🟢 组装真实的内存链路（注册和登录会共享同一个内存 Repo 里的数据）
-	userRepo := repository.NewUserRepository()
+	// 1. 核心修复：创建一个临时的纯内存 SQLite 数据库，用来给测试代码发泄数据
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("无法启动内存测试数据库: %v", err)
+	}
+
+	// 2.  自动迁移：让 GORM 默默在内存里把 users 表建出来
+	_ = db.AutoMigrate(&model.User{})
+
+	// 3.  完美对齐升级后的构造函数
+	userRepo := repository.NewUserRepository(db)
 	userAuthService := service.NewUserAuthService(userRepo)
 	h := NewUserAuthHandler(userAuthService)
 
-	// 2. 🎯 大表格：按“时光流逝”的顺序，先测异常，再测成功注册，最后测登录
+	// 4. 🎯 大表格：按“时光流逝”的顺序，先测异常，再测成功注册，最后测登录
 	tests := []struct {
 		name           string
 		run            func(c *gin.Context) // 动态调用目标函数

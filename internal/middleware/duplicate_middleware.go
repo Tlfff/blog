@@ -35,7 +35,7 @@ func DuplicateMitigation(expire time.Duration) gin.HandlerFunc {
 		// 1. 从gin上下午中获取用户信息
 		user := c.MustGet("currentUser").(*auth.UserContext)
 		// 2. 构建唯一的key，将id转为10进制并组装上路由路径
-		key := strconv.FormatInt(user.UserID, 10) + "_" + c.FullPath()
+		key := strconv.FormatUint(user.UserID, 10) + "_" + c.FullPath()
 
 		// 3. 调用防重工具类进行前置拦截
 		if common.Duplicate.Check(key, expire) {
