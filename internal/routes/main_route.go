@@ -23,6 +23,7 @@ func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 		InitArticlePublicRoutes(publicGroup, appHandler.Article)
 		InitUserPublicRoutes(publicGroup, appHandler.UserAuth, appHandler.User)
 	}
+
 	// 3.需要登录的接口
 	privateGroup := r.Group("/my")
 	privateGroup.Use(middleware.AuthMiddleware())
@@ -34,6 +35,13 @@ func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 	authGroup.Use(middleware.AuthMiddleware(), middleware.AdminCheckMiddleware())
 	{
 		InitArticlePrivateRoutes(authGroup, appHandler.Article)
+	}
+
+	// 5.登录和不登录功能有区别的接口
+	optionalGroup := r.Group("/optional")
+	optionalGroup.Use(middleware.OptionalAuth())
+	{
+		InitArticleOptionalRoutes(optionalGroup, appHandler.Article)
 	}
 
 }

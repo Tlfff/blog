@@ -12,12 +12,16 @@ import (
 )
 
 type ArticleService struct {
-	repo     *repository.ArticleRepository
-	userRepo *repository.UserRepository
+	repo        *repository.ArticleRepository
+	userRepo    *repository.UserRepository
+	historyView *ArticleViewHistoryService
 }
 
-func NewArticleService(repo *repository.ArticleRepository) *ArticleService {
-	return &ArticleService{repo: repo}
+func NewArticleService(repo *repository.ArticleRepository, historyView *ArticleViewHistoryService) *ArticleService {
+	return &ArticleService{
+		repo:        repo,
+		historyView: historyView,
+	}
 }
 
 // 创建文章,创建的文章可能是草稿或者发表的
@@ -91,8 +95,9 @@ func (s *ArticleService) ClearArticle(articleId uint64, userId uint64) error {
 	return s.repo.ClearArticle(articleId, userId)
 }
 
-// 管理员：查看文章详情
-func (s *ArticleService) GetPublishedArticle(articleId uint64) (*article.ArticleDetailResponse, error) {
+// 公开：查看文章详情
+func (s *ArticleService) GetPublishedArticle(articleId uint64, userId uint64, ip string) (*article.ArticleDetailResponse, error) {
+	// 1.查出文章
 	oldArticle, err := s.repo.FindArticleByID(articleId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -107,7 +112,9 @@ func (s *ArticleService) GetPublishedArticle(articleId uint64) (*article.Article
 		return nil, common.ErrArticlePermissionDenied
 	}
 
-	// todo：假定一个作者昵称，如果未来连了用户表，可以用 artModel.AuthorID 去查出来
+	// 2.记录浏览历史
+	s.historyView.RecordView(userId, articleId, ip)
+	// 3. todo：假定一个作者昵称，如果未来连了用户表，可以用 artModel.AuthorID 去查出来
 	authorNick := "博主"
 
 	return article.NewArticleDetailResponse(oldArticle, authorNick), nil
