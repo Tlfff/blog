@@ -13,6 +13,8 @@ var (
 	ErrAuthorizationRequired      = errors.New("未携带登录凭证")
 	ErrInvalidAuthorizationHeader = errors.New("Authorization格式错误")
 	ErrTokenEmpty                 = errors.New("Token不能为空")
+	ErrDuplicateSubmission        = errors.New("请勿重复提交请求")
+	ErrForbidden                  = errors.New("权限不足")
 
 	//------------------------- 注册登录模块 ---------------------------------
 	ErrRegisterInputEmpty = errors.New("手机号、密码、昵称不能为空")
@@ -20,10 +22,11 @@ var (
 	ErrRoleInvalid        = errors.New("用户角色非法")
 	ErrPasswordTooShort   = errors.New("密码长度不能少于6位")
 	//------------------------- 用户模块 ---------------------------------
-	ErrUserExists       = errors.New("用户已存在")
-	ErrUserNotFound     = errors.New("用户不存在或已被禁用")
-	ErrPasswordFailed   = errors.New("密码错误")
-	ErrNickNameNotFound = errors.New("昵称缺失")
+	ErrUserExists         = errors.New("用户已存在")
+	ErrUserNotFound       = errors.New("用户不存在或已被禁用")
+	ErrPasswordFailed     = errors.New("密码错误")
+	ErrNickNameNotFound   = errors.New("昵称缺失")
+	ErrPhoneAlreadyExists = errors.New("手机号已被注册")
 	//------------------------- JWT模块 ---------------------------------
 	ErrTokenInvalid   = errors.New("Token无效")
 	ErrTokenExpired   = errors.New("Token已过期")
@@ -51,6 +54,10 @@ func GetCodeByError(err error) int {
 		ErrTokenEmpty:
 
 		return CodeUnauthorized
+	case ErrDuplicateSubmission:
+		return CodeDuplicateSubmission
+	case ErrForbidden:
+		return CodeForbidden
 
 	// 参数错误
 	case ErrRegisterInputEmpty,
@@ -73,6 +80,8 @@ func GetCodeByError(err error) int {
 		return CodePasswordFailed
 	case ErrNickNameNotFound:
 		return CodeNickNameNotFound
+	case ErrPhoneAlreadyExists:
+		return CodePhoneAlreadyExists
 
 	// JWT
 	case ErrTokenInvalid,

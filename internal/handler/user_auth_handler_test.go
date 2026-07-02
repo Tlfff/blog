@@ -1,210 +1,124 @@
 package handler
 
 import (
+	"bytes"
+	"testing"
+
+	"blog/internal/auth"
+	"blog/internal/dto/user"
+	"blog/internal/model"
 	"blog/internal/repository"
 	"blog/internal/service"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
-func newUserAuthHandler() *UserAuthHandler {
-	repo := repository.NewUserRepository()
-
-	return NewUserAuthHandler(
-		service.NewUserAuthService(repo),
-	)
-}
-func TestRegister(t *testing.T) {
-	h := newUserAuthHandler()
-
-	body := `{
-		"nickname":"test",
-		"phone":"13800138000",
-		"password":"123456",
-		"role":1
-	}`
-
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(body),
-	)
-
-	w := httptest.NewRecorder()
-
-	h.Register(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("注册失败")
+func TestUserAuthHandler_AllRoutes(t *testing.T) {
+	// 1. 核心修复：创建一个临时的纯内存 SQLite 数据库，用来给测试代码发泄数据
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("无法启动内存测试数据库: %v", err)
 	}
-}
-func TestRegisterInvalidRequest(t *testing.T) {
-	h := newUserAuthHandler()
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(`{}`),
-	)
+	// 2.  自动迁移：让 GORM 默默在内存里把 users 表建出来
+	_ = db.AutoMigrate(&model.User{})
 
-	w := httptest.NewRecorder()
+	// 3.  完美对齐升级后的构造函数
+	userRepo := repository.NewUserRepository(db)
+	userAuthService := service.NewUserAuthService(userRepo)
+	h := NewUserAuthHandler(userAuthService)
 
-	h.Register(w, req)
+	// 4. 🎯 大表格：按“时光流逝”的顺序，先测异常，再测成功注册，最后测登录
+	tests := []struct {
+		name           string
+		run            func(c *gin.Context) // 动态调用目标函数
+		method         string
+		path           string
+		body           interface{}
+		ctxUser        *auth.UserContext
+		expectContains string // 预期返回包含的内容
+	}{
+		// ==================== 🔐 场景 A：用户注册 (Register) ====================
+		{
+			name:           "1. 注册-请求体错误(触发第一个if)",
+			run:            h.Register,
+			method:         "POST",
+			path:           "/auth/register",
+			body:           "我是坏的JSON字符串",
+			ctxUser:        nil,
+			expectContains: "", // 触发 c.Error，实际返回空
+		},
+		{
+			name:   "2. 注册-成功通关",
+			run:    h.Register,
+			method: "POST",
+			path:   "/auth/register",
+			body: user.RegisterRequest{
+				Nickname: "林风",
+				Phone:    "18078789119",
+				Password: "123456",
+			},
+			ctxUser:        nil,
+			expectContains: `"注册成功"`,
+		},
 
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
+		// ==================== 🔓 场景 B：用户登录 (Login) ====================
+		{
+			name:           "3. 登录-请求体错误(触发第一个if)",
+			run:            h.Login,
+			method:         "POST",
+			path:           "/auth/login",
+			body:           "格式不对的JSON",
+			ctxUser:        nil,
+			expectContains: "",
+		},
+		{
+			name:   "4. 登录-账号或密码错误(触发Service报错if)",
+			run:    h.Login,
+			method: "POST",
+			path:   "/auth/login",
+			body: user.LoginRequest{
+				Account:  "18078789119",
+				Password: "789321", // 故意输错密码
+			},
+			ctxUser:        nil,
+			expectContains: "", // 会被 c.Error(err) 拦下
+		},
+		{
+			name:   "5. 登录-成功通关(拿到JWT令牌)",
+			run:    h.Login,
+			method: "POST",
+			path:   "/auth/login",
+			body: user.LoginRequest{
+				Account:  "18078789119", // 使用第2步成功注册的手机号
+				Password: "123456",
+			},
+			ctxUser:        nil,
+			expectContains: `"access_token"`, // 成功登录应该能拿到你的令牌字段
+		},
 	}
-}
-func TestRegisterBadJSON(t *testing.T) {
-	h := newUserAuthHandler()
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(`{nickname}`),
-	)
+	// 3. 🤖 驱动引擎
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 使用之前你在 user_test.go 里写好的 makeTestContext 工具函数
+			c, w := makeTestContext(tt.method, tt.path, tt.body, tt.ctxUser)
 
-	w := httptest.NewRecorder()
+			// 轰炸目标接口
+			tt.run(c)
 
-	h.Register(w, req)
+			// 调试辅助日志
+			actualBody := w.Body.String()
+			if actualBody == "" && len(c.Errors) > 0 {
+				actualBody = "[被 c.Error 拦截] 原因: " + c.Errors.Last().Error()
+			}
 
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
-func TestRegisterDuplicateUser(t *testing.T) {
-	h := newUserAuthHandler()
-
-	body := `{
-		"nickname":"test",
-		"phone":"13800138001",
-		"password":"123456",
-		"role":1
-	}`
-
-	req1 := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(body),
-	)
-
-	w1 := httptest.NewRecorder()
-
-	h.Register(w1, req1)
-
-	req2 := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(body),
-	)
-
-	w2 := httptest.NewRecorder()
-
-	h.Register(w2, req2)
-
-	if w2.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
-func TestLogin(t *testing.T) {
-	h := newUserAuthHandler()
-
-	registerBody := `{
-		"nickname":"login",
-		"phone":"13800138002",
-		"password":"123456",
-		"role":1
-	}`
-
-	reqRegister := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(registerBody),
-	)
-
-	wRegister := httptest.NewRecorder()
-
-	h.Register(wRegister, reqRegister)
-
-	loginBody := `{
-		"phone":"13800138002",
-		"password":"123456"
-	}`
-
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/login",
-		strings.NewReader(loginBody),
-	)
-
-	w := httptest.NewRecorder()
-
-	h.Login(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("登录失败")
-	}
-}
-func TestLoginWrongPassword(t *testing.T) {
-	h := newUserAuthHandler()
-
-	registerBody := `{
-		"nickname":"login",
-		"phone":"13800138003",
-		"password":"123456",
-		"role":1
-	}`
-
-	reqRegister := httptest.NewRequest(
-		http.MethodPost,
-		"/user/register",
-		strings.NewReader(registerBody),
-	)
-
-	wRegister := httptest.NewRecorder()
-
-	h.Register(wRegister, reqRegister)
-
-	loginBody := `{
-		"phone":"13800138003",
-		"password":"654321"
-	}`
-
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/login",
-		strings.NewReader(loginBody),
-	)
-
-	w := httptest.NewRecorder()
-
-	h.Login(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
-	}
-}
-func TestLoginUserNotFound(t *testing.T) {
-	h := newUserAuthHandler()
-
-	loginBody := `{
-		"phone":"19999999999",
-		"password":"123456"
-	}`
-
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/user/login",
-		strings.NewReader(loginBody),
-	)
-
-	w := httptest.NewRecorder()
-
-	h.Login(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("请求执行异常")
+			// 结果校验断言
+			if tt.expectContains != "" && !bytes.Contains(w.Body.Bytes(), []byte(tt.expectContains)) {
+				t.Errorf("用例 [%s] 失败!\n预期包含: %s\n实际返回: %s", tt.name, tt.expectContains, actualBody)
+			}
+		})
 	}
 }

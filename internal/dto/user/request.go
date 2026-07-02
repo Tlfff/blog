@@ -1,71 +1,36 @@
 package user
 
-import (
-	"blog/internal/common"
-	"blog/internal/model"
-)
-
 // 用户注册
 type RegisterRequest struct {
-	Nickname string `json:"nickname"`
-	Phone    string `json:"phone"`
-	Password string `json:"password"`
-	Role     int8   `json:"role"`
-}
-
-func (r *RegisterRequest) Validate() error {
-	if r.Phone == "" || r.Password == "" || r.Nickname == "" {
-		return common.ErrRegisterInputEmpty
-	}
-	if len(r.Password) < 6 {
-		return common.ErrPasswordTooShort
-	}
-	// 校验角色合法性
-	if r.Role == 0 || model.FindRoleById(int(r.Role)) != nil {
-		return common.ErrRoleInvalid
-	}
-	return nil
+	Nickname string `json:"nickname" binding:"required"`
+	Phone    string `json:"phone" binding:"required"`
+	Password string `json:"password" binding:"required,min=6"` // 限制密码最少6位
 }
 
 // 用户登录
 type LoginRequest struct {
-	Phone    string `json:"phone"`
-	Password string `json:"password"`
-}
-
-func (r *LoginRequest) Validate() error {
-	if r.Phone == "" || r.Password == "" {
-		return common.ErrLoginInputEmpty
-	}
-	return nil
+	Account  string `json:"account" binding:"required"` // 支持手机号和昵称
+	Password string `json:"password" binding:"required"`
 }
 
 // 更新用户基本信息
 type UpdateProfileRequest struct {
-	Nickname string `json:"nickname"`
+	Nickname string `json:"nickname" binding:"required"`
 	Avatar   string `json:"avatar"`
 }
 
-func (r *UpdateProfileRequest) Validate() error {
-	if r.Nickname == "" {
-		return common.ErrNickNameNotFound
-	}
-	return nil
+// 更改密码
+type UpdatePasswordRequest struct {
+	OldPassword string `json:"old_password" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=6"`
 }
 
-// 变更敏感账号信息
+// 变更敏感账号信息-电话
 type UpdateAccountRequest struct {
-	Phone       string `json:"phone"`
-	OldPassword string `json:"old_password"`
-	NewPassword string `json:"new_password"`
+	Phone string `json:"phone" binding:"required"`
 }
 
-func (r *UpdateAccountRequest) Validate() error {
-	if r.Phone == "" || r.OldPassword == "" || r.NewPassword == "" {
-		return common.ErrLoginInputEmpty
-	}
-	if len(r.NewPassword) < 6 {
-		return common.ErrPasswordTooShort
-	}
-	return nil
+// 查看他人主页
+type GetPublicProfileRequest struct {
+	UserId uint64 `form:"user_id" binding:"required"`
 }

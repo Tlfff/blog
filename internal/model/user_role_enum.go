@@ -5,8 +5,8 @@ import "errors"
 type Role int8
 
 const (
-	RoleUser Role = iota
-	RoleAdmin
+	RoleUser  = 1
+	RoleAdmin = 2
 )
 
 func (r Role) String() string {

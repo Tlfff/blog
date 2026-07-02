@@ -2,54 +2,56 @@ package article
 
 import (
 	"blog/internal/model"
-	"time"
+	"strings"
 )
 
 // 文章详情
 type ArticleDetailResponse struct {
-	ID         int64     `json:"id"`
-	Title      string    `json:"title"`
-	Content    string    `json:"content"`
-	Tags       []string  `json:"tags"`
-	Status     int8      `json:"status"`
-	AuthorID   int64     `json:"author_id"`
-	AddTime    time.Time `json:"Add_time"`
-	UpdateTime time.Time `json:"update_time"`
+	ID          uint64   `json:"id"`
+	Title       string   `json:"title"`
+	Content     string   `json:"content"`
+	Tags        []string `json:"tags"`
+	Status      int8     `json:"status"`
+	AuthorNick  string   `json:"author_nick"`
+	CreatedTime int64    `json:"created_time"`
+	UpdatedTime int64    `json:"updated_time"`
 }
 
+// 构造单条详情响应
+func NewArticleDetailResponse(m *model.Article, nickName string) *ArticleDetailResponse {
+	if m == nil {
+		return nil
+	}
+	tags := strings.Split(m.Tags, ",")
+	if m.Tags == "" {
+		tags = []string{}
+	}
+	return &ArticleDetailResponse{
+		ID:          m.ID,
+		Title:       m.Title,
+		Content:     m.Content,
+		Tags:        tags,
+		Status:      int8(m.Status),
+		AuthorNick:  nickName,
+		CreatedTime: m.CreatedTime.Unix(),
+		UpdatedTime: m.UpdatedTime.Unix(),
+	}
+}
+
+// ====================  前台文章列表返回  ====================
 // 列表项
 type ArticleListItem struct {
-	ID         int64     `json:"id"`
-	Title      string    `json:"title"`
-	Summary    string    `json:"summary"` // 摘要
-	AuthorID   int64     `json:"author_id"`
-	UpdateTime time.Time `json:"update_time"`
-	// LikeCount    int64 `json:"like_count"`
-	// CommentCount int64 `json:"comment_count"`
-	// Heat int64 `json:"heat"`
+	ID          uint64 `json:"id"`
+	Title       string `json:"title"`
+	Summary     string `json:"summary"` // 摘要
+	AuthorID    uint64 `json:"author_id"`
+	UpdatedTime int64  `json:"updated_time"`
 }
 
 // 列表返回
 type ArticleListResponse struct {
 	List  []*ArticleListItem `json:"list"`
 	Total int                `json:"total"`
-}
-
-// 构造单条详情响应
-func NewArticleDetailResponse(m *model.Article) *ArticleDetailResponse {
-	if m == nil {
-		return nil
-	}
-	return &ArticleDetailResponse{
-		ID:         m.ID,
-		Title:      m.Title,
-		Content:    m.Content,
-		Tags:       m.Tags,
-		Status:     int8(m.Status),
-		AuthorID:   m.AuthorID,
-		AddTime:    m.AddTime,
-		UpdateTime: m.UpdateTime,
-	}
 }
 
 // 构造列表响应
@@ -67,13 +69,51 @@ func NewArticleListResponse(models []*model.Article) *ArticleListResponse {
 		}
 
 		resp.List = append(resp.List, &ArticleListItem{
-			ID:         m.ID,
-			Title:      m.Title,
-			Summary:    summary,
-			AuthorID:   m.AuthorID,
-			UpdateTime: m.UpdateTime,
+			ID:          m.ID,
+			Title:       m.Title,
+			Summary:     summary,
+			AuthorID:    m.AuthorID,
+			UpdatedTime: m.UpdatedTime.Unix(),
 		})
 	}
 	resp.Total = len(resp.List)
+	return resp
+}
+
+// ====================  后台文章列表返回  ====================
+type AdminListItem struct {
+	ID          uint64   `json:"id"`
+	Title       string   `json:"title"`
+	Tags        []string `json:"tags"`
+	Status      int8     `json:"status"` // 状态：1所有，2草稿，3发布，0垃圾箱
+	CreatedTime int64    `json:"created_time"`
+	UpdatedTime int64    `json:"updated_time"`
+}
+type AdminListResponse struct {
+	List  []*AdminListItem `json:"list"`
+	Total int              `json:"total"`
+}
+
+// 构建后台列表
+func NewAdminListResponse(models []*model.Article) *AdminListResponse {
+	resp := &AdminListResponse{
+		List:  make([]*AdminListItem, 0),
+		Total: len(models),
+	}
+
+	for _, m := range models {
+		tags := strings.Split(m.Tags, ",")
+		if m.Tags == "" {
+			tags = []string{}
+		}
+		resp.List = append(resp.List, &AdminListItem{
+			ID:          m.ID,
+			Title:       m.Title,
+			Tags:        tags,
+			Status:      m.Status,
+			CreatedTime: m.CreatedTime.Unix(),
+			UpdatedTime: m.UpdatedTime.Unix(),
+		})
+	}
 	return resp
 }

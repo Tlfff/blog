@@ -56,7 +56,7 @@ func base64UrlDecode(s string) ([]byte, error) {
 }
 
 // 生成Token
-func GenerateToken(phone string, role int8, userID int64) (string, error) {
+func GenerateToken(phone string, role int8, userID uint64) (string, error) {
 	// 1. 组装数据
 	claims := &Claims{
 		UserID: userID,

@@ -1,51 +1,59 @@
 package repository
 
 import (
-	"errors"
-	"log"
-
-	"blog/internal/common"
 	"blog/internal/model"
+
+	"gorm.io/gorm"
 )
 
 type UserRepository struct {
-	users map[string]*model.User
+	db *gorm.DB
 }
 
-func NewUserRepository() *UserRepository {
+func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{
-		users: make(map[string]*model.User),
+		db: db,
 	}
 }
 
 // 创建新用户
-func (m *UserRepository) CreateUser(user *model.User) error {
-	m.users[user.Phone] = user
-	return nil
+// insert into users (phone, password, nickname, avatar, role, status) values (?, ?, ?, ?, ?, ?)
+func (r *UserRepository) CreateUser(user *model.User) error {
+	return r.db.Create(user).Error
 }
 
-// 根据手机号获取用户信息
-func (m *UserRepository) GetUserByPhone(phone string) (*model.User, error) {
-	user, ok := m.users[phone]
-	if !ok || user.Status != 1 {
-		log.Printf("用户%s不存在或已被禁用", phone)
-		return nil, errors.New(common.ErrUserNotFound.Error())
+// 根据账户获取用户信息
+// select id,phone,password,nickname,avatar,role from users where phone =? and status=1
+func (r *UserRepository) GetUserByAccount(account string) (*model.User, error) {
+	var user model.User
+	err := r.db.Where("phone = ? AND status = ?", account, 1).Take(&user).Error
+	if err != nil {
+		return nil, err
 	}
-	return user, nil
+	return &user, nil
 }
 
-// 根据用户ID获取用户信息(因为现在map用的phone作key)
-func (m *UserRepository) FindUserByID(id int64) (*model.User, error) {
-	for _, user := range m.users {
-		if user.ID == id {
-			return user, nil
-		}
+// 根据用户ID获取用户信息
+// select id,phone,password,nickname,avatar,role from users where id =? and status=1
+func (r *UserRepository) FindUserByID(id uint64) (*model.User, error) {
+	var user model.User
+	err := r.db.Where("id = ? AND status = ?", id, 1).Take(&user).Error
+	if err != nil {
+		return nil, err
 	}
-	return nil, errors.New(common.ErrUserNotFound.Error())
+	return &user, nil
 }
 
 // 更新用户信息
-func (m *UserRepository) UpdateUser(user *model.User) error {
-	m.users[user.Phone] = user
+// update users set nickname=?,avatar=?,phone=?,password=? where id=? and status=1
+func (r *UserRepository) UpdateUser(user *model.User) error {
+	result := r.db.Model(&model.User{}).
+		Where("id = ? AND status = ?", user.ID, 1).
+		Updates(user)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
 	return nil
 }

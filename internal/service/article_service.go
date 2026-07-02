@@ -2,13 +2,18 @@ package service
 
 import (
 	"blog/internal/common"
+	"blog/internal/dto/article"
 	"blog/internal/model"
 	"blog/internal/repository"
-	"time"
+	"errors"
+	"strings"
+
+	"gorm.io/gorm"
 )
 
 type ArticleService struct {
-	repo *repository.ArticleRepository
+	repo     *repository.ArticleRepository
+	userRepo *repository.UserRepository
 }
 
 func NewArticleService(repo *repository.ArticleRepository) *ArticleService {
@@ -16,69 +21,159 @@ func NewArticleService(repo *repository.ArticleRepository) *ArticleService {
 }
 
 // 创建文章,创建的文章可能是草稿或者发表的
-func (s *ArticleService) CreateArticle(article *model.Article) error {
-	now := time.Now()
-	article.AddTime = now
-	article.UpdateTime = now
-	return s.repo.CreateArticle(article)
+func (s *ArticleService) CreateArticle(authorID uint64, title, content string, tags []string, status int8) error {
+
+	// 手动拼接标签 ["Go", "Gin"] -> "Go,Gin"
+	tagsStr := strings.Join(tags, ",")
+
+	art := &model.Article{
+		AuthorID: authorID,
+		Title:    title,
+		Content:  content,
+		Tags:     tagsStr,
+		Status:   status,
+	}
+
+	return s.repo.CreateArticle(art)
 }
 
 // 更新文章,更新的文章可能是草稿或者发表的
-func (s *ArticleService) UpdateArticle(article *model.Article) error {
-	OldArticle, err := s.repo.FindArticleByID(article.ID)
+func (s *ArticleService) UpdateArticle(articleId uint64, authorID uint64, title, content string, tags []string, status int8) error {
+	// 鉴权：先查出老文章
+	oldArticle, err := s.repo.FindArticleByID(articleId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return common.ErrArticleNotFound
+		}
+		return err
+	}
+	if oldArticle.Status == model.Deleted {
+		return common.ErrArticleDeleted
+	}
+	if oldArticle.AuthorID != authorID {
+		return common.ErrArticlePermissionDenied
+	}
+
+	tagsStr := strings.Join(tags, ",")
+
+	art := &model.Article{
+		ID:      articleId,
+		Title:   title,
+		Content: content,
+		Tags:    tagsStr,
+		Status:  status,
+	}
+
+	return s.repo.UpdateArticle(art)
+}
+
+// 软删除文章
+func (s *ArticleService) DeleteArticle(articleId uint64, userId uint64) error {
+	oldArticle, err := s.repo.FindArticleByID(articleId)
 	if err != nil {
 		return err
 	}
-	if OldArticle.Status == model.Deleted {
-		return common.ErrArticleDeleted
-	}
-	if OldArticle.AuthorID != article.AuthorID {
+	if oldArticle.AuthorID != userId {
 		return common.ErrArticlePermissionDenied
 	}
-	return s.repo.UpdateArticle(article)
+	return s.repo.DeleteArticle(articleId)
 }
 
-// 删除文章
-func (s *ArticleService) DeleteArticle(articleId int64, userId int64) error {
-	return s.repo.DeleteArticle(articleId, userId)
-}
-
-// 查看文章详情
-func (s *ArticleService) GetArticle(articleId int64) (*model.Article, error) {
-	article, err := s.repo.FindArticleByID(articleId)
+// 硬删除文章
+func (s *ArticleService) ClearArticle(articleId uint64, userId uint64) error {
+	oldArticle, err := s.repo.FindArticleByID(articleId)
 	if err != nil {
+		return err
+	}
+	if oldArticle.AuthorID != userId {
+		return common.ErrArticlePermissionDenied
+	}
+	return s.repo.ClearArticle(articleId, userId)
+}
+
+// 管理员：查看文章详情
+func (s *ArticleService) GetPublishedArticle(articleId uint64) (*article.ArticleDetailResponse, error) {
+	oldArticle, err := s.repo.FindArticleByID(articleId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, common.ErrArticleNotFound
+		}
 		return nil, err
 	}
-	if article == nil {
-		return nil, common.ErrArticleNotFound
-	}
-	if article.Status == model.Deleted {
+	if oldArticle.Status == model.Deleted {
 		return nil, common.ErrArticleDeleted
 	}
-	return article, nil
+	if oldArticle.Status != model.Published {
+		return nil, common.ErrArticlePermissionDenied
+	}
+
+	// todo：假定一个作者昵称，如果未来连了用户表，可以用 artModel.AuthorID 去查出来
+	authorNick := "博主"
+
+	return article.NewArticleDetailResponse(oldArticle, authorNick), nil
+}
+
+// 管理员：查看文章详情
+func (s *ArticleService) GetArticle(articleId uint64) (*article.ArticleDetailResponse, error) {
+	oldArticle, err := s.repo.FindArticleByID(articleId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, common.ErrArticleNotFound
+		}
+		return nil, err
+	}
+	if oldArticle.Status == model.Deleted {
+		return nil, common.ErrArticleDeleted
+	}
+
+	// todo：假定一个作者昵称，如果未来连了用户表，可以用 artModel.AuthorID 去查出来
+	authorNick := "博主"
+
+	return article.NewArticleDetailResponse(oldArticle, authorNick), nil
 }
 
 // 发表文章
-func (s *ArticleService) PublishArticle(articleId int64, userId int64) error {
-	article, err := s.repo.FindArticleByID(articleId)
+func (s *ArticleService) PublishArticle(articleId uint64, userId uint64) error {
+	oldArticle, err := s.repo.FindArticleByID(articleId)
 	if err != nil {
 		return err
 	}
-	if article.Status == model.Deleted {
+	if oldArticle.AuthorID != userId {
+		return common.ErrArticlePermissionDenied
+	}
+	if oldArticle.Status == model.Deleted {
 		return common.ErrArticleDeleted
 	}
-	article.AuthorID = userId
-	article.Status = model.Published
-	article.UpdateTime = time.Now()
-	return s.repo.UpdateArticle(article)
+
+	oldArticle.Status = model.Published
+	return s.repo.UpdateArticle(oldArticle)
+}
+
+// 恢复文章
+func (s *ArticleService) RecoverArticle(articleId uint64, userId uint64) error {
+	oldArticle, err := s.repo.FindArticleByID(articleId)
+	if err != nil {
+		return err
+	}
+	oldArticle.Status = model.Draft
+	oldArticle.AuthorID = userId
+	return s.repo.UpdateArticle(oldArticle)
 }
 
 // 获取已发表文章列表
-func (s *ArticleService) GetPublishedList(AuthorID int64) ([]*model.Article, error) {
-	return s.repo.GetListByStatus(AuthorID, model.Published)
+func (s *ArticleService) GetPublishedList(authorID uint64) (*article.ArticleListResponse, error) {
+	models, err := s.repo.GetListByStatus(authorID, model.Published)
+	if err != nil {
+		return nil, err
+	}
+	return article.NewArticleListResponse(models), nil
 }
 
-// 获取用户草稿文章列表
-func (s *ArticleService) GetDraftedList(AuthorID int64) ([]*model.Article, error) {
-	return s.repo.GetListByStatus(AuthorID, model.Draft)
+// 管理者：获取文章列表
+func (s *ArticleService) GetAdminList(authorID uint64, status int8) (*article.AdminListResponse, error) {
+	models, err := s.repo.GetListByStatus(authorID, status)
+	if err != nil {
+		return nil, err
+	}
+	return article.NewAdminListResponse(models), nil
 }

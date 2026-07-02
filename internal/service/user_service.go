@@ -3,9 +3,12 @@ package service
 import (
 	"blog/internal/auth"
 	"blog/internal/common"
-	"blog/internal/model"
+	"blog/internal/dto/user"
 	"blog/internal/repository"
+	"errors"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type UserService struct {
@@ -16,43 +19,62 @@ func NewUserService(repo *repository.UserRepository) *UserService {
 	return &UserService{repo: repo}
 }
 
-// 获取用户详情
-func (s *UserService) GetProfile(userID int64) (*model.User, error) {
-	return s.repo.FindUserByID(userID)
+// 获取自己主页详情
+func (s *UserService) GetMyProfile(userID uint64) (*user.MyProfileResponse, error) {
+	u, err := s.repo.FindUserByID(userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, common.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	return user.NewMyProfileResponse(u), nil
+}
+
+// 获取他人主页详情
+func (s *UserService) GetUserProfile(userID uint64) (*user.UserProfileResponse, error) {
+	u, err := s.repo.FindUserByID(userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, common.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	return user.NewUserProfileResponse(u), nil
 }
 
 // 更新用户基本信息
-func (s *UserService) UpdateProfile(userID int64, nickname string, avatar string) error {
-
-	user, err := s.repo.FindUserByID(userID)
+func (s *UserService) UpdateProfile(userID uint64, nickname string, avatar string) error {
+	u, err := s.repo.FindUserByID(userID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return common.ErrUserNotFound
+		}
 		return err
 	}
 
-	user.Nickname = nickname
-	user.Avatar = avatar
-	user.UpdateTime = time.Now()
+	u.Nickname = nickname
+	u.Avatar = avatar
 
-	return s.repo.UpdateUser(user)
+	return s.repo.UpdateUser(u)
 }
 
-// 更新用户账户
-func (s *UserService) UpdateAccount(userID int64, phone string, oldPassword string, newPassword string) error {
-
-	user, err := s.repo.FindUserByID(userID)
+// 更新用户密码
+func (s *UserService) UpdatePassword(userID uint64, oldPassword string, newPassword string) error {
+	u, err := s.repo.FindUserByID(userID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return common.ErrUserNotFound
+		}
 		return err
 	}
 
-	ok, err := auth.VerifyPassword(
-		oldPassword,
-		user.Password,
-	)
-
+	ok, err := auth.VerifyPassword(oldPassword, u.Password)
 	if err != nil {
 		return err
 	}
-
 	if !ok {
 		return common.ErrPasswordFailed
 	}
@@ -62,9 +84,30 @@ func (s *UserService) UpdateAccount(userID int64, phone string, oldPassword stri
 		return err
 	}
 
-	user.Phone = phone
-	user.Password = hash
-	user.UpdateTime = time.Now()
+	u.Password = hash
+	u.UpdatedTime = time.Now()
 
-	return s.repo.UpdateUser(user)
+	return s.repo.UpdateUser(u)
+}
+
+// 更新用户账户
+func (s *UserService) UpdateAccount(userID uint64, phone string) error {
+	u, err := s.repo.FindUserByID(userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return common.ErrUserNotFound
+		}
+		return err
+	}
+
+	// 检查新手机号是否已被他人占用
+	existUser, err := s.repo.GetUserByAccount(phone)
+	if err == nil && existUser.ID != userID {
+		return common.ErrPhoneAlreadyExists
+	}
+
+	u.Phone = phone
+	u.UpdatedTime = time.Now()
+
+	return s.repo.UpdateUser(u)
 }
