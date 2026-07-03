@@ -1,4 +1,4 @@
-CREATE TABLE articles(
+CREATE TABLE IF NOT EXISTS articles(
     id                 BIGINT UNSIGNED          NOT NULL    AUTO_INCREMENT              COMMENT '文章ID',
     author_id          BIGINT UNSIGNED          NOT NULL                                COMMENT '作者ID',
     title              VARCHAR(255)             NOT NULL                                COMMENT '文章标题',

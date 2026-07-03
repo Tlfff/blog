@@ -1,4 +1,4 @@
-CREATE TABLE article_view_histories(
+CREATE TABLE IF NOT EXISTS article_view_histories(
     id                 BIGINT UNSIGNED          NOT NULL    AUTO_INCREMENT              COMMENT '浏览历史ID',
     user_id            BIGINT UNSIGNED          NOT NULL                                COMMENT '用户ID',
     article_id         BIGINT UNSIGNED          NOT NULL                                COMMENT '文章ID',
