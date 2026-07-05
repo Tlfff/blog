@@ -17,10 +17,11 @@ type ArticleService struct {
 	historyView *ArticleViewHistoryService
 }
 
-func NewArticleService(repo *repository.ArticleRepository, historyView *ArticleViewHistoryService) *ArticleService {
+func NewArticleService(repo *repository.ArticleRepository, userRepo *repository.UserRepository, historyView *ArticleViewHistoryService) *ArticleService {
 	return &ArticleService{
 		repo:        repo,
 		historyView: historyView,
+		userRepo:    userRepo,
 	}
 }
 
@@ -114,10 +115,18 @@ func (s *ArticleService) GetPublishedArticle(articleId uint64, userId uint64, ip
 
 	// 2.记录浏览历史
 	s.historyView.RecordView(userId, articleId, ip)
-	// 3. todo：假定一个作者昵称，如果未来连了用户表，可以用 artModel.AuthorID 去查出来
-	authorNick := "博主"
+	// 3. 获取作者信息
+	authorNick := "匿名博主"
+	authorAvatar := ""
+	authorIP := ""
+	user, err := s.userRepo.FindUserByID(oldArticle.AuthorID)
+	if err == nil && user != nil {
+		authorNick = user.Nickname
+		authorAvatar = user.Avatar
+		authorIP = user.LastLoginIp
+	}
 
-	return article.NewArticleDetailResponse(oldArticle, authorNick), nil
+	return article.NewArticleDetailResponse(oldArticle, authorNick, authorAvatar, authorIP), nil
 }
 
 // 管理员：查看文章详情
@@ -133,10 +142,19 @@ func (s *ArticleService) GetArticle(articleId uint64) (*article.ArticleDetailRes
 		return nil, common.ErrArticleDeleted
 	}
 
-	// todo：假定一个作者昵称，如果未来连了用户表，可以用 artModel.AuthorID 去查出来
-	authorNick := "博主"
+	// 获取用户信息
+	authorNick := "匿名博主"
+	authorAvatar := ""
+	authorIP := ""
 
-	return article.NewArticleDetailResponse(oldArticle, authorNick), nil
+	user, err := s.userRepo.FindUserByID(oldArticle.AuthorID)
+	if err == nil && user != nil {
+		authorNick = user.Nickname
+		authorAvatar = user.Avatar
+		authorIP = user.LastLoginIp
+	}
+
+	return article.NewArticleDetailResponse(oldArticle, authorNick, authorAvatar, authorIP), nil
 }
 
 // 发表文章

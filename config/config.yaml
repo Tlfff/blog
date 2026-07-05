@@ -1,6 +1,6 @@
 database:
-  username: "root"
-  password: "12345678"
+  username: "bloguser"
+  password: "20040614"
   host: "127.0.0.1"
   port: 3306
   dbname: "blog"

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"blog/internal/model"
+	"context"
 
 	"gorm.io/gorm"
 )
@@ -34,7 +35,7 @@ func (r *UserRepository) GetUserByAccount(account string) (*model.User, error) {
 }
 
 // 根据用户ID获取用户信息
-// select id,phone,password,nickname,avatar,role from users where id =? and status=1
+// select id,phone,password,nickname,avatar,role,last_login_ip,last_login_time from users where id =? and status=1
 func (r *UserRepository) FindUserByID(id uint64) (*model.User, error) {
 	var user model.User
 	err := r.db.Where("id = ? AND status = ?", id, 1).Take(&user).Error
@@ -42,6 +43,28 @@ func (r *UserRepository) FindUserByID(id uint64) (*model.User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+// 批量根据用户ID获取用户信息 (组装用户字典专用)
+// select id,phone,password,nickname,avatar,role,last_login_ip,last_login_time from users where id in (?, ?, ...) and status=1
+func (r *UserRepository) FindUsersByIDs(ctx context.Context, ids []uint64) ([]*model.User, error) {
+	var users []*model.User
+
+	// 兜底防御：如果传进来的 ids 切片是空的，直接返回空切片
+	if len(ids) == 0 {
+		return users, nil
+	}
+
+	// 使用 Where("id IN ?", ids) 配合 status=1 进行高性能批量检索
+	err := r.db.WithContext(ctx).
+		Where("id IN ? AND status = ?", ids, 1).
+		Find(&users).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
 }
 
 // 更新用户信息
