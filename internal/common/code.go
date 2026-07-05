@@ -27,4 +27,9 @@ const (
 	CodeArticleDeleted     = 1301 //文章被删除
 	CodeArticlePermission  = 1302 //操作文章权限不足
 	CodeArticleStatusError = 1303 //文章状态异常
+	//------------------------- 评论模块 ---------------------------------
+	CodeCommentNotFound    = 1400 // 评论不存在
+	CodeCommentDeleted     = 1401 // 评论已被删除
+	CodeCommentRootDeleted = 1402 // 主楼评论已被删除，无法回复
+	CodeCommentPermission  = 1403 // 操作评论权限不足
 )

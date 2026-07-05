@@ -9,6 +9,7 @@ type Comment struct {
 	ReplyToUserID uint64    `gorm:"column:reply_to_user_id"`            //被回复的用户ID
 	Content       string    `gorm:"column:content"`                     //评论内容
 	RootID        uint64    `gorm:"column:root_id"`                     //根评论ID
+	IP            string    `gorm:"column:ip" `                         // 评论的IP地址
 	CreatedTime   time.Time `gorm:"column:created_time;autoCreateTime"` //评论创建时间
 	UpdatedTime   time.Time `gorm:"column:updated_time;autoUpdateTime"` //评论更新时间
 	Status        int8      `gorm:"column:status"`                      //评论状态：0-已删除 1-正常

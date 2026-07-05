@@ -41,6 +41,11 @@ var (
 	ErrArticleContentEmpty     = errors.New("文章内容不能为空")
 	ErrArticleIDInvalid        = errors.New("文章ID非法")
 	ErrArticleStatusInvalid    = errors.New("文章状态非法")
+	//------------------------- 评论模块 ---------------------------------
+	ErrCommentNotFound    = errors.New("评论不存在")
+	ErrCommentDeleted     = errors.New("评论已被删除")
+	ErrCommentRootDeleted = errors.New("主楼评论已被删除，无法回复")
+	ErrCommentPermission  = errors.New("无权操作该评论")
 )
 
 func GetCodeByError(err error) int {
@@ -99,7 +104,17 @@ func GetCodeByError(err error) int {
 		return CodeArticlePermission
 	case ErrArticleStatusError:
 		return CodeArticleStatusError
+	// 评论模块
+	case ErrCommentNotFound:
+		return CodeCommentNotFound
+	case ErrCommentDeleted:
+		return CodeCommentDeleted
+	case ErrCommentRootDeleted:
+		return CodeCommentRootDeleted
+	case ErrCommentPermission:
+		return CodeCommentPermission
 	default:
 		return CodeInternalServerError
+
 	}
 }

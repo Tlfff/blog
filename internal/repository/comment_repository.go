@@ -26,10 +26,40 @@ type CommentRepository interface {
 
 	// Offset分页：展开拉取子评论列表（作为跳页/上一页兜底）
 	DeleteCommment(ctx context.Context, id uint64) error
+	// 计算满足条件的主评论总数 (用于主列表分页的 total)
+	CountRootComments(ctx context.Context, articleID uint64, authorID uint64) (int64, error)
+	// 计算某个主评论下的子评论总数 (用于楼层内回复数展示)
+	CountReplies(ctx context.Context, rootID uint64) (int64, error)
 }
 
 type commentRepository struct {
 	db *gorm.DB
+}
+
+// 计算子评论数量
+// select count(*) from comments where root_id=? and status=1
+func (c *commentRepository) CountReplies(ctx context.Context, rootID uint64) (int64, error) {
+	var count int64
+	err := c.db.WithContext(ctx).Model(&model.Comment{}).Where("root_id=? AND status=1", rootID).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// 计算文章中总评论数量
+// select count(*) from comments where article=? and root_id=? and status=1
+func (c *commentRepository) CountRootComments(ctx context.Context, articleID uint64, authorID uint64) (int64, error) {
+	var count int64
+	tx := c.db.WithContext(ctx).Model(&model.Comment{}).Where("article_id=? AND root_id=0 AND status=1", articleID)
+	if authorID > 0 {
+		tx = tx.Where("user_id=?", authorID)
+	}
+	err := tx.Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 // 软删除评论
@@ -44,7 +74,7 @@ func (c *commentRepository) DeleteCommment(ctx context.Context, id uint64) error
 func (c *commentRepository) FindByID(ctx context.Context, id uint64) (*model.Comment, error) {
 	var comment model.Comment
 	err := c.db.WithContext(ctx).
-		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "parent_id", "created_time", "updated_time", "status").
+		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "created_time", "updated_time", "status").
 		Where("id=?", id).
 		First(&comment).Error
 	if err != nil {
@@ -60,7 +90,7 @@ func (c *commentRepository) FindByID(ctx context.Context, id uint64) (*model.Com
 func (c *commentRepository) FindRepliesWithCursor(ctx context.Context, rootID uint64, lastID uint64, pageSize int) ([]*model.Comment, error) {
 	var list []*model.Comment
 	err := c.db.WithContext(ctx).
-		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "parent_id", "created_time", "updated_time", "status").
+		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "created_time", "updated_time", "status", "ip").
 		Where("root_id=?  AND status=1 AND id>?", rootID, lastID).
 		Order("id ASC").Limit(pageSize).
 		Find(&list).Error
@@ -78,7 +108,7 @@ func (c *commentRepository) FindRepliesWithCursor(ctx context.Context, rootID ui
 func (c *commentRepository) FindRepliesWithOffset(ctx context.Context, rootID uint64, page int, pageSize int) ([]*model.Comment, error) {
 	var list []*model.Comment
 	err := c.db.WithContext(ctx).
-		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "parent_id", "created_time", "updated_time", "status").
+		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "created_time", "updated_time", "status", "ip").
 		Where("root_id=?  AND status=1", rootID).
 		Order("id ASC").Limit(pageSize).Offset(page).
 		Find(&list).Error
@@ -96,7 +126,7 @@ func (c *commentRepository) FindRepliesWithOffset(ctx context.Context, rootID ui
 func (c *commentRepository) FindRootCommentsWithCursor(ctx context.Context, articleID uint64, lastID uint64, pageSize int, isDesc bool, authorID uint64) ([]*model.Comment, error) {
 	var list []*model.Comment
 	tx := c.db.WithContext(ctx).
-		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "parent_id", "created_time", "updated_time", "status").
+		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "created_time", "updated_time", "status", "ip").
 		Where("article_id=? AND root_id=0 AND status=1", articleID)
 	// 只看楼主
 	if authorID > 0 {
@@ -123,7 +153,7 @@ func (c *commentRepository) FindRootCommentsWithCursor(ctx context.Context, arti
 func (c *commentRepository) FindRootCommentsWithOffset(ctx context.Context, articleID uint64, page int, pageSize int, isDesc bool, authorID uint64) ([]*model.Comment, error) {
 	var list []*model.Comment
 	tx := c.db.WithContext(ctx).
-		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "parent_id", "created_time", "updated_time", "status").
+		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "created_time", "updated_time", "status", "ip").
 		Where("article_id=?  AND root_id=0 AND status=1", articleID)
 	// 只看楼主
 	if authorID > 0 {

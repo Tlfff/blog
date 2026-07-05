@@ -30,35 +30,41 @@ var serverCmd = &cobra.Command{
 		db, err := database.NewMySQLClient(config.Database.Username, config.Database.Password, config.Database.Host, config.Database.Port, config.Database.DBName)
 		if err != nil {
 			fmt.Printf("[error]:数据库连接初始化失败：%v\n", err)
-			return // 🚨 极其重要：连接失败必须立刻拦截并退出，不能往下传 nil！
+			return // 连接失败必须立刻拦截并退出，不能往下传 nil！
 		}
 
-		// 3. 安全防御打印（上线后可删，现在帮你排查）
+		// 3. 安全防御打印
 		if db == nil {
 			fmt.Println("[error]: NewMySQLClient 返回的 db 对象居然是空的，请检查 pkg/database 里的内部实现！")
 			return
 		}
-		// 3. 初始化用户模块
+		// 4. 初始化模块
+		// 4.1  初始化用户模块
 		userRepo := repository.NewUserRepository(db)
 		userAuthService := service.NewUserAuthService(userRepo)
 		userService := service.NewUserService(userRepo)
 		userAuthHandler := handler.NewUserAuthHandler(userAuthService)
 		userHandler := handler.NewUserHandler(userService)
 
-		// 4. 初始化文章浏览历史模块
+		// 4.2 初始化文章浏览历史模块
 		historyRepo := repository.NewArticleViewHistoryRepository(db)
 		historyService := service.NewArticleViewHistoryService(historyRepo)
 
-		// 5. 初始化文章模块
+		// 4.3 初始化文章模块
 		articleRepo := repository.NewArticleRepository(db)
-		articleService := service.NewArticleService(articleRepo, historyService)
+		articleService := service.NewArticleService(articleRepo, userRepo, historyService)
 		articleHandler := handler.NewArticleHandler(articleService)
+		// 4.4 初始化评论模块
+		commentRepo := repository.NewCommentRepository(db)                 // 传入 db 初始化 repo
+		commentService := service.NewCommentService(commentRepo, userRepo) // 💡 注入你的 commentRepo 和第 3 步初始化好的 userRepo
+		commentHandler := handler.NewCommentHandler(commentService)
 
-		// 6. 组装成统一的路由容器
+		// 5. 组装成统一的路由容器
 		appHandler := &routes.AppHandler{
 			UserAuth: userAuthHandler,
 			User:     userHandler,
 			Article:  articleHandler,
+			Comment:  commentHandler,
 		}
 
 		// 6. 创建路由引擎

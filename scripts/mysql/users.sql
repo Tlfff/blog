@@ -1,3 +1,5 @@
+USE blog;
+
 CREATE TABLE IF NOT EXISTS users(
     id              BIGINT UNSIGNED     NOT NULL    AUTO_INCREMENT              COMMENT '用户ID',
     nickname        VARCHAR(50)         NOT NULL                                COMMENT '用户名',
