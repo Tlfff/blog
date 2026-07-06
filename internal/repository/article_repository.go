@@ -6,6 +6,13 @@ import (
 	"gorm.io/gorm"
 )
 
+type ArticleWithUser struct {
+	model.Article
+	Nickname    string `gorm:"column:nickname"`
+	Avatar      string `gorm:"column:avatar"`
+	LastLoginIp string `gorm:"column:last_login_ip"`
+}
+
 type ArticleRepository struct {
 	db *gorm.DB
 }
@@ -14,6 +21,23 @@ func NewArticleRepository(db *gorm.DB) *ArticleRepository {
 	return &ArticleRepository{
 		db: db,
 	}
+}
+
+// 连表查单条文章详情
+// SELECT a.id, a.author_id, a.title, a.content, a.tags, a.status, a.view_count, a.like_count, a.comment_count, a.created_time, a.updated_time,
+// u.nickname, u.avatar, u.last_login_ip
+// FROM articles a
+// LEFT JOIN users u ON a.author_id = u.id
+// WHERE a.id = ?
+// LIMIT 1
+func (a *ArticleRepository) FindArticleAndUserInfoByID(id uint64) (*ArticleWithUser, error) {
+	var result ArticleWithUser
+	err := a.db.Table("articles a").
+		Select(`a.id, a.author_id, a.title, a.content, a.tags, a.status, a.view_count, a.like_count, a.comment_count, a.created_time, a.updated_time, u.nickname, u.avatar, u.last_login_ip`).
+		Joins("LEFT JOIN users u ON a.author_id = u.id").
+		Where("a.id = ?", id).
+		Take(&result).Error
+	return &result, err
 }
 
 // 创建文章

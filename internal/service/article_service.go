@@ -17,11 +17,10 @@ type ArticleService struct {
 	historyView *ArticleViewHistoryService
 }
 
-func NewArticleService(repo *repository.ArticleRepository, userRepo *repository.UserRepository, historyView *ArticleViewHistoryService) *ArticleService {
+func NewArticleService(repo *repository.ArticleRepository, historyView *ArticleViewHistoryService) *ArticleService {
 	return &ArticleService{
 		repo:        repo,
 		historyView: historyView,
-		userRepo:    userRepo,
 	}
 }
 
@@ -99,62 +98,40 @@ func (s *ArticleService) ClearArticle(articleId uint64, userId uint64) error {
 // 公开：查看文章详情
 func (s *ArticleService) GetPublishedArticle(articleId uint64, userId uint64, ip string) (*article.ArticleDetailResponse, error) {
 	// 1.查出文章
-	oldArticle, err := s.repo.FindArticleByID(articleId)
+	detail, err := s.repo.FindArticleAndUserInfoByID(articleId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, common.ErrArticleNotFound
 		}
 		return nil, err
 	}
-	if oldArticle.Status == model.Deleted {
+	if detail.Status == model.Deleted {
 		return nil, common.ErrArticleDeleted
 	}
-	if oldArticle.Status != model.Published {
+	if detail.Status != model.Published {
 		return nil, common.ErrArticlePermissionDenied
 	}
 
 	// 2.记录浏览历史
 	s.historyView.RecordView(userId, articleId, ip)
-	// 3. 获取作者信息
-	authorNick := "匿名博主"
-	authorAvatar := ""
-	authorIP := ""
-	user, err := s.userRepo.FindUserByID(oldArticle.AuthorID)
-	if err == nil && user != nil {
-		authorNick = user.Nickname
-		authorAvatar = user.Avatar
-		authorIP = user.LastLoginIp
-	}
 
-	return article.NewArticleDetailResponse(oldArticle, authorNick, authorAvatar, authorIP), nil
+	return article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp), nil
 }
 
 // 管理员：查看文章详情
 func (s *ArticleService) GetArticle(articleId uint64) (*article.ArticleDetailResponse, error) {
-	oldArticle, err := s.repo.FindArticleByID(articleId)
+	detail, err := s.repo.FindArticleAndUserInfoByID(articleId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, common.ErrArticleNotFound
 		}
 		return nil, err
 	}
-	if oldArticle.Status == model.Deleted {
+	if detail.Status == model.Deleted {
 		return nil, common.ErrArticleDeleted
 	}
 
-	// 获取用户信息
-	authorNick := "匿名博主"
-	authorAvatar := ""
-	authorIP := ""
-
-	user, err := s.userRepo.FindUserByID(oldArticle.AuthorID)
-	if err == nil && user != nil {
-		authorNick = user.Nickname
-		authorAvatar = user.Avatar
-		authorIP = user.LastLoginIp
-	}
-
-	return article.NewArticleDetailResponse(oldArticle, authorNick, authorAvatar, authorIP), nil
+	return article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp), nil
 }
 
 // 发表文章

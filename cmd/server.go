@@ -52,11 +52,11 @@ var serverCmd = &cobra.Command{
 
 		// 4.3 初始化文章模块
 		articleRepo := repository.NewArticleRepository(db)
-		articleService := service.NewArticleService(articleRepo, userRepo, historyService)
+		articleService := service.NewArticleService(articleRepo, historyService)
 		articleHandler := handler.NewArticleHandler(articleService)
 		// 4.4 初始化评论模块
-		commentRepo := repository.NewCommentRepository(db)                 // 传入 db 初始化 repo
-		commentService := service.NewCommentService(commentRepo, userRepo) // 💡 注入你的 commentRepo 和第 3 步初始化好的 userRepo
+		commentRepo := repository.NewCommentRepository(db)
+		commentService := service.NewCommentService(commentRepo)
 		commentHandler := handler.NewCommentHandler(commentService)
 
 		// 5. 组装成统一的路由容器

@@ -7,6 +7,7 @@ type CommentUserInfo struct {
 	UserID   uint64 `json:"user_id"`
 	Username string `json:"username"`
 	Avatar   string `json:"avatar"`
+	// IP       string `json:"ip"`
 }
 
 // ---- 一、 前台主评论列表返回 ----
