@@ -30,7 +30,7 @@ func TestUserAuthHandler_AllRoutes(t *testing.T) {
 	userAuthService := service.NewUserAuthService(userRepo)
 	h := NewUserAuthHandler(userAuthService)
 
-	// 4. 🎯 大表格：按“时光流逝”的顺序，先测异常，再测成功注册，最后测登录
+	// 4. 大表格：按“时光流逝”的顺序，先测异常，再测成功注册，最后测登录
 	tests := []struct {
 		name           string
 		run            func(c *gin.Context) // 动态调用目标函数
@@ -80,7 +80,7 @@ func TestUserAuthHandler_AllRoutes(t *testing.T) {
 			method: "POST",
 			path:   "/auth/login",
 			body: user.LoginRequest{
-				Account:  "18078789119",
+				Phone:    "18078789119",
 				Password: "789321", // 故意输错密码
 			},
 			ctxUser:        nil,
@@ -92,7 +92,7 @@ func TestUserAuthHandler_AllRoutes(t *testing.T) {
 			method: "POST",
 			path:   "/auth/login",
 			body: user.LoginRequest{
-				Account:  "18078789119", // 使用第2步成功注册的手机号
+				Phone:    "18078789119", // 使用第2步成功注册的手机号
 				Password: "123456",
 			},
 			ctxUser:        nil,

@@ -2,23 +2,26 @@ package article
 
 import (
 	"blog/internal/model"
+	"blog/pkg/iputil"
 	"strings"
 )
 
 // 文章详情
 type ArticleDetailResponse struct {
-	ID          uint64   `json:"id"`
-	Title       string   `json:"title"`
-	Content     string   `json:"content"`
-	Tags        []string `json:"tags"`
-	Status      int8     `json:"status"`
-	AuthorNick  string   `json:"author_nick"`
-	CreatedTime int64    `json:"created_time"`
-	UpdatedTime int64    `json:"updated_time"`
+	ID           uint64   `json:"id"`
+	Title        string   `json:"title"`
+	Content      string   `json:"content"`
+	Tags         []string `json:"tags"`
+	Status       int8     `json:"status"`
+	AuthorNick   string   `json:"author_nick"`
+	AuthorAvatar string   `json:"author_avatar"`
+	IP           string   `json:"ip"` //作者IP
+	CreatedTime  int64    `json:"created_time"`
+	UpdatedTime  int64    `json:"updated_time"`
 }
 
 // 构造单条详情响应
-func NewArticleDetailResponse(m *model.Article, nickName string) *ArticleDetailResponse {
+func NewArticleDetailResponse(m *model.Article, nickName, avatar, authorIP string) *ArticleDetailResponse {
 	if m == nil {
 		return nil
 	}
@@ -27,14 +30,16 @@ func NewArticleDetailResponse(m *model.Article, nickName string) *ArticleDetailR
 		tags = []string{}
 	}
 	return &ArticleDetailResponse{
-		ID:          m.ID,
-		Title:       m.Title,
-		Content:     m.Content,
-		Tags:        tags,
-		Status:      int8(m.Status),
-		AuthorNick:  nickName,
-		CreatedTime: m.CreatedTime.Unix(),
-		UpdatedTime: m.UpdatedTime.Unix(),
+		ID:           m.ID,
+		Title:        m.Title,
+		Content:      m.Content,
+		Tags:         tags,
+		Status:       int8(m.Status),
+		AuthorNick:   nickName,
+		AuthorAvatar: avatar,
+		IP:           iputil.ConvertIPToRegion(authorIP),
+		CreatedTime:  m.CreatedTime.Unix(),
+		UpdatedTime:  m.UpdatedTime.Unix(),
 	}
 }
 

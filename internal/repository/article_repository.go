@@ -2,9 +2,17 @@ package repository
 
 import (
 	"blog/internal/model"
+	"context"
 
 	"gorm.io/gorm"
 )
+
+type ArticleWithUser struct {
+	model.Article
+	Nickname    string `gorm:"column:nickname"`
+	Avatar      string `gorm:"column:avatar"`
+	LastLoginIp string `gorm:"column:last_login_ip"`
+}
 
 type ArticleRepository struct {
 	db *gorm.DB
@@ -14,6 +22,23 @@ func NewArticleRepository(db *gorm.DB) *ArticleRepository {
 	return &ArticleRepository{
 		db: db,
 	}
+}
+
+// 连表查单条文章详情
+// SELECT a.id, a.author_id, a.title, a.content, a.tags, a.status, a.view_count, a.like_count, a.comment_count, a.created_time, a.updated_time,
+// u.nickname, u.avatar, u.last_login_ip
+// FROM articles a
+// LEFT JOIN users u ON a.author_id = u.id
+// WHERE a.id = ?
+// LIMIT 1
+func (a *ArticleRepository) FindArticleAndUserInfoByID(id uint64) (*ArticleWithUser, error) {
+	var result ArticleWithUser
+	err := a.db.Table("articles a").
+		Select(`a.id, a.author_id, a.title, a.content, a.tags, a.status, a.view_count, a.like_count, a.comment_count, a.created_time, a.updated_time, u.nickname, u.avatar, u.last_login_ip`).
+		Joins("LEFT JOIN users u ON a.author_id = u.id").
+		Where("a.id = ?", id).
+		Take(&result).Error
+	return &result, err
 }
 
 // 创建文章
@@ -74,4 +99,14 @@ func (a *ArticleRepository) GetListByStatus(AuthorID uint64, status int8) ([]*mo
 		Where("author_id=? AND status=?", AuthorID, status).
 		Find(&list).Error
 	return list, err
+}
+
+// 更新文章评论数
+// 传入 delta 改变文章评论数（delta 可以是正数如 1，也可以是负数如 -5）
+//
+// 使用传入的 tx 确保操作在外部的事务生命周期内
+func (a *ArticleRepository) UpdateCommentCountDelta(ctx context.Context, tx *gorm.DB, articleID uint64, delta int64) error {
+	return tx.WithContext(ctx).Model(&model.Article{}).
+		Where("id = ?", articleID).
+		Update("comment_count", gorm.Expr("comment_count + ?", delta)).Error
 }

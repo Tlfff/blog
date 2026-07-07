@@ -120,8 +120,10 @@ func (h *ArticleHandler) GetArticleDetail(c *gin.Context) {
 		return
 	}
 
+	userId := c.GetUint64("userID")
+	ip := c.ClientIP()
 	// 2. 获取详情
-	res, err := h.article.GetPublishedArticle(req.ID)
+	res, err := h.article.GetPublishedArticle(req.ID, userId, ip)
 	if err != nil {
 		c.Error(err)
 		return

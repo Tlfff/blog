@@ -32,8 +32,6 @@ func (d *DuplicateChecker) Check(key string, expire time.Duration) bool {
 	if lastTime, ok := d.cache[key]; ok {
 		if now.Sub(lastTime) < expire {
 			return true // 重复提交
-		} else {
-			delete(d.cache, key) // 惰性删除
 		}
 	}
 

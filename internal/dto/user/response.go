@@ -2,6 +2,7 @@ package user
 
 import (
 	"blog/internal/model"
+	"blog/pkg/iputil"
 )
 
 // 登录成功响应体
@@ -25,7 +26,7 @@ func NewMyProfileResponse(user *model.User) *MyProfileResponse {
 		Nickname:      user.Nickname,
 		Avatar:        user.Avatar,
 		LastLoginTime: user.LastLoginTime.Unix(),
-		LastLoginIp:   user.LastLoginIp,
+		LastLoginIp:   iputil.ConvertIPToRegion(user.LastLoginIp),
 	}
 }
 

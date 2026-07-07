@@ -12,28 +12,41 @@ type AppHandler struct {
 	UserAuth *handler.UserAuthHandler
 	Article  *handler.ArticleHandler
 	User     *handler.UserHandler
+	Comment  *handler.CommentHandler
 }
 
 func InitRoute(r *gin.Engine, appHandler *AppHandler) {
-	// 1. 挂载全局错误中间件
+	// 1. 全局中间件
+	r.Use(middleware.LoggerMiddleware())
 	r.Use(middleware.GlobalErrorMiddleware())
-	// 2.不需要登录的接口
+	// 2.不需要登录的接口（/r/xxx）
 	publicGroup := r.Group("")
 	{
 		InitArticlePublicRoutes(publicGroup, appHandler.Article)
 		InitUserPublicRoutes(publicGroup, appHandler.UserAuth, appHandler.User)
+		InitCommentPublicRoutes(publicGroup, appHandler.Comment)
 	}
+
 	// 3.需要登录的接口
-	privateGroup := r.Group("/my")
+	privateGroup := r.Group("/auth")
 	privateGroup.Use(middleware.AuthMiddleware())
 	{
 		InitUserPrivateRoutes(privateGroup, appHandler.User)
+		InitCommentPrivateRoutes(privateGroup, appHandler.Comment)
 	}
 	// 4.管理员管理的接口
 	authGroup := r.Group("/admin")
 	authGroup.Use(middleware.AuthMiddleware(), middleware.AdminCheckMiddleware())
 	{
 		InitArticlePrivateRoutes(authGroup, appHandler.Article)
+		InitCommentAdminRoutes(authGroup, appHandler.Comment)
+	}
+
+	// 5.登录和不登录功能有区别的接口
+	optionalGroup := r.Group("/optional")
+	optionalGroup.Use(middleware.OptionalAuth())
+	{
+		InitArticleOptionalRoutes(optionalGroup, appHandler.Article)
 	}
 
 }
