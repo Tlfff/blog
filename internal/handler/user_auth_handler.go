@@ -50,9 +50,14 @@ func (h *UserAuthHandler) Login(c *gin.Context) {
 		c.Error(common.ErrInvalidRequestBody)
 		return
 	}
+	// 1.1 两个不能同时为空
+	if req.Nickname == "" && req.Phone == "" {
+		c.Error(common.ErrInvalidRequestBody)
+		return
+	}
 
 	// 2. 调用登录
-	res, err := h.userAuth.Login(req.Account, req.Password, c.ClientIP())
+	res, err := h.userAuth.Login(req.Phone, req.Nickname, req.Password, c.ClientIP())
 	if err != nil {
 		c.Error(err)
 		return

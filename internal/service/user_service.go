@@ -101,7 +101,7 @@ func (s *UserService) UpdateAccount(userID uint64, phone string) error {
 	}
 
 	// 检查新手机号是否已被他人占用
-	existUser, err := s.repo.GetUserByAccount(phone)
+	existUser, err := s.repo.GetUserByAccount(phone, "")
 	if err == nil && existUser.ID != userID {
 		return common.ErrPhoneAlreadyExists
 	}

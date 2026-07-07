@@ -17,13 +17,12 @@ type CommentWithUser struct {
 	// 被回复人公共信息 (如果是主评论则为空)
 	ReplyNickname string `gorm:"column:reply_nickname"`
 	ReplyAvatar   string `gorm:"column:reply_avatar"`
-	ReplyCount    int64  `gorm:"column:reply_count"`
 }
 
 type CommentRepository interface {
-	Insert(ctx context.Context, comment *model.Comment) error
+	Insert(ctx context.Context, tx *gorm.DB, comment *model.Comment) error
 
-	UpdateStatus(ctx context.Context, id uint64, status uint8) error
+	UpdateStatus(ctx context.Context, tx *gorm.DB, id uint64, status uint8) (int64, error)
 
 	FindByID(ctx context.Context, id uint64) (*model.Comment, error)
 
@@ -39,10 +38,39 @@ type CommentRepository interface {
 	CountRootComments(ctx context.Context, articleID uint64, authorID uint64) (int64, error)
 	// 计算某个主评论下的子评论总数 (用于楼层内回复数展示)
 	CountReplies(ctx context.Context, rootID uint64) (int64, error)
+	CountRepliesTx(ctx context.Context, tx *gorm.DB, rootID uint64) (int64, error)
+	// 批量软删除指定主评论下所有未删除子评论
+	BatchUpdateChildCommentStatus(ctx context.Context, tx *gorm.DB, rootID uint64) (int64, error)
+	UpdateCommentCountDelta(ctx context.Context, tx *gorm.DB, id uint64, delta int64) error
+	GetDB() *gorm.DB
 }
 
 type commentRepository struct {
 	db *gorm.DB
+}
+
+func (c *commentRepository) UpdateCommentCountDelta(ctx context.Context, tx *gorm.DB, id uint64, delta int64) error {
+	return tx.WithContext(ctx).Model(&model.Comment{}).
+		Where("id = ?", id).
+		UpdateColumn("comment_count", gorm.Expr("comment_count + ?", delta)).Error
+}
+
+func (c *commentRepository) BatchUpdateChildCommentStatus(ctx context.Context, tx *gorm.DB, rootID uint64) (int64, error) {
+	res := tx.WithContext(ctx).
+		Model(&model.Comment{}).
+		Where("root_id = ? AND status = 1", rootID).
+		Update("status", 0)
+	return res.RowsAffected, res.Error
+}
+
+func (c *commentRepository) CountRepliesTx(ctx context.Context, tx *gorm.DB, rootID uint64) (int64, error) {
+	var count int64
+	err := tx.WithContext(ctx).Model(&model.Comment{}).Where("root_id=? AND status=1", rootID).Count(&count).Error
+	return count, err
+}
+
+func (c *commentRepository) GetDB() *gorm.DB {
+	return c.db
 }
 
 // 计算子评论数量
@@ -83,7 +111,7 @@ func (c *commentRepository) DeleteCommment(ctx context.Context, id uint64) error
 func (c *commentRepository) FindByID(ctx context.Context, id uint64) (*model.Comment, error) {
 	var comment model.Comment
 	err := c.db.WithContext(ctx).
-		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "created_time", "updated_time", "status").
+		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "like_count", "comment_count", "ip", "created_time", "updated_time", "status").
 		Where("id=?", id).
 		First(&comment).Error
 	if err != nil {
@@ -95,20 +123,20 @@ func (c *commentRepository) FindByID(ctx context.Context, id uint64) (*model.Com
 // 子评论：游标方式查找列表,固定升序
 // SELECT
 //
-//	c.id, c.article_id, c.user_id, c.reply_to_user_id, c.content, c.root_id, c.created_time, c.updated_time, c.status,
-//	u1.nickname AS nickname, u1.avatar AS avatar,u1.last_login_ip AS last_login_ip,
+//	c.id, c.article_id, c.user_id, c.reply_to_user_id, c.content, c.root_id, c.like_count, c.comment_count, c.ip, c.created_time, c.updated_time, c.status,
+//	u1.nickname AS nickname, u1.avatar AS avatar, u1.last_login_ip AS last_login_ip,
 //	u2.nickname AS reply_nickname, u2.avatar AS reply_avatar
 //
 // FROM comments c
 // LEFT JOIN users u1 ON c.user_id = u1.id
 // LEFT JOIN users u2 ON c.reply_to_user_id = u2.id
-// WHERE c.root_id = ？ AND c.status = 1 AND c.id > last_id
+// WHERE c.root_id = ? AND c.status = 1 AND c.id > ?
 // ORDER BY c.id ASC
-// LIMIT pageSize;
+// LIMIT ?;
 func (c *commentRepository) FindRepliesWithCursor(ctx context.Context, rootID uint64, lastID uint64, pageSize int) ([]*CommentWithUser, error) {
 	var list []*CommentWithUser
 	err := c.db.WithContext(ctx).Table("comments c").
-		Select(`c.id, c.article_id, c.user_id, c.reply_to_user_id, c.content, c.root_id, c.created_time, c.updated_time, c.status,
+		Select(`c.id, c.article_id, c.user_id, c.reply_to_user_id, c.content, c.root_id, c.like_count, c.comment_count, c.ip, c.created_time, c.updated_time, c.status,
 				u1.nickname AS nickname, u1.avatar AS avatar, u1.last_login_ip AS last_login_ip, 
 				u2.nickname AS reply_nickname, u2.avatar AS reply_avatar`).
 		Joins("LEFT JOIN users u1 ON c.user_id = u1.id").
@@ -124,9 +152,9 @@ func (c *commentRepository) FindRepliesWithCursor(ctx context.Context, rootID ui
 // 子评论：传统分页方式查找列表
 // SELECT
 //
-//	c.id,c.article_id,c.user_id,c.reply_to_user_id,c.content,c.root_id,c.created_time,c.updated_time,c.status,
-//	u1.nickname AS nickname,u1.avatar AS avatar,u1.last_login_ip AS last_login_ip,
-//	u2.nickname AS reply_nickname,u2.avatar AS reply_avatar
+//	c.id, c.article_id, c.user_id, c.reply_to_user_id, c.content, c.root_id, c.like_count, c.comment_count, c.ip, c.created_time, c.updated_time, c.status,
+//	u1.nickname AS nickname, u1.avatar AS avatar, u1.last_login_ip AS last_login_ip,
+//	u2.nickname AS reply_nickname, u2.avatar AS reply_avatar
 //
 // FROM comments c
 // LEFT JOIN users u1 ON c.user_id = u1.id
@@ -137,9 +165,9 @@ func (c *commentRepository) FindRepliesWithCursor(ctx context.Context, rootID ui
 func (c *commentRepository) FindRepliesWithOffset(ctx context.Context, rootID uint64, page int, pageSize int) ([]*CommentWithUser, error) {
 	var list []*CommentWithUser
 	err := c.db.WithContext(ctx).Table("comments c").
-		Select(`c.id,c.article_id,c.user_id,c.reply_to_user_id,c.content,c.root_id,c.created_time,c.updated_time,c.status,
-				u1.nickname AS nickname,u1.avatar AS avatar,u1.last_login_ip AS last_login_ip, 
-				u2.nickname AS reply_nickname,u2.avatar AS reply_avatar`).
+		Select(`c.id, c.article_id, c.user_id, c.reply_to_user_id, c.content, c.root_id, c.like_count, c.comment_count, c.ip, c.created_time, c.updated_time, c.status,
+				u1.nickname AS nickname, u1.avatar AS avatar, u1.last_login_ip AS last_login_ip, 
+				u2.nickname AS reply_nickname, u2.avatar AS reply_avatar`).
 		Joins("LEFT JOIN users u1 ON c.user_id = u1.id").
 		Joins("LEFT JOIN users u2 ON c.reply_to_user_id = u2.id").
 		Where("c.root_id = ? AND c.status = 1", rootID).
@@ -153,15 +181,13 @@ func (c *commentRepository) FindRepliesWithOffset(ctx context.Context, rootID ui
 // 主评论：游标方式查找列表
 // SELECT
 //
-//	c.id,c.article_id,c.user_id,c.reply_to_user_id,c.content,c.root_id,c.created_time,c.updated_time,c.status,
+//	c.id,c.article_id,c.user_id,c.reply_to_user_id,c.content,c.root_id, c.like_count, c.comment_count, c.ip,c.created_time,c.updated_time,c.status,
 //	u1.nickname AS nickname, u1.avatar AS avatar, u1.last_login_ip AS last_login_ip,
 //	u2.nickname AS reply_nickname, u2.avatar AS reply_avatar,
-//	IFNULL(rc.reply_count, 0) AS reply_count
 //
 // FROM comments c
 // LEFT JOIN users u1 ON c.user_id = u1.id
 // LEFT JOIN users u2 ON c.reply_to_user_id = u2.id
-// LEFT JOIN (SELECT root_id, COUNT(*) AS reply_count FROM comments WHERE root_id > 0 AND status = 1 GROUP BY root_id) rc ON c.id = rc.root_id
 // WHERE c.article_id = ? AND c.root_id = 0 AND c.status = 1
 // -- 可选条件：authorID>0 拼接 AND c.user_id = ?
 // -- 游标条件：isDesc=true 拼接 AND c.id < ? ORDER BY c.id DESC
@@ -170,19 +196,12 @@ func (c *commentRepository) FindRepliesWithOffset(ctx context.Context, rootID ui
 func (c *commentRepository) FindRootCommentsWithCursor(ctx context.Context, articleID uint64, lastID uint64, pageSize int, isDesc bool, authorID uint64) ([]*CommentWithUser, error) {
 	var list []*CommentWithUser
 
-	tx := c.db.WithContext(ctx).Table("comments").
-		Select(`c.id,c.article_id,c.user_id,c.reply_to_user_id,c.content,c.root_id,c.created_time,c.updated_time,c.status,
-			u1.nickname AS nickname, u1.avatar AS avatar,u1.last_login_ip AS last_login_ip, 
-			u2.nickname AS reply_nickname, u2.avatar AS reply_avatar,
-			IFNULL(rc.reply_count, 0) AS reply_count`).
+	tx := c.db.WithContext(ctx).Table("comments c").
+		Select(`c.id, c.article_id, c.user_id, c.reply_to_user_id, c.content, c.root_id, c.like_count, c.comment_count, c.ip, c.created_time, c.updated_time, c.status,
+			u1.nickname AS nickname, u1.avatar AS avatar, u1.last_login_ip AS last_login_ip, 
+			u2.nickname AS reply_nickname, u2.avatar AS reply_avatar`).
 		Joins("LEFT JOIN users u1 ON c.user_id = u1.id").
 		Joins("LEFT JOIN users u2 ON c.reply_to_user_id = u2.id").
-		Joins(`LEFT JOIN (
-			SELECT root_id, COUNT(*) AS reply_count 
-			FROM comments 
-			WHERE root_id > 0 AND status = 1 
-			GROUP BY root_id
-		) rc ON c.id = rc.root_id`).
 		Where("c.article_id = ? AND c.root_id = 0 AND c.status = 1", articleID)
 
 	if authorID > 0 {
@@ -203,34 +222,27 @@ func (c *commentRepository) FindRootCommentsWithCursor(ctx context.Context, arti
 // 主评论：传统分页方式查找列表
 // SELECT
 //
-//	c.id,c.article_id,c.user_id,c.reply_to_user_id,c.content,c.root_id,c.created_time,c.updated_time,c.status,
+//	c.id, c.article_id, c.user_id, c.reply_to_user_id, c.content, c.root_id, c.like_count, c.comment_count, c.ip, c.created_time, c.updated_time, c.status,
 //	u1.nickname AS nickname, u1.avatar AS avatar, u1.last_login_ip AS last_login_ip,
-//	u2.nickname AS reply_nickname, u2.avatar AS reply_avatar,
-//	IFNULL(rc.reply_count, 0) AS reply_count
+//	u2.nickname AS reply_nickname, u2.avatar AS reply_avatar
 //
 // FROM comments c
 // LEFT JOIN users u1 ON c.user_id = u1.id
 // LEFT JOIN users u2 ON c.reply_to_user_id = u2.id
-// LEFT JOIN (SELECT root_id, COUNT(*) AS reply_count FROM comments WHERE root_id > 0 AND status = 1 GROUP BY root_id) rc ON c.id = rc.root_id
 // WHERE c.article_id = ? AND c.root_id = 0 AND c.status = 1
-// -- 可选条件：authorID>0 自动拼接 AND c.user_id = ?
-// -- 排序：isDesc=true ORDER BY c.id DESC，否则 ORDER BY c.id ASC
+// -- 可选条件：authorID > 0 时追加 AND c.user_id = ?
+// -- 排序二选一
+// -- isDesc=true: ORDER BY c.id DESC
+// -- isDesc=false: ORDER BY c.id ASC
 // LIMIT ? OFFSET ?;
 func (c *commentRepository) FindRootCommentsWithOffset(ctx context.Context, articleID uint64, page int, pageSize int, isDesc bool, authorID uint64) ([]*CommentWithUser, error) {
 	var list []*CommentWithUser
 	tx := c.db.WithContext(ctx).Table("comments c").
-		Select(`c.id,c.article_id,c.user_id,c.reply_to_user_id,c.content,c.root_id,c.created_time,c.updated_time,c.status,
-			u1.nickname AS nickname, u1.avatar AS avatar,u1.last_login_ip AS last_login_ip, 
-			u2.nickname AS reply_nickname, u2.avatar AS reply_avatar,
-			IFNULL(rc.reply_count, 0) AS reply_count`).
+		Select(`c.id, c.article_id, c.user_id, c.reply_to_user_id, c.content, c.root_id, c.like_count, c.comment_count, c.ip, c.created_time, c.updated_time, c.status,
+			u1.nickname AS nickname, u1.avatar AS avatar, u1.last_login_ip AS last_login_ip, 
+			u2.nickname AS reply_nickname, u2.avatar AS reply_avatar`).
 		Joins("LEFT JOIN users u1 ON c.user_id = u1.id").
 		Joins("LEFT JOIN users u2 ON c.reply_to_user_id = u2.id").
-		Joins(`LEFT JOIN (
-			SELECT root_id, COUNT(*) AS reply_count 
-			FROM comments 
-			WHERE root_id > 0 AND status = 1 
-			GROUP BY root_id
-		) rc ON c.id = rc.root_id`).
 		Where("c.article_id = ? AND c.root_id = 0 AND c.status = 1", articleID)
 
 	if authorID > 0 {
@@ -253,17 +265,19 @@ func (c *commentRepository) FindRootCommentsWithOffset(ctx context.Context, arti
 // insert into comment
 // article_id, user_id, reply_to_user_id, content, root_id, parent_id
 // values(?,?,?,?,?,?)
-func (c *commentRepository) Insert(ctx context.Context, comment *model.Comment) error {
-	return c.db.WithContext(ctx).Create(&comment).Error
+func (c *commentRepository) Insert(ctx context.Context, tx *gorm.DB, comment *model.Comment) error {
+	return tx.WithContext(ctx).Create(&comment).Error
 }
 
-// 更新评论状态
+// 更新评论状态(软删除)
 // update comment set status=?
-// where id =?
-func (c *commentRepository) UpdateStatus(ctx context.Context, id uint64, status uint8) error {
-	return c.db.WithContext(ctx).Model(&model.Comment{}).
-		Where("id=?", id).
-		Update("status", status).Error
+// where id =? and status =1
+func (c *commentRepository) UpdateStatus(ctx context.Context, tx *gorm.DB, id uint64, status uint8) (int64, error) {
+	res := tx.WithContext(ctx).Model(&model.Comment{}).
+		Where("id=? AND status = 1", id).
+		Update("status", status)
+	// res 是本次update操作结果，直接拿本次更新行数，不受中间SQL干扰
+	return res.RowsAffected, res.Error
 }
 
 func NewCommentRepository(db *gorm.DB) CommentRepository {

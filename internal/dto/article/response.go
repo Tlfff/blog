@@ -2,6 +2,7 @@ package article
 
 import (
 	"blog/internal/model"
+	"blog/pkg/iputil"
 	"strings"
 )
 
@@ -36,7 +37,7 @@ func NewArticleDetailResponse(m *model.Article, nickName, avatar, authorIP strin
 		Status:       int8(m.Status),
 		AuthorNick:   nickName,
 		AuthorAvatar: avatar,
-		IP:           authorIP,
+		IP:           iputil.ConvertIPToRegion(authorIP),
 		CreatedTime:  m.CreatedTime.Unix(),
 		UpdatedTime:  m.UpdatedTime.Unix(),
 	}

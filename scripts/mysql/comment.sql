@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS `comments` (
     content                 TEXT                NOT NULL                                COMMENT '评论内容',
     root_id                 BIGINT UNSIGNED     NOT NULL    DEFAULT   0                 COMMENT '对应的主评论ID',
     ip                      VARCHAR(50)         NOT NULL    DEFAULT ''                  COMMENT '评论IP地址',
+    like_count              BIGINT              NOT NULL    DEFAULT   0                 COMMENT '点赞数量',
+    comment_count           BIGINT              NOT NULL    DEFAULT   0                 COMMENT '子评论数量',
     created_time            DATETIME            NOT NULL    DEFAULT CURRENT_TIMESTAMP   COMMENT '创建时间',
     updated_time            DATETIME            NOT NULL    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     status                  TINYINT             NOT NULL    DEFAULT   1                 COMMENT '评论状态:0-删除,1-正常',

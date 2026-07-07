@@ -24,10 +24,22 @@ func (r *UserRepository) CreateUser(user *model.User) error {
 }
 
 // 根据账户获取用户信息
-// select id,phone,password,nickname,avatar,role from users where phone =? and status=1
-func (r *UserRepository) GetUserByAccount(account string) (*model.User, error) {
+// select id,phone,password,nickname,avatar,role from users where phone = ? and status=1
+// 或 select id,phone,password,nickname,avatar,role from users where nickname = ? and status=1
+func (r *UserRepository) GetUserByAccount(phone, nickname string) (*model.User, error) {
 	var user model.User
-	err := r.db.Where("phone = ? AND status = ?", account, 1).Take(&user).Error
+	tx := r.db.Model(&model.User{}).
+		Select("id,phone,password,nickname,avatar,role").
+		Where("status = 1")
+
+	if phone != "" {
+		tx = tx.Where("phone = ?", phone)
+	}
+	if nickname != "" {
+		tx = tx.Where("nickname = ?", nickname)
+	}
+
+	err := tx.Take(&user).Error
 	if err != nil {
 		return nil, err
 	}

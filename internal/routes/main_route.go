@@ -19,7 +19,7 @@ func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 	// 1. 全局中间件
 	r.Use(middleware.LoggerMiddleware())
 	r.Use(middleware.GlobalErrorMiddleware())
-	// 2.不需要登录的接口
+	// 2.不需要登录的接口（/r/xxx）
 	publicGroup := r.Group("")
 	{
 		InitArticlePublicRoutes(publicGroup, appHandler.Article)
@@ -28,7 +28,7 @@ func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 	}
 
 	// 3.需要登录的接口
-	privateGroup := r.Group("/my")
+	privateGroup := r.Group("/auth")
 	privateGroup.Use(middleware.AuthMiddleware())
 	{
 		InitUserPrivateRoutes(privateGroup, appHandler.User)

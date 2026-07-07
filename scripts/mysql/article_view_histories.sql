@@ -10,3 +10,4 @@ CREATE TABLE IF NOT EXISTS article_view_histories(
     KEY idx_userid_createdtime (user_id,created_time)
     -- KEY idx_updated_time (updated_time)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '浏览历史表'
+a

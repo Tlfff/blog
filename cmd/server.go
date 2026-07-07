@@ -2,12 +2,17 @@ package cmd
 
 import (
 	"blog/config"
+	"blog/internal/common"
 	"blog/internal/handler"
 	"blog/internal/repository"
 	"blog/internal/routes"
 	"blog/internal/service"
 	"blog/pkg/database"
+	"blog/pkg/iputil"
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
@@ -26,6 +31,17 @@ var serverCmd = &cobra.Command{
 			fmt.Printf("加载配置文件失败：%v\n", err)
 			return
 		}
+		// 1.1 初始化自定义验证器
+		common.InitValidator()
+		// 1.2 初始化ip工具类
+		dir, _ := os.Getwd() // 获取当前程序运行的绝对路径
+		dbPath := filepath.Join(dir, "pkg/resource/ip2region.xdb")
+		if err := iputil.InitIPSearcher(dbPath); err != nil {
+			log.Fatalf("初始化 IP 解析器失败: %v", err)
+		}
+		// 在程序退出时，释放内存
+		defer iputil.Close()
+
 		// 2. 初始化数据库连接
 		db, err := database.NewMySQLClient(config.Database.Username, config.Database.Password, config.Database.Host, config.Database.Port, config.Database.DBName)
 		if err != nil {
@@ -56,7 +72,7 @@ var serverCmd = &cobra.Command{
 		articleHandler := handler.NewArticleHandler(articleService)
 		// 4.4 初始化评论模块
 		commentRepo := repository.NewCommentRepository(db)
-		commentService := service.NewCommentService(commentRepo)
+		commentService := service.NewCommentService(commentRepo, articleRepo)
 		commentHandler := handler.NewCommentHandler(commentService)
 
 		// 5. 组装成统一的路由容器

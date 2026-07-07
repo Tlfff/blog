@@ -24,7 +24,7 @@ func NewUserAuthService(repo *repository.UserRepository) *UserAuthService {
 // 注册新用户
 func (s *UserAuthService) Register(phone, password, nickname, clientIP string) error {
 	// 1. 检查用户是否已存在
-	_, err := s.repo.GetUserByAccount(phone)
+	_, err := s.repo.GetUserByAccount(phone, nickname)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
@@ -55,11 +55,10 @@ func (s *UserAuthService) Register(phone, password, nickname, clientIP string) e
 }
 
 // 登录验证
-func (s *UserAuthService) Login(account, password, clientIP string) (*user.LoginResponse, error) {
-	log.Printf("Attempting login for phone: %s\n", account)
+func (s *UserAuthService) Login(phone, nickname, password, clientIP string) (*user.LoginResponse, error) {
 
 	// 1. 查找用户
-	dbUser, err := s.repo.GetUserByAccount(account)
+	dbUser, err := s.repo.GetUserByAccount(phone, nickname)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, common.ErrUserNotFound

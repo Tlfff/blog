@@ -4,6 +4,7 @@ import (
 	"blog/internal/common"
 	"blog/internal/model"
 	"blog/internal/repository"
+	"log"
 	"time"
 )
 
@@ -24,6 +25,14 @@ func NewArticleViewHistoryService(repo *repository.ArticleViewHistoryRepository)
 func (s *ArticleViewHistoryService) RecordView(userID, articleID uint64, ip string) {
 	// 开启异步协程，让调用方瞬间返回，不阻塞主协程
 	go func() {
+		// 捕获panic，防止服务崩溃
+		defer func() {
+			if err := recover(); err != nil {
+				// 打印崩溃日志，接入日志框架
+				log.Printf("浏览统计协程panic recover: %v", err)
+			}
+		}()
+		// todo: 传入context
 		//  如果返回 true，说明该用户在这 10 分钟内是第一次看这篇文章
 		if s.viewMap.CheckAndSet(userID, articleID, ip, 10*time.Minute) {
 			// 如果是登录用户，记录浏览历史

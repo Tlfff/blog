@@ -2,6 +2,7 @@ package repository
 
 import (
 	"blog/internal/model"
+	"context"
 
 	"gorm.io/gorm"
 )
@@ -98,4 +99,14 @@ func (a *ArticleRepository) GetListByStatus(AuthorID uint64, status int8) ([]*mo
 		Where("author_id=? AND status=?", AuthorID, status).
 		Find(&list).Error
 	return list, err
+}
+
+// 更新文章评论数
+// 传入 delta 改变文章评论数（delta 可以是正数如 1，也可以是负数如 -5）
+//
+// 使用传入的 tx 确保操作在外部的事务生命周期内
+func (a *ArticleRepository) UpdateCommentCountDelta(ctx context.Context, tx *gorm.DB, articleID uint64, delta int64) error {
+	return tx.WithContext(ctx).Model(&model.Article{}).
+		Where("id = ?", articleID).
+		Update("comment_count", gorm.Expr("comment_count + ?", delta)).Error
 }

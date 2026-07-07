@@ -9,7 +9,8 @@ type RegisterRequest struct {
 
 // 用户登录
 type LoginRequest struct {
-	Account  string `json:"account" binding:"required"` // 支持手机号和昵称
+	Phone    string `json:"account" binding:"omitempty,numeric"`          // 只能是纯数字
+	Nickname string `json:"nickname" binding:"omitempty,not_only_number"` // 不能是纯数字
 	Password string `json:"password" binding:"required"`
 }
 

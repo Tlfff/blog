@@ -1,6 +1,9 @@
 package comment
 
-import "blog/internal/model"
+import (
+	"blog/internal/model"
+	"blog/pkg/iputil"
+)
 
 // CommentUserInfo 统一的评论相关用户信息
 type CommentUserInfo struct {
@@ -30,7 +33,7 @@ type RootCommentListResponse struct {
 	LastID  uint64             `json:"last_id"`  // 游标锚点
 }
 
-// NewRootCommentListResponse 构造主评论列表响应
+// 构造主评论列表响应
 func NewRootCommentListResponse(models []*model.Comment, userMap map[uint64]*CommentUserInfo, total int64, hasMore bool, lastID uint64) *RootCommentListResponse {
 	resp := &RootCommentListResponse{
 		List:    make([]*RootCommentItem, 0),
@@ -51,10 +54,10 @@ func NewRootCommentListResponse(models []*model.Comment, userMap map[uint64]*Com
 			ArticleID:   m.ArticleID,
 			User:        userInfo,
 			Content:     m.Content,
-			ReplyCount:  0,
 			CreatedTime: m.CreatedTime.Unix(),
 			Status:      m.Status,
-			IP:          m.IP,
+			IP:          iputil.ConvertIPToRegion(m.IP),
+			ReplyCount:  m.CommentCount,
 		})
 	}
 	return resp
@@ -115,7 +118,7 @@ func NewReplyListResponse(models []*model.Comment, userMap map[uint64]*CommentUs
 			Content:     m.Content,
 			CreatedTime: m.CreatedTime.Unix(),
 			Status:      m.Status,
-			IP:          m.IP,
+			IP:          iputil.ConvertIPToRegion(m.IP),
 		})
 	}
 	return resp
