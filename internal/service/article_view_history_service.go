@@ -4,6 +4,7 @@ import (
 	"blog/internal/common"
 	"blog/internal/model"
 	"blog/internal/repository"
+	"context"
 	"log"
 	"time"
 )
@@ -22,7 +23,7 @@ func NewArticleViewHistoryService(repo *repository.ArticleViewHistoryRepository)
 }
 
 // RecordView 核心业务逻辑：异步检查并记录浏览历史
-func (s *ArticleViewHistoryService) RecordView(userID, articleID uint64, ip string) {
+func (s *ArticleViewHistoryService) RecordView(ctx context.Context, userID, articleID uint64, ip string) {
 	// 开启异步协程，让调用方瞬间返回，不阻塞主协程
 	go func() {
 		// 捕获panic，防止服务崩溃
@@ -44,11 +45,11 @@ func (s *ArticleViewHistoryService) RecordView(userID, articleID uint64, ip stri
 				}
 
 				// 2. 写入浏览历史表
-				_ = s.repo.CreateViewHistory(history)
+				_ = s.repo.CreateViewHistory(ctx, history)
 			}
 
 			// 3. 文章主表的 view_count 原子自增 1
-			_ = s.repo.IncrementViewCount(articleID)
+			_ = s.repo.IncrementViewCount(ctx, articleID)
 		}
 	}()
 }

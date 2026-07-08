@@ -19,16 +19,16 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 
 // 创建新用户
 // insert into users (phone, password, nickname, avatar, role, status) values (?, ?, ?, ?, ?, ?)
-func (r *UserRepository) CreateUser(user *model.User) error {
-	return r.db.Create(user).Error
+func (r *UserRepository) CreateUser(ctx context.Context, user *model.User) error {
+	return r.db.WithContext(ctx).Create(user).Error
 }
 
 // 根据账户获取用户信息
 // select id,phone,password,nickname,avatar,role from users where phone = ? and status=1
 // 或 select id,phone,password,nickname,avatar,role from users where nickname = ? and status=1
-func (r *UserRepository) GetUserByAccount(phone, nickname string) (*model.User, error) {
+func (r *UserRepository) GetUserByAccount(ctx context.Context, phone, nickname string) (*model.User, error) {
 	var user model.User
-	tx := r.db.Model(&model.User{}).
+	tx := r.db.WithContext(ctx).Model(&model.User{}).
 		Select("id,phone,password,nickname,avatar,role").
 		Where("status = 1")
 
@@ -48,9 +48,9 @@ func (r *UserRepository) GetUserByAccount(phone, nickname string) (*model.User, 
 
 // 根据用户ID获取用户信息
 // select id,phone,password,nickname,avatar,role,last_login_ip,last_login_time from users where id =? and status=1
-func (r *UserRepository) FindUserByID(id uint64) (*model.User, error) {
+func (r *UserRepository) FindUserByID(ctx context.Context, id uint64) (*model.User, error) {
 	var user model.User
-	err := r.db.Where("id = ? AND status = ?", id, 1).Take(&user).Error
+	err := r.db.WithContext(ctx).Where("id = ? AND status = ?", id, 1).Take(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -81,8 +81,8 @@ func (r *UserRepository) FindUsersByIDs(ctx context.Context, ids []uint64) ([]*m
 
 // 更新用户信息
 // update users set nickname=?,avatar=?,phone=?,password=? where id=? and status=1
-func (r *UserRepository) UpdateUser(user *model.User) error {
-	result := r.db.Model(&model.User{}).
+func (r *UserRepository) UpdateUser(ctx context.Context, user *model.User) error {
+	result := r.db.WithContext(ctx).Model(&model.User{}).
 		Where("id = ? AND status = ?", user.ID, 1).
 		Updates(user)
 

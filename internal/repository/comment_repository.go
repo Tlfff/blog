@@ -25,6 +25,7 @@ type CommentRepository interface {
 	UpdateStatus(ctx context.Context, tx *gorm.DB, id uint64, status uint8) (int64, error)
 
 	FindByID(ctx context.Context, id uint64) (*model.Comment, error)
+	FindByIDForUpdate(ctx context.Context, tx *gorm.DB, id uint64) (*model.Comment, error)
 
 	// 游标分页：拉取文章主评论（支持正序/逆序、只看楼主）
 	FindRootCommentsWithCursor(ctx context.Context, articleID uint64, lastID uint64, pageSize int, isDesc bool, authorID uint64) ([]*CommentWithUser, error)
@@ -49,6 +50,22 @@ type commentRepository struct {
 	db *gorm.DB
 }
 
+// 用当前读加锁，查找评论
+// select id, article_id, user_id, reply_to_user_id, content, root_id,like_count, comment_count, created_time, updated_time, status
+// from comments where id=? for update
+func (c *commentRepository) FindByIDForUpdate(ctx context.Context, tx *gorm.DB, id uint64) (*model.Comment, error) {
+	var comment model.Comment
+	err := tx.WithContext(ctx).
+		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "like_count", "comment_count", "ip", "created_time", "updated_time", "status").
+		Set("gorm:query_option", "FOR UPDATE"). // 加上 MySQL 原生的 FOR UPDATE 排他锁
+		Where("id = ?", id).
+		First(&comment).Error
+	if err != nil {
+		return nil, err
+	}
+	return &comment, nil
+}
+
 func (c *commentRepository) UpdateCommentCountDelta(ctx context.Context, tx *gorm.DB, id uint64, delta int64) error {
 	return tx.WithContext(ctx).Model(&model.Comment{}).
 		Where("id = ?", id).
@@ -63,6 +80,7 @@ func (c *commentRepository) BatchUpdateChildCommentStatus(ctx context.Context, t
 	return res.RowsAffected, res.Error
 }
 
+// 计算子评论数量-同一事务
 func (c *commentRepository) CountRepliesTx(ctx context.Context, tx *gorm.DB, rootID uint64) (int64, error) {
 	var count int64
 	err := tx.WithContext(ctx).Model(&model.Comment{}).Where("root_id=? AND status=1", rootID).Count(&count).Error
@@ -99,14 +117,8 @@ func (c *commentRepository) CountRootComments(ctx context.Context, articleID uin
 	return count, nil
 }
 
-// 软删除评论
-// update comments set status = 0 where id=?
-func (c *commentRepository) DeleteCommment(ctx context.Context, id uint64) error {
-	return c.db.WithContext(ctx).Delete(&model.Comment{}).Error
-}
-
 // 通过id查找评论
-// select id, article_id, user_id, reply_to_user_id, content, root_id, created_time, updated_time, status
+// select id, article_id, user_id, reply_to_user_id, content, root_id,like_count, comment_count, created_time, updated_time, status
 // from comments where id=?
 func (c *commentRepository) FindByID(ctx context.Context, id uint64) (*model.Comment, error) {
 	var comment model.Comment

@@ -18,7 +18,6 @@ func NewCommentHandler(commentService *service.CommentService) *CommentHandler {
 }
 
 // Create 发表评论 (主评论或子评论通用)
-// POST /api/v1/comments
 func (h *CommentHandler) Create(c *gin.Context) {
 	var req commentDto.CreateCommentRequest
 	// 1. 解析并校验请求体r
@@ -48,8 +47,7 @@ func (h *CommentHandler) Create(c *gin.Context) {
 	common.OK(c, "评论成功", resp)
 }
 
-// ListRoots 公开：查看主评论列表 (支持分流：高性能游标与传统跳页)
-// GET /api/v1/comments/roots
+// 公开：查看主评论列表 (支持分流：游标与传统跳页)
 func (h *CommentHandler) ListRoots(c *gin.Context) {
 	var req commentDto.GetRootListRequest
 	// 1. 自动拦截不满足 min=10, max=20 的 page_size 错误r
@@ -79,7 +77,6 @@ func (h *CommentHandler) ListRoots(c *gin.Context) {
 }
 
 // ListReplies 公开：展开查看子评论列表 (楼中楼)
-// GET /api/v1/comments/replies
 func (h *CommentHandler) ListReplies(c *gin.Context) {
 	var req commentDto.GetReplyListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -104,8 +101,7 @@ func (h *CommentHandler) ListReplies(c *gin.Context) {
 	common.OK(c, "查询成功", res)
 }
 
-// DeleteMyComment 用户：删除自己的评论 (软删除)
-// DELETE /api/v1/comments/my
+// 用户：删除自己的评论 (软删除)
 func (h *CommentHandler) DeleteMyComment(c *gin.Context) {
 	var req commentDto.DeleteCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -124,8 +120,7 @@ func (h *CommentHandler) DeleteMyComment(c *gin.Context) {
 	common.OK(c, "评论已成功删除", nil)
 }
 
-// DeleteAdminComment 管理员：强制删除违规评论 (软删除)
-// DELETE /api/v1/comments/admin
+// 管理员：强制删除违规评论 (软删除)
 func (h *CommentHandler) DeleteAdminComment(c *gin.Context) {
 	var req commentDto.AdminDeleteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

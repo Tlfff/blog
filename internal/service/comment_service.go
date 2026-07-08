@@ -43,22 +43,8 @@ func NewCommentService(commentRepo repository.CommentRepository, articleRepo *re
 
 // 发表评论
 func (s *CommentService) CreateComment(ctx context.Context, articleID uint64, rootID uint64, userID uint64, replyToUserID uint64, content string, ip string) (*commentDto.CreateCommentResponse, error) {
-	// 1. 如果是子评论 (rootID > 0)，校验主楼状态
-	if rootID > 0 {
-		rootComment, err := s.commentRepo.FindByID(ctx, rootID)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, common.ErrCommentNotFound
-			}
-			return nil, err
-		}
-		// 状态为 0 说明主楼被删了
-		if rootComment.Status == 0 {
-			return nil, common.ErrCommentRootDeleted
-		}
-	}
 
-	// 2. 构造底层实体模型
+	// 1. 构造底层实体模型
 	commentModel := &model.Comment{
 		ArticleID:     articleID,
 		RootID:        rootID,
@@ -68,10 +54,25 @@ func (s *CommentService) CreateComment(ctx context.Context, articleID uint64, ro
 		IP:            ip,
 		Status:        1, // 1: 正常展示
 	}
-	// 3. 开启事务，插入同时更新文章中的评论数字段
+	// 2. 开启事务，插入同时更新文章中的评论数字段
 	db := s.commentRepo.GetDB().WithContext(ctx)
 	err := db.Transaction(func(tx *gorm.DB) error {
-		// 直接调用标准接口，无断言
+		// 3. 如果是子评论 (rootID > 0)，校验主楼状态
+		if rootID > 0 {
+			// 用当前读的方式上锁，避免并发问题
+			rootComment, err := s.commentRepo.FindByIDForUpdate(ctx, tx, rootID)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return common.ErrCommentNotFound
+				}
+				return err
+			}
+			// 状态为 0 说明主楼被删了
+			if rootComment.Status == 0 {
+				return common.ErrCommentRootDeleted
+			}
+		}
+		// 插入评论
 		if err := s.commentRepo.Insert(ctx, tx, commentModel); err != nil {
 			return err
 		}

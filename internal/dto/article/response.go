@@ -55,15 +55,17 @@ type ArticleListItem struct {
 
 // 列表返回
 type ArticleListResponse struct {
-	List  []*ArticleListItem `json:"list"`
-	Total int                `json:"total"`
+	List   []*ArticleListItem `json:"list"`
+	LastID uint64             `json:"last_id"`
+	Total  uint64             `json:"total"`
 }
 
 // 构造列表响应
-func NewArticleListResponse(models []*model.Article) *ArticleListResponse {
+func NewArticleListResponse(models []*model.Article, total, lastID uint64) *ArticleListResponse {
 	resp := &ArticleListResponse{
-		List:  make([]*ArticleListItem, 0),
-		Total: 0,
+		List:   make([]*ArticleListItem, 0),
+		Total:  total,
+		LastID: lastID,
 	}
 
 	for _, m := range models {
@@ -81,7 +83,6 @@ func NewArticleListResponse(models []*model.Article) *ArticleListResponse {
 			UpdatedTime: m.UpdatedTime.Unix(),
 		})
 	}
-	resp.Total = len(resp.List)
 	return resp
 }
 
@@ -95,15 +96,17 @@ type AdminListItem struct {
 	UpdatedTime int64    `json:"updated_time"`
 }
 type AdminListResponse struct {
-	List  []*AdminListItem `json:"list"`
-	Total int              `json:"total"`
+	List   []*AdminListItem `json:"list"`
+	LastID uint64           `json:"last_id"`
+	Total  uint64           `json:"total"`
 }
 
 // 构建后台列表
-func NewAdminListResponse(models []*model.Article) *AdminListResponse {
+func NewAdminListResponse(models []*model.Article, total, lastID uint64) *AdminListResponse {
 	resp := &AdminListResponse{
-		List:  make([]*AdminListItem, 0),
-		Total: len(models),
+		List:   make([]*AdminListItem, 0),
+		Total:  total,
+		LastID: lastID,
 	}
 
 	for _, m := range models {

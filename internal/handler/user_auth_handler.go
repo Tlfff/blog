@@ -27,6 +27,7 @@ func (h *UserAuthHandler) Register(c *gin.Context) {
 
 	// 2. 调用服务层进行注册
 	err := h.userAuth.Register(
+		c,
 		req.Phone,
 		req.Password,
 		req.Nickname,
@@ -57,7 +58,7 @@ func (h *UserAuthHandler) Login(c *gin.Context) {
 	}
 
 	// 2. 调用登录
-	res, err := h.userAuth.Login(req.Phone, req.Nickname, req.Password, c.ClientIP())
+	res, err := h.userAuth.Login(c, req.Phone, req.Nickname, req.Password, c.ClientIP())
 	if err != nil {
 		c.Error(err)
 		return

@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS articles(
     view_count         INT UNSIGNED             NOT NULL    DEFAULT 0                   COMMENT '浏览量',
     like_count         INT UNSIGNED             NOT NULL    DEFAULT 0                   COMMENT '点赞数',
     comment_count      INT UNSIGNED             NOT NULL    DEFAULT 0                   COMMENT '评论数',
-    status             TINYINT                  NOT NULL    DEFAULT 1                   COMMENT '文章状态:0-已删除,1-草稿,2-已发表',
+    status             TINYINT                  NOT NULL    DEFAULT 2                   COMMENT '文章状态:0-已删除,1-草稿,2-已发表',
     created_time       DATETIME                 NOT NULL    DEFAULT CURRENT_TIMESTAMP   COMMENT '创建时间',
     updated_time       DATETIME                 NOT NULL    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     PRIMARY KEY (id),

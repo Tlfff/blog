@@ -5,7 +5,7 @@ type CreateArticleRequest struct {
 	Title   string   `json:"title" binding:"required"` //不能为空
 	Content string   `json:"content" binding:"required"`
 	Tags    []string `json:"tags"`
-	Status  int8     `json:"status"`
+	Status  int8     `json:"status" binding:"omitempty,oneof=2 3"`
 }
 
 // 修改文章
@@ -14,7 +14,7 @@ type UpdateArticleRequest struct {
 	Title   string   `json:"title" binding:"required"`
 	Content string   `json:"content" binding:"required"`
 	Tags    []string `json:"tags"`
-	Status  int8     `json:"status" binding:"oneof=1 2"` // 状态只能是0,1,2
+	Status  int8     `json:"status" binding:"omitempty,oneof=2 3"` // 状态只能是2,3
 }
 
 // 删除文章
@@ -34,12 +34,19 @@ type GetDetailRequest struct {
 
 // 获取用户文章列表
 type GetPublishListRequest struct {
-	AuthorID uint64 `form:"author_id" binding:"required,min=1"`
+	LastID   uint64 `form:"last_id" binding:"omitempty,min=0"`
+	Page     uint64 `form:"page" binding:"omitempty,min=0"`
+	PageSize uint64 `form:"page_size" binding:"min=10,max=20"`
+	IsDesc   bool   `form:"is_desc"` // 是否按时间倒序（默认false正序）
 }
 
 // 管理者：获取文章列表
 type GetAdminListRequest struct {
-	Status int8 `form:"status" binding:"required,min=0"`
+	Status   int8   `form:"status" binding:"required,min=0"`
+	LastID   uint64 `form:"last_id" binding:"omitempty,min=0"`
+	Page     uint64 `form:"page" binding:"omitempty,min=0"`
+	PageSize uint64 `form:"page_size" binding:"min=10,max=20"`
+	IsDesc   bool   `form:"is_desc"` // 是否按时间倒序（默认false正序）
 }
 
 // 恢复文章
