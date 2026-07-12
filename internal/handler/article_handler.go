@@ -142,8 +142,10 @@ func (h *ArticleHandler) GetArticleDetailForMe(c *gin.Context) {
 		return
 	}
 
-	// 2. 获取详情
-	res, err := h.article.GetArticle(c, req.ID)
+	// 2. 从Gin 上下文获取用户信息
+	userCtx := c.MustGet("currentUser").(*auth.UserContext)
+	// 3. 获取详情
+	res, err := h.article.GetArticle(c, req.ID, userCtx.UserID)
 	if err != nil {
 		c.Error(err)
 		return

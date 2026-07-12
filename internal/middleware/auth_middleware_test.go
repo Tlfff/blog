@@ -80,7 +80,7 @@ func TestAuthMiddleware_AllRoutes(t *testing.T) {
 			})
 
 			// 挂载被测的中间件
-			r.Use(AuthMiddleware())
+			r.Use(MustAuth())
 
 			// 最终的业务 Handler：用于验证是否成功“漏过去”了，以及上下文是否拿到了
 			handlerEntered := false

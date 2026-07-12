@@ -3,6 +3,7 @@ package cmd
 import (
 	"blog/config"
 	"blog/internal/common"
+	"blog/internal/cron"
 	"blog/internal/handler"
 	"blog/internal/repository"
 	"blog/internal/routes"
@@ -28,7 +29,7 @@ var serverCmd = &cobra.Command{
 		// 1. 加载配置文件
 		config, err := config.LoadConfig("config/config.yaml")
 		if err != nil {
-			fmt.Printf("加载配置文件失败：%v\n", err)
+			fmt.Printf("[error]:加载配置文件失败：%v\n", err)
 			return
 		}
 		// 1.1 初始化自定义验证器
@@ -37,7 +38,7 @@ var serverCmd = &cobra.Command{
 		dir, _ := os.Getwd() // 获取当前程序运行的绝对路径
 		dbPath := filepath.Join(dir, "pkg/resource/ip2region.xdb")
 		if err := iputil.InitIPSearcher(dbPath); err != nil {
-			log.Fatalf("初始化 IP 解析器失败: %v", err)
+			log.Fatalf("[error]:初始化 IP 解析器失败: %v", err)
 		}
 		// 在程序退出时，释放内存
 		defer iputil.Close()
@@ -49,31 +50,46 @@ var serverCmd = &cobra.Command{
 			return // 连接失败必须立刻拦截并退出，不能往下传 nil！
 		}
 
-		// 3. 安全防御打印
+		// 安全防御打印
 		if db == nil {
 			fmt.Println("[error]: NewMySQLClient 返回的 db 对象居然是空的，请检查 pkg/database 里的内部实现！")
 			return
 		}
+		// 3. 初始化redis连接
+		rdb, err := database.NewRedisClient(config.Redis)
+		if err != nil {
+			fmt.Printf("[error]:Redis连接初始化失败:%v\n", err)
+			return
+		}
+		defer rdb.Close()
+
 		// 4. 初始化模块
-		// 4.1  初始化用户模块
+		// 4.1  初始化基础 Repository
 		userRepo := repository.NewUserRepository(db)
+		historyRepo := repository.NewArticleViewHistoryRepository(db)
+		articleRepo := repository.NewArticleRepository(db)
+		commentRepo := repository.NewCommentRepository(db)
+		articleLikeRepo := repository.NewArticleLikeRepository(db)
+		commentLikeRepo := repository.NewCommentLikeRepository(db)
+
+		// 4.2 初始化service
+		likeService := service.NewLikeService(articleLikeRepo, commentLikeRepo, rdb)
 		userAuthService := service.NewUserAuthService(userRepo)
 		userService := service.NewUserService(userRepo)
+		historyService := service.NewArticleViewHistoryService(historyRepo)
+		articleService := service.NewArticleService(articleRepo, historyService, likeService)
+		commentService := service.NewCommentService(commentRepo, articleRepo, rdb)
+
+		// 4.3 初始化handler
 		userAuthHandler := handler.NewUserAuthHandler(userAuthService)
 		userHandler := handler.NewUserHandler(userService)
-
-		// 4.2 初始化文章浏览历史模块
-		historyRepo := repository.NewArticleViewHistoryRepository(db)
-		historyService := service.NewArticleViewHistoryService(historyRepo)
-
-		// 4.3 初始化文章模块
-		articleRepo := repository.NewArticleRepository(db)
-		articleService := service.NewArticleService(articleRepo, historyService)
 		articleHandler := handler.NewArticleHandler(articleService)
-		// 4.4 初始化评论模块
-		commentRepo := repository.NewCommentRepository(db)
-		commentService := service.NewCommentService(commentRepo, articleRepo)
 		commentHandler := handler.NewCommentHandler(commentService)
+		likeHandler := handler.NewLikeHandler(likeService)
+
+		// 4.4 初始化定时器
+		likeSyncJob := cron.NewLikeSyncJob(likeService)
+		likeSyncJob.Start()
 
 		// 5. 组装成统一的路由容器
 		appHandler := &routes.AppHandler{
@@ -81,6 +97,7 @@ var serverCmd = &cobra.Command{
 			User:     userHandler,
 			Article:  articleHandler,
 			Comment:  commentHandler,
+			Like:     likeHandler,
 		}
 
 		// 6. 创建路由引擎

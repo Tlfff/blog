@@ -16,12 +16,14 @@ type ArticleService struct {
 	repo        *repository.ArticleRepository
 	userRepo    *repository.UserRepository
 	historyView *ArticleViewHistoryService
+	likeService *LikeService
 }
 
-func NewArticleService(repo *repository.ArticleRepository, historyView *ArticleViewHistoryService) *ArticleService {
+func NewArticleService(repo *repository.ArticleRepository, historyView *ArticleViewHistoryService, likeService *LikeService) *ArticleService {
 	return &ArticleService{
 		repo:        repo,
 		historyView: historyView,
+		likeService: likeService,
 	}
 }
 
@@ -114,13 +116,24 @@ func (s *ArticleService) GetPublishedArticle(ctx context.Context, articleId uint
 	}
 
 	// 2.记录浏览历史
-	s.historyView.RecordView(ctx, userId, articleId, ip)
+	s.historyView.RecordView(userId, articleId, ip)
+	// 3. 从 Redis 中动态拉取该文章的最真实点赞数
+	redisLikeCount, err := s.likeService.GetArticleLikeCount(ctx, articleId)
 
-	return article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp), nil
+	// 4. 动态拉取当前登录用户对该文章的点赞状态（点赞过传 true，没点过传 false）
+	var isLiked bool
+	if userId > 0 { // 如果用户已登录
+		isLiked, _ = s.likeService.IsUserLikedArticle(ctx, userId, articleId)
+	}
+
+	// 5. 构造详情响应
+	resp := article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp, isLiked, redisLikeCount)
+
+	return resp, nil
 }
 
 // 管理员：查看文章详情
-func (s *ArticleService) GetArticle(ctx context.Context, articleId uint64) (*article.ArticleDetailResponse, error) {
+func (s *ArticleService) GetArticle(ctx context.Context, articleId, userId uint64) (*article.ArticleDetailResponse, error) {
 	detail, err := s.repo.FindArticleAndUserInfoByID(ctx, articleId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -131,8 +144,19 @@ func (s *ArticleService) GetArticle(ctx context.Context, articleId uint64) (*art
 	if detail.Status == model.Deleted {
 		return nil, common.ErrArticleDeleted
 	}
+	// 3. 从 Redis 中动态拉取该文章的最真实点赞数
+	redisLikeCount, err := s.likeService.GetArticleLikeCount(ctx, articleId)
 
-	return article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp), nil
+	// 4. 动态拉取当前登录用户对该文章的点赞状态（点赞过传 true，没点过传 false）
+	var isLiked bool
+	if userId > 0 { // 如果用户已登录
+		isLiked, _ = s.likeService.IsUserLikedArticle(ctx, userId, articleId)
+	}
+
+	// 5. 构造详情响应
+	resp := article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp, isLiked, redisLikeCount)
+
+	return resp, nil
 }
 
 // 发表文章
@@ -185,7 +209,7 @@ func (s *ArticleService) GetPublishedList(ctx context.Context, page, pageSize, l
 	if len(list) > 0 {
 		nextLastID = list[len(list)-1].ID
 	}
-	return article.NewArticleListResponse(list, uint64(total), nextLastID), nil
+	return article.NewArticleListResponse(list, uint64(total), nextLastID, page, pageSize), nil
 }
 
 // 管理者：获取文章列表
@@ -211,5 +235,5 @@ func (s *ArticleService) GetAdminList(ctx context.Context, page, pageSize, lastI
 		nextLastID = list[len(list)-1].ID
 	}
 
-	return article.NewAdminListResponse(list, uint64(total), nextLastID), nil
+	return article.NewAdminListResponse(list, uint64(total), nextLastID, page, pageSize), nil
 }

@@ -17,7 +17,7 @@ var migrateCmd = &cobra.Command{
 	Short: "通过 scripts/mysql 目录下的 SQL 文件初始化数据库",
 	Long:  `自动识别并读取 scripts/mysql 目录下的所有 .sql 文件，优先建立数据库，再按顺序初始化所有业务表结构`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("🚀 开始从本地脚本目录执行数据库迁移...")
+		fmt.Println(" 开始从本地脚本目录执行数据库迁移...")
 
 		// 1. 加载配置文件
 		cfg, err := config.LoadConfig("config/config.yaml")

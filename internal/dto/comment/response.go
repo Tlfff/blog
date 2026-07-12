@@ -24,22 +24,27 @@ type RootCommentItem struct {
 	IP          string           `json:"ip"`
 	CreatedTime int64            `json:"created_time"`
 	Status      int8             `json:"status"`
+	LikeCount   uint64           `json:"like_count"`
 }
 
 type RootCommentListResponse struct {
-	List    []*RootCommentItem `json:"list"`
-	Total   int64              `json:"total"`    // 仅在走传统 Offset 分页时返回总数，走游标时返回 0
-	HasMore bool               `json:"has_more"` // 前端用来判断是否需要继续支持滑动加载
-	LastID  uint64             `json:"last_id"`  // 游标锚点
+	List  []*RootCommentItem `json:"list"`
+	Total int64              `json:"total"` // 仅在走传统 Offset 分页时返回总数，走游标时返回 0
+	// HasMore bool               `json:"has_more"` // 前端用来判断是否需要继续支持滑动加载
+	LastID   uint64 `json:"last_id"`   // 游标锚点
+	Page     uint64 `json:"page"`      // 页码
+	PageSize uint64 `json:"page_size"` // 页面大小
 }
 
 // 构造主评论列表响应
-func NewRootCommentListResponse(models []*model.Comment, userMap map[uint64]*CommentUserInfo, total int64, hasMore bool, lastID uint64) *RootCommentListResponse {
+func NewRootCommentListResponse(models []*model.Comment, userMap map[uint64]*CommentUserInfo, total int64, lastID, page, page_size uint64, likeMap map[uint64]uint64) *RootCommentListResponse {
 	resp := &RootCommentListResponse{
-		List:    make([]*RootCommentItem, 0),
-		Total:   total,
-		HasMore: hasMore,
-		LastID:  lastID,
+		List:  make([]*RootCommentItem, 0),
+		Total: total,
+		// HasMore: hasMore,
+		LastID:   lastID,
+		Page:     page,
+		PageSize: page_size,
 	}
 
 	for _, m := range models {
@@ -48,7 +53,11 @@ func NewRootCommentListResponse(models []*model.Comment, userMap map[uint64]*Com
 		if !exists {
 			userInfo = &CommentUserInfo{UserID: m.UserID, Username: "未知用户", Avatar: ""}
 		}
-
+		// 从redis中获取评论对应点赞数
+		likeCount, ok := likeMap[m.ID]
+		if !ok {
+			likeCount = uint64(m.LikeCount)
+		}
 		resp.List = append(resp.List, &RootCommentItem{
 			ID:          m.ID,
 			ArticleID:   m.ArticleID,
@@ -58,6 +67,7 @@ func NewRootCommentListResponse(models []*model.Comment, userMap map[uint64]*Com
 			Status:      m.Status,
 			IP:          iputil.ConvertIPToRegion(m.IP),
 			ReplyCount:  m.CommentCount,
+			LikeCount:   likeCount,
 		})
 	}
 	return resp
@@ -75,22 +85,27 @@ type ReplyCommentItem struct {
 	CreatedTime int64            `json:"created_time"`
 	Status      int8             `json:"status"`
 	IP          string           `json:"ip"`
+	LikeCount   uint64           `json:"like_count"`
 }
 
 type ReplyListResponse struct {
-	List    []*ReplyCommentItem `json:"list"`
-	Total   int64               `json:"total"`
-	HasMore bool                `json:"has_more"`
-	LastID  uint64              `json:"last_id"`
+	List  []*ReplyCommentItem `json:"list"`
+	Total int64               `json:"total"`
+	// HasMore bool                `json:"has_more"`
+	LastID   uint64 `json:"last_id"`
+	Page     uint64 `json:"page"`      // 页码
+	PageSize uint64 `json:"page_size"` // 页面大小
 }
 
 // NewReplyListResponse 构造楼中楼列表响应
-func NewReplyListResponse(models []*model.Comment, userMap map[uint64]*CommentUserInfo, total int64, hasMore bool, lastID uint64) *ReplyListResponse {
+func NewReplyListResponse(models []*model.Comment, userMap map[uint64]*CommentUserInfo, total int64, lastID, page, page_size uint64, likeMap map[uint64]uint64) *ReplyListResponse {
 	resp := &ReplyListResponse{
-		List:    make([]*ReplyCommentItem, 0),
-		Total:   total,
-		HasMore: hasMore,
-		LastID:  lastID,
+		List:  make([]*ReplyCommentItem, 0),
+		Total: total,
+		// HasMore: hasMore,
+		LastID:   lastID,
+		Page:     page,
+		PageSize: page_size,
 	}
 
 	for _, m := range models {
@@ -108,7 +123,11 @@ func NewReplyListResponse(models []*model.Comment, userMap map[uint64]*CommentUs
 				replyToUserInfo = &CommentUserInfo{UserID: m.ReplyToUserID, Username: "未知用户", Avatar: ""}
 			}
 		}
-
+		// 从redis中获取评论对应点赞数
+		likeCount, ok := likeMap[m.ID]
+		if !ok {
+			likeCount = uint64(m.LikeCount)
+		}
 		resp.List = append(resp.List, &ReplyCommentItem{
 			ID:          m.ID,
 			ArticleID:   m.ArticleID,
@@ -119,6 +138,7 @@ func NewReplyListResponse(models []*model.Comment, userMap map[uint64]*CommentUs
 			CreatedTime: m.CreatedTime.Unix(),
 			Status:      m.Status,
 			IP:          iputil.ConvertIPToRegion(m.IP),
+			LikeCount:   likeCount,
 		})
 	}
 	return resp
