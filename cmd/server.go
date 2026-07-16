@@ -9,7 +9,7 @@ import (
 	"blog/internal/routes"
 	"blog/internal/service"
 	"blog/pkg/database"
-	"blog/pkg/iputil"
+	iputil "blog/pkg/util/ip"
 	"fmt"
 	"log"
 	"os"
@@ -73,23 +73,28 @@ var serverCmd = &cobra.Command{
 		commentLikeRepo := repository.NewCommentLikeRepository(db)
 
 		// 4.2 初始化service
-		likeService := service.NewLikeService(articleLikeRepo, commentLikeRepo, rdb)
+		likeService := service.NewLikeService(articleLikeRepo, commentLikeRepo, commentRepo, rdb)
 		userAuthService := service.NewUserAuthService(userRepo)
 		userService := service.NewUserService(userRepo)
 		historyService := service.NewArticleViewHistoryService(historyRepo)
-		articleService := service.NewArticleService(articleRepo, historyService, likeService)
+		articleService := service.NewArticleService(articleRepo, historyService, likeService, rdb)
+		articleRankService := service.NewArticleRankService(articleRepo, rdb)
 		commentService := service.NewCommentService(commentRepo, articleRepo, rdb)
 
 		// 4.3 初始化handler
 		userAuthHandler := handler.NewUserAuthHandler(userAuthService)
 		userHandler := handler.NewUserHandler(userService)
-		articleHandler := handler.NewArticleHandler(articleService)
+		articleHandler := handler.NewArticleHandler(articleService, articleRankService)
 		commentHandler := handler.NewCommentHandler(commentService)
 		likeHandler := handler.NewLikeHandler(likeService)
 
 		// 4.4 初始化定时器
 		likeSyncJob := cron.NewLikeSyncJob(likeService)
-		likeSyncJob.Start()
+		// rankJob := cron.NewRankSyncJob(articleRankService)
+		// 传入所有定时任务，由全局管理器统一调度
+		cronMgr := cron.NewCronManager(likeSyncJob)
+		cronMgr.Start()
+		defer cronMgr.Stop()
 
 		// 5. 组装成统一的路由容器
 		appHandler := &routes.AppHandler{

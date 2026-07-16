@@ -11,6 +11,7 @@ import (
 func InitArticlePublicRoutes(r *gin.RouterGroup, articleHandler *handler.ArticleHandler) {
 	// 获取已发表文章列表
 	r.GET("/article/list", articleHandler.GetPublishedList)
+	r.GET("/article/hot-rank", articleHandler.GetHotArticleRank)
 }
 func InitArticleOptionalRoutes(r *gin.RouterGroup, articleHandler *handler.ArticleHandler) {
 	// 获取已发表文章详情

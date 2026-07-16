@@ -2,7 +2,7 @@ package comment
 
 import (
 	"blog/internal/model"
-	"blog/pkg/iputil"
+	"blog/pkg/util/ip"
 )
 
 // CommentUserInfo 统一的评论相关用户信息
@@ -20,7 +20,7 @@ type RootCommentItem struct {
 	ArticleID   uint64           `json:"article_id"`
 	User        *CommentUserInfo `json:"user"`
 	Content     string           `json:"content"`
-	ReplyCount  int64            `json:"reply_count"`
+	ReplyCount  uint32           `json:"reply_count"`
 	IP          string           `json:"ip"`
 	CreatedTime int64            `json:"created_time"`
 	Status      int8             `json:"status"`
@@ -65,7 +65,7 @@ func NewRootCommentListResponse(models []*model.Comment, userMap map[uint64]*Com
 			Content:     m.Content,
 			CreatedTime: m.CreatedTime.Unix(),
 			Status:      m.Status,
-			IP:          iputil.ConvertIPToRegion(m.IP),
+			IP:          ip.ConvertIPToRegion(m.IP),
 			ReplyCount:  m.CommentCount,
 			LikeCount:   likeCount,
 		})
@@ -137,7 +137,7 @@ func NewReplyListResponse(models []*model.Comment, userMap map[uint64]*CommentUs
 			Content:     m.Content,
 			CreatedTime: m.CreatedTime.Unix(),
 			Status:      m.Status,
-			IP:          iputil.ConvertIPToRegion(m.IP),
+			IP:          ip.ConvertIPToRegion(m.IP),
 			LikeCount:   likeCount,
 		})
 	}

@@ -325,14 +325,14 @@ func (s *CommentService) checkCommentAuth(ctx context.Context, commentID uint64,
 	return oldComment, nil
 }
 
-// 💡 辅助方法：通过 MGet 批量高效获取多条评论在 Redis 中的点赞数
+// 辅助方法：通过 MGet 批量高效获取多条评论在 Redis 中的点赞数
 func (s *CommentService) getCommentsLikeCountMap(ctx context.Context, comments []*model.Comment) map[uint64]uint64 {
 	likeMap := make(map[uint64]uint64)
 	if len(comments) == 0 {
 		return likeMap
 	}
 
-	// 1. 组装所有评论对应的 Redis Count Key
+	// 1. 组装所有评论对应的 Redis Hash Key
 	keys := make([]string, len(comments))
 	for i, c := range comments {
 		keys[i] = consts.KeyCommentLikeCountPrefix + strconv.FormatUint(c.ID, 10)

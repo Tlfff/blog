@@ -46,6 +46,10 @@ var (
 	ErrCommentDeleted     = errors.New("评论已被删除")
 	ErrCommentRootDeleted = errors.New("主楼评论已被删除，无法回复")
 	ErrCommentPermission  = errors.New("无权操作该评论")
+	//------------------------- redis ---------------------------------
+	ErrLockFailed   = errors.New("获取redis锁失败")
+	ErrLockExpired  = errors.New("redis锁过期")
+	ErrUnLockFailed = errors.New("解除redis锁失败")
 )
 
 func GetCodeByError(err error) int {
@@ -113,6 +117,14 @@ func GetCodeByError(err error) int {
 		return CodeCommentRootDeleted
 	case ErrCommentPermission:
 		return CodeCommentPermission
+
+	// redis
+	case ErrLockExpired:
+		return CodeLockExpired
+	case ErrLockFailed:
+		return CodeLockFailed
+	case ErrUnLockFailed:
+		return CodeUnLockFailed
 	default:
 		return CodeInternalServerError
 

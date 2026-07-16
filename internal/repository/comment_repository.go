@@ -43,6 +43,7 @@ type CommentRepository interface {
 	// 批量软删除指定主评论下所有未删除子评论
 	BatchUpdateChildCommentStatus(ctx context.Context, tx *gorm.DB, rootID uint64) (int64, error)
 	UpdateCommentCountDelta(ctx context.Context, tx *gorm.DB, id uint64, delta int64) error
+	GetArticleId(ctx context.Context, id uint64) (uint64, error)
 	GetDB() *gorm.DB
 }
 
@@ -291,6 +292,20 @@ func (c *commentRepository) UpdateStatus(ctx context.Context, tx *gorm.DB, id ui
 		Update("status", status)
 	// res 是本次update操作结果，直接拿本次更新行数，不受中间SQL干扰
 	return res.RowsAffected, res.Error
+}
+
+// 通过评论id获取文章id
+// select article_id from comments where id=?
+func (c *commentRepository) GetArticleId(ctx context.Context, id uint64) (uint64, error) {
+	var articleId uint64
+	err := c.db.WithContext(ctx).
+		Model(&model.Comment{}).
+		Select("article_id").Where("id=?", id).Find(&articleId).Error
+	if err != nil {
+		return 0, err
+	}
+	return articleId, nil
+
 }
 
 func NewCommentRepository(db *gorm.DB) CommentRepository {

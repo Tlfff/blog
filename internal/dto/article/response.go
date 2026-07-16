@@ -2,7 +2,7 @@ package article
 
 import (
 	"blog/internal/model"
-	"blog/pkg/iputil"
+	"blog/pkg/util/ip"
 	"strings"
 )
 
@@ -39,7 +39,7 @@ func NewArticleDetailResponse(m *model.Article, nickName, avatar, authorIP strin
 		Status:       int8(m.Status),
 		AuthorNick:   nickName,
 		AuthorAvatar: avatar,
-		IP:           iputil.ConvertIPToRegion(authorIP),
+		IP:           ip.ConvertIPToRegion(authorIP),
 		CreatedTime:  m.CreatedTime.Unix(),
 		UpdatedTime:  m.UpdatedTime.Unix(),
 		IsLiked:      isLiked,
@@ -134,6 +134,26 @@ func NewAdminListResponse(models []*model.Article, total, lastID, page, page_siz
 			CreatedTime: m.CreatedTime.Unix(),
 			UpdatedTime: m.UpdatedTime.Unix(),
 		})
+	}
+	return resp
+}
+
+// ====================  文章排行榜列表返回  ====================
+type HotRankResponse struct {
+	List *[]HotRankItem `json:"list"`
+}
+type HotRankItem struct {
+	ArticleID    uint64  `json:"article_id"`    // 文章id
+	Title        string  `json:"title"`         // 文章标题
+	Hot          float64 `json:"hot"`           // 热度
+	ViewCount    uint32  `json:"view_count"`    // 浏览量
+	CommentCount uint32  `json:"comment_count"` // 评论数
+	LikeCount    uint32  `json:"like_count"`    // 点赞数
+}
+
+func NewHotRankResponse(list []HotRankItem) *HotRankResponse {
+	resp := &HotRankResponse{
+		List: &list,
 	}
 	return resp
 }

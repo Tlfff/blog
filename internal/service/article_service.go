@@ -2,13 +2,18 @@ package service
 
 import (
 	"blog/internal/common"
+	"blog/internal/consts"
 	"blog/internal/dto/article"
 	"blog/internal/model"
 	"blog/internal/repository"
+	"blog/pkg/util/cache"
 	"context"
 	"errors"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -16,14 +21,16 @@ type ArticleService struct {
 	repo        *repository.ArticleRepository
 	userRepo    *repository.UserRepository
 	historyView *ArticleViewHistoryService
+	rdb         *redis.Client
 	likeService *LikeService
 }
 
-func NewArticleService(repo *repository.ArticleRepository, historyView *ArticleViewHistoryService, likeService *LikeService) *ArticleService {
+func NewArticleService(repo *repository.ArticleRepository, historyView *ArticleViewHistoryService, likeService *LikeService, rdb *redis.Client) *ArticleService {
 	return &ArticleService{
 		repo:        repo,
 		historyView: historyView,
 		likeService: likeService,
+		rdb:         rdb,
 	}
 }
 
@@ -100,7 +107,8 @@ func (s *ArticleService) ClearArticle(ctx context.Context, articleId uint64, use
 
 // 公开：查看文章详情
 func (s *ArticleService) GetPublishedArticle(ctx context.Context, articleId uint64, userId uint64, ip string) (*article.ArticleDetailResponse, error) {
-	// 1.查出文章
+
+	// 1.2 查出文章
 	detail, err := s.repo.FindArticleAndUserInfoByID(ctx, articleId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -236,4 +244,49 @@ func (s *ArticleService) GetAdminList(ctx context.Context, page, pageSize, lastI
 	}
 
 	return article.NewAdminListResponse(list, uint64(total), nextLastID, page, pageSize), nil
+}
+
+// 初始化文章主Info Hash缓存
+func (s *ArticleService) doEnsureArticleInfoCacheExists(ctx context.Context, articleID uint64) error {
+	statusKey := consts.KeyArticleInfoHashPrefix + strconv.FormatUint(articleID, 10)
+	lockKey := consts.KeyArticleInfoLockPrefix + statusKey
+	lockValue := strconv.FormatUint(articleID, 10)
+
+	// 检查缓存是否存在
+	checkExists := func(ctx context.Context) (bool, error) {
+		exists, err := s.rdb.Exists(ctx, statusKey).Result()
+		return exists > 0, err
+	}
+
+	// 从数据库加载文章基础数据，初始化info hash
+	initCache := func(ctx context.Context) error {
+		article, err := s.repo.FindArticleByID(ctx, articleID)
+		if err != nil {
+			return err
+		}
+		pipe := s.rdb.Pipeline()
+		pipe.HSet(ctx, statusKey,
+			"id", article.ID,
+			"title", article.Title,
+			consts.FeildArticleLikeCount, article.LikeCount,
+			consts.FeildArticleViewCount, article.ViewCount,
+			consts.FeildArticleCommentCount, article.CommentCount,
+		)
+		pipe.Expire(ctx, statusKey, 10*24*time.Hour)
+		_, err = pipe.Exec(ctx)
+		return err
+	}
+
+	return cache.DoubleCheckInitCache(
+		ctx,
+		s.rdb,
+		statusKey,
+		lockKey,
+		lockValue,
+		consts.LockExpire,
+		consts.RetryCount,
+		consts.RetryDelay,
+		checkExists,
+		initCache,
+	)
 }
