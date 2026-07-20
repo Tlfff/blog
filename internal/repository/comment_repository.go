@@ -43,6 +43,7 @@ type CommentRepository interface {
 	// 批量软删除指定主评论下所有未删除子评论
 	BatchUpdateChildCommentStatus(ctx context.Context, tx *gorm.DB, rootID uint64) (int64, error)
 	UpdateCommentCountDelta(ctx context.Context, tx *gorm.DB, id uint64, delta int64) error
+	GetArticleId(ctx context.Context, id uint64) (uint64, error)
 	GetDB() *gorm.DB
 }
 
@@ -57,7 +58,7 @@ func (c *commentRepository) FindByIDForUpdate(ctx context.Context, tx *gorm.DB, 
 	var comment model.Comment
 	err := tx.WithContext(ctx).
 		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "like_count", "comment_count", "ip", "created_time", "updated_time", "status").
-		Set("gorm:query_option", "FOR UPDATE"). // 加上 MySQL 原生的 FOR UPDATE 排他锁
+		Set("gorm:query_option", "FOR UPDATE"). // 加上 FOR UPDATE 排他锁
 		Where("id = ?", id).
 		First(&comment).Error
 	if err != nil {
@@ -72,11 +73,12 @@ func (c *commentRepository) UpdateCommentCountDelta(ctx context.Context, tx *gor
 		UpdateColumn("comment_count", gorm.Expr("comment_count + ?", delta)).Error
 }
 
+// 批量更新子评论状态-删除
 func (c *commentRepository) BatchUpdateChildCommentStatus(ctx context.Context, tx *gorm.DB, rootID uint64) (int64, error) {
 	res := tx.WithContext(ctx).
 		Model(&model.Comment{}).
-		Where("root_id = ? AND status = 1", rootID).
-		Update("status", 0)
+		Where("root_id = ? AND status = ?", rootID, model.CommentPublished).
+		Update("status", model.CommentDeleted)
 	return res.RowsAffected, res.Error
 }
 
@@ -95,7 +97,7 @@ func (c *commentRepository) GetDB() *gorm.DB {
 // select count(*) from comments where root_id=? and status=1
 func (c *commentRepository) CountReplies(ctx context.Context, rootID uint64) (int64, error) {
 	var count int64
-	err := c.db.WithContext(ctx).Model(&model.Comment{}).Where("root_id=? AND status=1", rootID).Count(&count).Error
+	err := c.db.WithContext(ctx).Model(&model.Comment{}).Where("root_id=? AND status=?", rootID, model.CommentPublished).Count(&count).Error
 	if err != nil {
 		return 0, err
 	}
@@ -106,7 +108,7 @@ func (c *commentRepository) CountReplies(ctx context.Context, rootID uint64) (in
 // select count(*) from comments where article=? and root_id=? and status=1
 func (c *commentRepository) CountRootComments(ctx context.Context, articleID uint64, authorID uint64) (int64, error) {
 	var count int64
-	tx := c.db.WithContext(ctx).Model(&model.Comment{}).Where("article_id=? AND root_id=0 AND status=1", articleID)
+	tx := c.db.WithContext(ctx).Model(&model.Comment{}).Where("article_id=? AND root_id=0 AND status=?", articleID, model.Published)
 	if authorID > 0 {
 		tx = tx.Where("user_id=?", authorID)
 	}
@@ -153,7 +155,7 @@ func (c *commentRepository) FindRepliesWithCursor(ctx context.Context, rootID ui
 				u2.nickname AS reply_nickname, u2.avatar AS reply_avatar`).
 		Joins("LEFT JOIN users u1 ON c.user_id = u1.id").
 		Joins("LEFT JOIN users u2 ON c.reply_to_user_id = u2.id").
-		Where("c.root_id = ? AND c.status = 1 AND c.id > ?", rootID, lastID).
+		Where("c.root_id = ? AND c.status = ? AND c.id > ?", rootID, model.CommentPublished, lastID).
 		Order("c.id ASC").Limit(pageSize).Scan(&list).Error
 	if err != nil {
 		return nil, err
@@ -182,7 +184,7 @@ func (c *commentRepository) FindRepliesWithOffset(ctx context.Context, rootID ui
 				u2.nickname AS reply_nickname, u2.avatar AS reply_avatar`).
 		Joins("LEFT JOIN users u1 ON c.user_id = u1.id").
 		Joins("LEFT JOIN users u2 ON c.reply_to_user_id = u2.id").
-		Where("c.root_id = ? AND c.status = 1", rootID).
+		Where("c.root_id = ? AND c.status = ?", rootID, model.CommentPublished).
 		Order("c.id ASC").Limit(pageSize).Offset((page - 1) * pageSize).Scan(&list).Error
 	if err != nil {
 		return nil, err
@@ -214,7 +216,7 @@ func (c *commentRepository) FindRootCommentsWithCursor(ctx context.Context, arti
 			u2.nickname AS reply_nickname, u2.avatar AS reply_avatar`).
 		Joins("LEFT JOIN users u1 ON c.user_id = u1.id").
 		Joins("LEFT JOIN users u2 ON c.reply_to_user_id = u2.id").
-		Where("c.article_id = ? AND c.root_id = 0 AND c.status = 1", articleID)
+		Where("c.article_id = ? AND c.root_id = 0 AND c.status = ?", articleID, model.Published)
 
 	if authorID > 0 {
 		tx = tx.Where("c.user_id = ?", authorID)
@@ -255,7 +257,7 @@ func (c *commentRepository) FindRootCommentsWithOffset(ctx context.Context, arti
 			u2.nickname AS reply_nickname, u2.avatar AS reply_avatar`).
 		Joins("LEFT JOIN users u1 ON c.user_id = u1.id").
 		Joins("LEFT JOIN users u2 ON c.reply_to_user_id = u2.id").
-		Where("c.article_id = ? AND c.root_id = 0 AND c.status = 1", articleID)
+		Where("c.article_id = ? AND c.root_id = 0 AND c.status = ?", articleID, model.CommentPublished)
 
 	if authorID > 0 {
 		tx = tx.Where("c.user_id = ?", authorID)
@@ -286,10 +288,24 @@ func (c *commentRepository) Insert(ctx context.Context, tx *gorm.DB, comment *mo
 // where id =? and status =1
 func (c *commentRepository) UpdateStatus(ctx context.Context, tx *gorm.DB, id uint64, status uint8) (int64, error) {
 	res := tx.WithContext(ctx).Model(&model.Comment{}).
-		Where("id=? AND status = 1", id).
+		Where("id=? AND status = ?", id, model.CommentPublished).
 		Update("status", status)
 	// res 是本次update操作结果，直接拿本次更新行数，不受中间SQL干扰
 	return res.RowsAffected, res.Error
+}
+
+// 通过评论id获取文章id
+// select article_id from comments where id=?
+func (c *commentRepository) GetArticleId(ctx context.Context, id uint64) (uint64, error) {
+	var articleId uint64
+	err := c.db.WithContext(ctx).
+		Model(&model.Comment{}).
+		Select("article_id").Where("id=?", id).Find(&articleId).Error
+	if err != nil {
+		return 0, err
+	}
+	return articleId, nil
+
 }
 
 func NewCommentRepository(db *gorm.DB) CommentRepository {

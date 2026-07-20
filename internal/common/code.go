@@ -32,4 +32,8 @@ const (
 	CodeCommentDeleted     = 1401 // 评论已被删除
 	CodeCommentRootDeleted = 1402 // 主楼评论已被删除，无法回复
 	CodeCommentPermission  = 1403 // 操作评论权限不足
+	//------------------------- redis模块 ---------------------------------
+	CodeUnLockFailed = 1500 // 解锁失败
+	CodeLockFailed   = 1501 // 加锁失败
+	CodeLockExpired  = 1502 //锁过期
 )

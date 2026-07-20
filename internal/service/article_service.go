@@ -9,19 +9,24 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
 type ArticleService struct {
-	repo        *repository.ArticleRepository
-	userRepo    *repository.UserRepository
-	historyView *ArticleViewHistoryService
+	repo           *repository.ArticleRepository
+	userRepo       *repository.UserRepository
+	historyView    *ArticleViewHistoryService
+	rdb            *redis.Client
+	artLikeService *ArticleLikeService
 }
 
-func NewArticleService(repo *repository.ArticleRepository, historyView *ArticleViewHistoryService) *ArticleService {
+func NewArticleService(repo *repository.ArticleRepository, historyView *ArticleViewHistoryService, artLikeService *ArticleLikeService, rdb *redis.Client) *ArticleService {
 	return &ArticleService{
-		repo:        repo,
-		historyView: historyView,
+		repo:           repo,
+		historyView:    historyView,
+		artLikeService: artLikeService,
+		rdb:            rdb,
 	}
 }
 
@@ -98,7 +103,8 @@ func (s *ArticleService) ClearArticle(ctx context.Context, articleId uint64, use
 
 // 公开：查看文章详情
 func (s *ArticleService) GetPublishedArticle(ctx context.Context, articleId uint64, userId uint64, ip string) (*article.ArticleDetailResponse, error) {
-	// 1.查出文章
+
+	// 1 查出文章
 	detail, err := s.repo.FindArticleAndUserInfoByID(ctx, articleId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -114,13 +120,23 @@ func (s *ArticleService) GetPublishedArticle(ctx context.Context, articleId uint
 	}
 
 	// 2.记录浏览历史
-	s.historyView.RecordView(ctx, userId, articleId, ip)
+	s.historyView.RecordView(userId, articleId, ip)
 
-	return article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp), nil
+	// 3. 判断当前登录用户是否点赞过该文章
+	var isLiked bool
+	if userId > 0 {
+		isLiked, _ = s.artLikeService.IsUserLikedArticle(ctx, userId, articleId)
+	}
+
+	// 4. 构造详情响应
+	resp := article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp, isLiked)
+
+	return resp, nil
 }
 
 // 管理员：查看文章详情
-func (s *ArticleService) GetArticle(ctx context.Context, articleId uint64) (*article.ArticleDetailResponse, error) {
+func (s *ArticleService) GetArticle(ctx context.Context, articleId, userId uint64) (*article.ArticleDetailResponse, error) {
+	// 1.获取文章详情
 	detail, err := s.repo.FindArticleAndUserInfoByID(ctx, articleId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -131,8 +147,16 @@ func (s *ArticleService) GetArticle(ctx context.Context, articleId uint64) (*art
 	if detail.Status == model.Deleted {
 		return nil, common.ErrArticleDeleted
 	}
+	// 2. 判断当前登录用户是否点赞过该文章
+	var isLiked bool
+	if userId > 0 {
+		isLiked, _ = s.artLikeService.IsUserLikedArticle(ctx, userId, articleId)
+	}
 
-	return article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp), nil
+	// 3. 构造详情响应
+	resp := article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp, isLiked)
+
+	return resp, nil
 }
 
 // 发表文章
@@ -185,7 +209,7 @@ func (s *ArticleService) GetPublishedList(ctx context.Context, page, pageSize, l
 	if len(list) > 0 {
 		nextLastID = list[len(list)-1].ID
 	}
-	return article.NewArticleListResponse(list, uint64(total), nextLastID), nil
+	return article.NewArticleListResponse(list, uint64(total), nextLastID, page, pageSize), nil
 }
 
 // 管理者：获取文章列表
@@ -211,5 +235,5 @@ func (s *ArticleService) GetAdminList(ctx context.Context, page, pageSize, lastI
 		nextLastID = list[len(list)-1].ID
 	}
 
-	return article.NewAdminListResponse(list, uint64(total), nextLastID), nil
+	return article.NewAdminListResponse(list, uint64(total), nextLastID, page, pageSize), nil
 }

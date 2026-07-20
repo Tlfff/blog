@@ -12,11 +12,15 @@ import (
 )
 
 type ArticleHandler struct {
-	article *service.ArticleService
+	article     *service.ArticleService
+	articleRank *service.ArticleRankService
 }
 
-func NewArticleHandler(article *service.ArticleService) *ArticleHandler {
-	return &ArticleHandler{article: article}
+func NewArticleHandler(article *service.ArticleService, articleRank *service.ArticleRankService) *ArticleHandler {
+	return &ArticleHandler{
+		article:     article,
+		articleRank: articleRank,
+	}
 }
 
 // 创建文章
@@ -86,7 +90,7 @@ func (h *ArticleHandler) DeleteArticle(c *gin.Context) {
 	// 2. 从上下文中获取用户信息，MustGet表示一定会有数据返回，所以只返回any，Get会返回bool和any
 	user := c.MustGet("currentUser").(*auth.UserContext)
 
-	if err := h.article.DeleteArticle(c, req.ID, uint64(user.UserID)); err != nil {
+	if err := h.article.DeleteArticle(c.Request.Context(), req.ID, uint64(user.UserID)); err != nil {
 		c.Error(err)
 		return
 	}
@@ -142,8 +146,10 @@ func (h *ArticleHandler) GetArticleDetailForMe(c *gin.Context) {
 		return
 	}
 
-	// 2. 获取详情
-	res, err := h.article.GetArticle(c, req.ID)
+	// 2. 从Gin 上下文获取用户信息
+	userCtx := c.MustGet("currentUser").(*auth.UserContext)
+	// 3. 获取详情
+	res, err := h.article.GetArticle(c, req.ID, userCtx.UserID)
 	if err != nil {
 		c.Error(err)
 		return
@@ -240,4 +246,15 @@ func (h *ArticleHandler) ClearArticle(c *gin.Context) {
 	}
 
 	common.OK(c, "删除文章成功", nil)
+}
+
+// 获取文章排行榜
+func (h *ArticleHandler) GetHotArticleRank(c *gin.Context) {
+	// 1. 获取文章排行榜
+	rankList, err := h.articleRank.GetHotRank(c.Request.Context())
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	common.OK(c, "获取排行榜成功", rankList)
 }
