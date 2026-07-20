@@ -251,7 +251,7 @@ func (h *ArticleHandler) ClearArticle(c *gin.Context) {
 // 获取文章排行榜
 func (h *ArticleHandler) GetHotArticleRank(c *gin.Context) {
 	// 1. 获取文章排行榜
-	rankList, err := h.articleRank.GetTop10HotArticles(c.Request.Context())
+	rankList, err := h.articleRank.GetHotRank(c.Request.Context())
 	if err != nil {
 		c.Error(err)
 		return

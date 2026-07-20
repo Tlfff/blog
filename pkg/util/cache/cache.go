@@ -42,8 +42,8 @@ func DoubleCheckInitCache(
 	}
 
 	// 2. 获取分布式锁
-	lock := redisUtil.NewRedisLock(rdb, lockKey, lockExpire, retryCount, retryDelay)
-	err = lock.Lock(ctx)
+	lock := redisUtil.NewRedisLock(rdb, lockKey, lockExpire)
+	err = lock.RetryLock(ctx)
 	if err != nil {
 		return err
 	}

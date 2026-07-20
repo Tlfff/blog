@@ -23,7 +23,7 @@ type ArticleDetailResponse struct {
 }
 
 // 构造单条详情响应
-func NewArticleDetailResponse(m *model.Article, nickName, avatar, authorIP string, isLiked bool, likeCount uint64) *ArticleDetailResponse {
+func NewArticleDetailResponse(m *model.Article, nickName, avatar, authorIP string, isLiked bool) *ArticleDetailResponse {
 	if m == nil {
 		return nil
 	}
@@ -43,7 +43,7 @@ func NewArticleDetailResponse(m *model.Article, nickName, avatar, authorIP strin
 		CreatedTime:  m.CreatedTime.Unix(),
 		UpdatedTime:  m.UpdatedTime.Unix(),
 		IsLiked:      isLiked,
-		LikeCount:    likeCount,
+		LikeCount:    uint64(m.LikeCount),
 	}
 }
 

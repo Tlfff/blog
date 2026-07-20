@@ -184,6 +184,48 @@ func (a *ArticleRepository) GetArticleCountByStatus(ctx context.Context, status 
 	return count, nil
 }
 
+// 获取浏览量、点赞数、评论数、标题
+// select view_count,comment_count,like_count from article where id = ?
+func (a *ArticleRepository) GetHot(ctx context.Context, articleID uint64) (*model.Article, error) {
+	var res model.Article
+	err := a.db.WithContext(ctx).Model(&model.Article{}).
+		Select("view_count, comment_count, like_count").
+		Where("id=?", articleID).
+		First(&res).Error
+	if err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+//	批量获取文章的标题、浏览量、点赞数、评论数
+//
+// select id,title,view_count,comment_count,like_count from articles where id in (?)
+func (a *ArticleRepository) GetHotListByIDs(ctx context.Context, ids []uint64) ([]*model.Article, error) {
+	var list []*model.Article
+	err := a.db.WithContext(ctx).Model(&model.Article{}).
+		Select("id,title, view_count, comment_count, like_count").
+		Where("id IN ?", ids).
+		Find(&list).Error
+	return list, err
+}
+
+// GetTopHotArticles 按热度取前N篇已发布文章
+// select id,view_count,comment_count,like_count
+// from articles where status=?
+// order by (view_count + like_count + comment_count) desc
+// limit ?
+func (a *ArticleRepository) GetTopHotArticles(ctx context.Context, limit int) ([]*model.Article, error) {
+	var list []*model.Article
+	err := a.db.WithContext(ctx).Model(&model.Article{}).
+		Select("id, view_count, comment_count, like_count").
+		Where("status = ?", model.Published).
+		Order("(view_count + like_count + comment_count) DESC").
+		Limit(limit).
+		Find(&list).Error
+	return list, err
+}
+
 // 转换传入的文章状态
 func applyStatusCondition(tx *gorm.DB, status int8) *gorm.DB {
 	switch status {

@@ -73,11 +73,12 @@ var serverCmd = &cobra.Command{
 		commentLikeRepo := repository.NewCommentLikeRepository(db)
 
 		// 4.2 初始化service
-		likeService := service.NewLikeService(articleLikeRepo, commentLikeRepo, commentRepo, rdb)
+		artLikeService := service.NewArticleLikeService(articleLikeRepo, articleRepo, rdb)
+		comLikeService := service.NewCommentLikeService(commentLikeRepo, commentRepo, rdb)
 		userAuthService := service.NewUserAuthService(userRepo)
 		userService := service.NewUserService(userRepo)
 		historyService := service.NewArticleViewHistoryService(historyRepo)
-		articleService := service.NewArticleService(articleRepo, historyService, likeService, rdb)
+		articleService := service.NewArticleService(articleRepo, historyService, artLikeService, rdb)
 		articleRankService := service.NewArticleRankService(articleRepo, rdb)
 		commentService := service.NewCommentService(commentRepo, articleRepo, rdb)
 
@@ -86,13 +87,13 @@ var serverCmd = &cobra.Command{
 		userHandler := handler.NewUserHandler(userService)
 		articleHandler := handler.NewArticleHandler(articleService, articleRankService)
 		commentHandler := handler.NewCommentHandler(commentService)
-		likeHandler := handler.NewLikeHandler(likeService)
+		likeHandler := handler.NewLikeHandler(artLikeService, comLikeService)
 
 		// 4.4 初始化定时器
-		likeSyncJob := cron.NewLikeSyncJob(likeService)
-		// rankJob := cron.NewRankSyncJob(articleRankService)
+		// likeSyncJob := cron.NewLikeSyncJob(likeService)
+		rankJob := cron.NewRankSyncJob(articleRankService)
 		// 传入所有定时任务，由全局管理器统一调度
-		cronMgr := cron.NewCronManager(likeSyncJob)
+		cronMgr := cron.NewCronManager(rankJob)
 		cronMgr.Start()
 		defer cronMgr.Stop()
 

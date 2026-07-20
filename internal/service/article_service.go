@@ -2,35 +2,31 @@ package service
 
 import (
 	"blog/internal/common"
-	"blog/internal/consts"
 	"blog/internal/dto/article"
 	"blog/internal/model"
 	"blog/internal/repository"
-	"blog/pkg/util/cache"
 	"context"
 	"errors"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
 type ArticleService struct {
-	repo        *repository.ArticleRepository
-	userRepo    *repository.UserRepository
-	historyView *ArticleViewHistoryService
-	rdb         *redis.Client
-	likeService *LikeService
+	repo           *repository.ArticleRepository
+	userRepo       *repository.UserRepository
+	historyView    *ArticleViewHistoryService
+	rdb            *redis.Client
+	artLikeService *ArticleLikeService
 }
 
-func NewArticleService(repo *repository.ArticleRepository, historyView *ArticleViewHistoryService, likeService *LikeService, rdb *redis.Client) *ArticleService {
+func NewArticleService(repo *repository.ArticleRepository, historyView *ArticleViewHistoryService, artLikeService *ArticleLikeService, rdb *redis.Client) *ArticleService {
 	return &ArticleService{
-		repo:        repo,
-		historyView: historyView,
-		likeService: likeService,
-		rdb:         rdb,
+		repo:           repo,
+		historyView:    historyView,
+		artLikeService: artLikeService,
+		rdb:            rdb,
 	}
 }
 
@@ -108,7 +104,7 @@ func (s *ArticleService) ClearArticle(ctx context.Context, articleId uint64, use
 // 公开：查看文章详情
 func (s *ArticleService) GetPublishedArticle(ctx context.Context, articleId uint64, userId uint64, ip string) (*article.ArticleDetailResponse, error) {
 
-	// 1.2 查出文章
+	// 1 查出文章
 	detail, err := s.repo.FindArticleAndUserInfoByID(ctx, articleId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -125,23 +121,22 @@ func (s *ArticleService) GetPublishedArticle(ctx context.Context, articleId uint
 
 	// 2.记录浏览历史
 	s.historyView.RecordView(userId, articleId, ip)
-	// 3. 从 Redis 中动态拉取该文章的最真实点赞数
-	redisLikeCount, err := s.likeService.GetArticleLikeCount(ctx, articleId)
 
-	// 4. 动态拉取当前登录用户对该文章的点赞状态（点赞过传 true，没点过传 false）
+	// 3. 判断当前登录用户是否点赞过该文章
 	var isLiked bool
-	if userId > 0 { // 如果用户已登录
-		isLiked, _ = s.likeService.IsUserLikedArticle(ctx, userId, articleId)
+	if userId > 0 {
+		isLiked, _ = s.artLikeService.IsUserLikedArticle(ctx, userId, articleId)
 	}
 
-	// 5. 构造详情响应
-	resp := article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp, isLiked, redisLikeCount)
+	// 4. 构造详情响应
+	resp := article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp, isLiked)
 
 	return resp, nil
 }
 
 // 管理员：查看文章详情
 func (s *ArticleService) GetArticle(ctx context.Context, articleId, userId uint64) (*article.ArticleDetailResponse, error) {
+	// 1.获取文章详情
 	detail, err := s.repo.FindArticleAndUserInfoByID(ctx, articleId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -152,17 +147,14 @@ func (s *ArticleService) GetArticle(ctx context.Context, articleId, userId uint6
 	if detail.Status == model.Deleted {
 		return nil, common.ErrArticleDeleted
 	}
-	// 3. 从 Redis 中动态拉取该文章的最真实点赞数
-	redisLikeCount, err := s.likeService.GetArticleLikeCount(ctx, articleId)
-
-	// 4. 动态拉取当前登录用户对该文章的点赞状态（点赞过传 true，没点过传 false）
+	// 2. 判断当前登录用户是否点赞过该文章
 	var isLiked bool
-	if userId > 0 { // 如果用户已登录
-		isLiked, _ = s.likeService.IsUserLikedArticle(ctx, userId, articleId)
+	if userId > 0 {
+		isLiked, _ = s.artLikeService.IsUserLikedArticle(ctx, userId, articleId)
 	}
 
-	// 5. 构造详情响应
-	resp := article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp, isLiked, redisLikeCount)
+	// 3. 构造详情响应
+	resp := article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp, isLiked)
 
 	return resp, nil
 }
@@ -244,49 +236,4 @@ func (s *ArticleService) GetAdminList(ctx context.Context, page, pageSize, lastI
 	}
 
 	return article.NewAdminListResponse(list, uint64(total), nextLastID, page, pageSize), nil
-}
-
-// 初始化文章主Info Hash缓存
-func (s *ArticleService) doEnsureArticleInfoCacheExists(ctx context.Context, articleID uint64) error {
-	statusKey := consts.KeyArticleInfoHashPrefix + strconv.FormatUint(articleID, 10)
-	lockKey := consts.KeyArticleInfoLockPrefix + statusKey
-	lockValue := strconv.FormatUint(articleID, 10)
-
-	// 检查缓存是否存在
-	checkExists := func(ctx context.Context) (bool, error) {
-		exists, err := s.rdb.Exists(ctx, statusKey).Result()
-		return exists > 0, err
-	}
-
-	// 从数据库加载文章基础数据，初始化info hash
-	initCache := func(ctx context.Context) error {
-		article, err := s.repo.FindArticleByID(ctx, articleID)
-		if err != nil {
-			return err
-		}
-		pipe := s.rdb.Pipeline()
-		pipe.HSet(ctx, statusKey,
-			"id", article.ID,
-			"title", article.Title,
-			consts.FeildArticleLikeCount, article.LikeCount,
-			consts.FeildArticleViewCount, article.ViewCount,
-			consts.FeildArticleCommentCount, article.CommentCount,
-		)
-		pipe.Expire(ctx, statusKey, 10*24*time.Hour)
-		_, err = pipe.Exec(ctx)
-		return err
-	}
-
-	return cache.DoubleCheckInitCache(
-		ctx,
-		s.rdb,
-		statusKey,
-		lockKey,
-		lockValue,
-		consts.LockExpire,
-		consts.RetryCount,
-		consts.RetryDelay,
-		checkExists,
-		initCache,
-	)
 }

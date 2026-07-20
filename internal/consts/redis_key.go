@@ -17,4 +17,13 @@ const (
 	FeildArticleLikeCount    = "like_count"    // 文章info哈希的field
 	FeildArticleViewCount    = "view_count"    // 文章info哈希的field
 	FeildArticleCommentCount = "comment_count" // 文章info哈希的field
+
+	// ----------------------------- 重构后的key -----------------------------
+	// ----------------------------- 文章点赞相关key -----------------------------
+	KeyLikeArticlePre  = "like:article:"      // set,记录用户是否点赞文章
+	KeyLockLikeArticle = "lock:like:article:" // 锁，在冷启动缓存时使用
+	// ----------------------------- 评论点赞相关key -----------------------------
+	KeyLikeCommentPre  = "like:comment:"      // set,记录用户是否点赞文章
+	KeyLockLikeComment = "lock:like:comment:" // 锁，在冷启动缓存时使用
+
 )

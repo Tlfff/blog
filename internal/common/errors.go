@@ -49,7 +49,7 @@ var (
 	//------------------------- redis ---------------------------------
 	ErrLockFailed   = errors.New("获取redis锁失败")
 	ErrLockExpired  = errors.New("redis锁过期")
-	ErrUnLockFailed = errors.New("解除redis锁失败")
+	ErrUnLockFailed = errors.New("解除redis锁失败,锁不存在或者非该锁持有者")
 )
 
 func GetCodeByError(err error) int {

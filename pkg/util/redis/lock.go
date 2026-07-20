@@ -24,6 +24,15 @@ type RedisLock struct {
 	locked     bool          // 是否成功持有锁
 }
 
+func NewRedisLock(rdb *redis.Client, key string, expireTime time.Duration) *RedisLock {
+	return &RedisLock{
+		rdb:        rdb,
+		key:        key,
+		value:      uuid.NewString(),
+		expireTime: expireTime,
+	}
+}
+
 // 全局缓存解锁脚本，避免每次读取文件
 var unlockScript string
 
@@ -37,18 +46,7 @@ func init() {
 	unlockScript = string(data)
 }
 
-func NewRedisLock(rdb *redis.Client, key string, expireTime time.Duration, retryCount int, retryDelay time.Duration) *RedisLock {
-	return &RedisLock{
-		rdb:        rdb,
-		key:        key,
-		value:      uuid.NewString(),
-		expireTime: expireTime,
-		retryCount: retryCount,
-		retryDelay: retryDelay,
-	}
-}
-
-func (l *RedisLock) Lock(ctx context.Context) error {
+func (l *RedisLock) RetryLock(ctx context.Context) error {
 	for i := 0; i < l.retryCount; i++ {
 		// 检查上下文是否过期
 		select {
@@ -88,4 +86,17 @@ func (l *RedisLock) UnLock(ctx context.Context) error {
 		return nil
 	}
 	return common.ErrUnLockFailed
+}
+
+// 加锁,value为锁唯一标识，防止误删
+func (l *RedisLock) TryLock(ctx context.Context) (bool, error) {
+	if l.locked == true {
+		return true, nil
+	}
+	ok, err := l.rdb.SetNX(ctx, l.key, l.value, l.expireTime).Result()
+	if err != nil {
+		return false, err
+	}
+	l.locked = ok
+	return ok, nil
 }

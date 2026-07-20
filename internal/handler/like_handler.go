@@ -10,12 +10,14 @@ import (
 )
 
 type LikeHandler struct {
-	likeService *service.LikeService
+	artLikeService *service.ArticleLikeService
+	comLikeService *service.CommentLikeService
 }
 
-func NewLikeHandler(likeService *service.LikeService) *LikeHandler {
+func NewLikeHandler(artLikeService *service.ArticleLikeService, comLikeService *service.CommentLikeService) *LikeHandler {
 	return &LikeHandler{
-		likeService: likeService,
+		artLikeService: artLikeService,
+		comLikeService: comLikeService,
 	}
 }
 
@@ -32,7 +34,7 @@ func (h *LikeHandler) ArticleLikeHandler(c *gin.Context) {
 	userCtx := c.MustGet("currentUser").(*auth.UserContext)
 
 	// 3. 点赞文章，直接操作redis
-	if err := h.likeService.ArticleLike(c.Request.Context(), userCtx.UserID, req.ArticleID); err != nil {
+	if err := h.artLikeService.ArticleLike(c.Request.Context(), userCtx.UserID, req.ArticleID); err != nil {
 		c.Error(err)
 		return
 	}
@@ -53,7 +55,7 @@ func (h *LikeHandler) ArticleCancelLikeHandler(c *gin.Context) {
 	userCtx := c.MustGet("currentUser").(*auth.UserContext)
 
 	// 3. 取消点赞文章，直接操作redis
-	if err := h.likeService.ArticleCancelLike(c.Request.Context(), userCtx.UserID, req.ArticleID); err != nil {
+	if err := h.artLikeService.ArticleCancelLike(c.Request.Context(), userCtx.UserID, req.ArticleID); err != nil {
 		c.Error(err)
 	}
 
@@ -73,7 +75,7 @@ func (h *LikeHandler) CommentLikeHandler(c *gin.Context) {
 	userCtx := c.MustGet("currentUser").(*auth.UserContext)
 
 	// 3. 点赞评论，直接操作redis
-	if err := h.likeService.CommentLike(c.Request.Context(), userCtx.UserID, req.CommentID); err != nil {
+	if err := h.comLikeService.CommentLike(c.Request.Context(), userCtx.UserID, req.CommentID); err != nil {
 		c.Error(err)
 		return
 	}
@@ -92,7 +94,7 @@ func (h *LikeHandler) CommentCancelLikeHandler(c *gin.Context) {
 	// 2. 从 Gin 上下文获取当前登录用户
 	userCtx := c.MustGet("currentUser").(*auth.UserContext)
 	// 3. 取消点赞评论，直接操作redis
-	if err := h.likeService.CommentCancelLike(c.Request.Context(), userCtx.UserID, req.CommentID); err != nil {
+	if err := h.comLikeService.CommentCancelLike(c.Request.Context(), userCtx.UserID, req.CommentID); err != nil {
 		c.Error(err)
 		return
 	}

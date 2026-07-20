@@ -17,8 +17,8 @@ func NewRankSyncJob(rankService *service.ArticleRankService) *RankSyncJob {
 	}
 }
 
-// Spec 每天 02:10:00 执行，和点赞任务错开时间
-// return "0 10 2 * * *"
+// Spec 每小时 执行
+// return "0 0 * * * *"
 func (j *RankSyncJob) Spec() string {
 	return "0 * * * * *"
 }
@@ -29,10 +29,11 @@ func (j *RankSyncJob) Name() string {
 
 func (j *RankSyncJob) Run(ctx context.Context) error {
 	log.Printf("[Cron][%s] 开始执行每日榜单校准任务", j.Name())
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	// 设置一个5分钟的过期时间
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	if err := j.rankService.DailyCalibrate(ctx); err != nil {
+	if err := j.rankService.RebuildHotRank(ctx); err != nil {
 		log.Printf("[Cron][%s] 榜单校准失败: %v", j.Name(), err)
 		return err
 	}
