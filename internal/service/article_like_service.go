@@ -9,6 +9,7 @@ import (
 	"context"
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -18,13 +19,17 @@ type ArticleLikeService struct {
 	artlikeRepo repository.ArticleLikeRepository
 	artRepo     *repository.ArticleRepository
 	rdb         *redis.Client
+	ntfService  *NotificationService
+	userRepo    *repository.UserRepository
 }
 
-func NewArticleLikeService(artLikeRepo repository.ArticleLikeRepository, artRepo *repository.ArticleRepository, rbd *redis.Client) *ArticleLikeService {
+func NewArticleLikeService(artLikeRepo repository.ArticleLikeRepository, artRepo *repository.ArticleRepository, rbd *redis.Client, ntfService *NotificationService, userRepo *repository.UserRepository) *ArticleLikeService {
 	return &ArticleLikeService{
 		artlikeRepo: artLikeRepo,
 		artRepo:     artRepo,
 		rdb:         rbd,
+		ntfService:  ntfService,
+		userRepo:    userRepo,
 	}
 }
 
@@ -74,6 +79,8 @@ func (s *ArticleLikeService) ArticleLike(ctx context.Context, userID, articleID 
 	if err := s.updateRankZSet(ctx, articleID); err != nil {
 		log.Printf("更新排行榜失败,article_id:%d,err:%v", articleID, err)
 	}
+	// 5. 异步发送通知
+	s.asyncSendLikeNotification(userID, articleID)
 	return nil
 }
 
@@ -238,4 +245,33 @@ func (s *ArticleLikeService) getArticleLikeKey(articleID uint64) string {
 }
 func (s *ArticleLikeService) getLockArticleLikeKey(articleID uint64) string {
 	return consts.KeyLockLikeArticle + strconv.FormatUint(articleID, 10)
+}
+
+// ------------------------------ 发送通知函数 ------------------------------
+func (s *ArticleLikeService) asyncSendLikeNotification(userID, articleID uint64) {
+	go func() {
+		// 1. 捕获异常
+		defer func() {
+			if err := recover(); err != nil {
+				log.Printf("协程异常，方法：%s,异常：%v", "recordView", err)
+			}
+		}()
+		// 2. 创建新上下文，设置个过期时间3s
+		newCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		// 3. 获取文章内容
+		article, err := s.artRepo.FindArticleByID(newCtx, articleID)
+		if err != nil {
+			log.Printf("[Notification] 获取文章失败, article_id:%d, err:%v", articleID, err)
+			return
+		}
+		// 4. 获取用户信息
+		user, err := s.userRepo.FindUserByID(newCtx, userID)
+		// 5. 发送通知
+		err = s.ntfService.SendLikeArticleNotification(newCtx, user.ID, user.Nickname, user.Avatar, article.AuthorID, article.ID, article.Title)
+		if err != nil {
+			log.Printf("[Notification] 发送点赞通知失败, article_id:%d, user_id:%d, err:%v", articleID, userID, err)
+		}
+
+	}()
 }

@@ -14,6 +14,7 @@ type AppHandler struct {
 	User     *handler.UserHandler
 	Comment  *handler.CommentHandler
 	Like     *handler.LikeHandler
+	Notify   *handler.NotificationHandler
 }
 
 func InitRoute(r *gin.Engine, appHandler *AppHandler) {
@@ -37,6 +38,8 @@ func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 
 		// 点赞功能相关接口
 		InitLikePrivateRoutes(privateGroup, appHandler.Like)
+		// 通知功能相关接口
+		InitNotificationPrivateRoutes(privateGroup, appHandler.Notify)
 
 	}
 	// 4.管理员管理的接口

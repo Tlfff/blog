@@ -20,7 +20,7 @@ func NewRankSyncJob(rankService *service.ArticleRankService) *RankSyncJob {
 // Spec 每小时 执行
 // return "0 0 * * * *"
 func (j *RankSyncJob) Spec() string {
-	return "0 * * * * *"
+	return "0 0 * * * *"
 }
 
 func (j *RankSyncJob) Name() string {

@@ -43,7 +43,8 @@ var serverCmd = &cobra.Command{
 		// 在程序退出时，释放内存
 		defer iputil.Close()
 
-		// 2. 初始化数据库连接
+		// 2 初始化数据库连接
+		// 2.1 初始化mysql
 		db, err := database.NewMySQLClient(config.Database.Username, config.Database.Password, config.Database.Host, config.Database.Port, config.Database.DBName)
 		if err != nil {
 			fmt.Printf("[error]:数据库连接初始化失败：%v\n", err)
@@ -55,6 +56,9 @@ var serverCmd = &cobra.Command{
 			fmt.Println("[error]: NewMySQLClient 返回的 db 对象居然是空的，请检查 pkg/database 里的内部实现！")
 			return
 		}
+		// 2.2 初始化mongodb
+		mongodb, err := database.NewMongoDBClient(config.Mongodb.Username, config.Mongodb.Password, config.Mongodb.Host, config.Mongodb.DBName, config.Mongodb.Port)
+
 		// 3. 初始化redis连接
 		rdb, err := database.NewRedisClient(config.Redis)
 		if err != nil {
@@ -71,9 +75,11 @@ var serverCmd = &cobra.Command{
 		commentRepo := repository.NewCommentRepository(db)
 		articleLikeRepo := repository.NewArticleLikeRepository(db)
 		commentLikeRepo := repository.NewCommentLikeRepository(db)
+		ntfRepo := repository.NewNotificationRepository(mongodb)
 
 		// 4.2 初始化service
-		artLikeService := service.NewArticleLikeService(articleLikeRepo, articleRepo, rdb)
+		ntfService := service.NewNotificationService(ntfRepo)
+		artLikeService := service.NewArticleLikeService(articleLikeRepo, articleRepo, rdb, ntfService, userRepo)
 		comLikeService := service.NewCommentLikeService(commentLikeRepo, commentRepo, rdb)
 		userAuthService := service.NewUserAuthService(userRepo)
 		userService := service.NewUserService(userRepo)
@@ -88,6 +94,7 @@ var serverCmd = &cobra.Command{
 		articleHandler := handler.NewArticleHandler(articleService, articleRankService)
 		commentHandler := handler.NewCommentHandler(commentService)
 		likeHandler := handler.NewLikeHandler(artLikeService, comLikeService)
+		ntfHandler := handler.NewNotificationHandler(ntfService)
 
 		// 4.4 初始化定时器
 		// likeSyncJob := cron.NewLikeSyncJob(likeService)
@@ -104,6 +111,7 @@ var serverCmd = &cobra.Command{
 			Article:  articleHandler,
 			Comment:  commentHandler,
 			Like:     likeHandler,
+			Notify:   ntfHandler,
 		}
 
 		// 6. 创建路由引擎

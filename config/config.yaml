@@ -8,3 +8,9 @@ redis:
   addr: "127.0.0.1:6379"
   db: 0
   password: ""
+mongodb:
+  host: "127.0.0.1"
+  port: 27017
+  dbname: "blog"
+  username: "bloguser"      
+  password: "20040614"
