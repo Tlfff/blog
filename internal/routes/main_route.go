@@ -13,6 +13,8 @@ type AppHandler struct {
 	Article  *handler.ArticleHandler
 	User     *handler.UserHandler
 	Comment  *handler.CommentHandler
+	Like     *handler.LikeHandler
+	Notify   *handler.NotificationHandler
 }
 
 func InitRoute(r *gin.Engine, appHandler *AppHandler) {
@@ -29,14 +31,20 @@ func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 
 	// 3.需要登录的接口
 	privateGroup := r.Group("/auth")
-	privateGroup.Use(middleware.AuthMiddleware())
+	privateGroup.Use(middleware.MustAuth())
 	{
 		InitUserPrivateRoutes(privateGroup, appHandler.User)
 		InitCommentPrivateRoutes(privateGroup, appHandler.Comment)
+
+		// 点赞功能相关接口
+		InitLikePrivateRoutes(privateGroup, appHandler.Like)
+		// 通知功能相关接口
+		InitNotificationPrivateRoutes(privateGroup, appHandler.Notify)
+
 	}
 	// 4.管理员管理的接口
 	authGroup := r.Group("/admin")
-	authGroup.Use(middleware.AuthMiddleware(), middleware.AdminCheckMiddleware())
+	authGroup.Use(middleware.MustAuth(), middleware.AdminCheckMiddleware())
 	{
 		InitArticlePrivateRoutes(authGroup, appHandler.Article)
 		InitCommentAdminRoutes(authGroup, appHandler.Comment)

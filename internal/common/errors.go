@@ -14,6 +14,7 @@ var (
 	ErrInvalidAuthorizationHeader = errors.New("Authorization格式错误")
 	ErrTokenEmpty                 = errors.New("Token不能为空")
 	ErrDuplicateSubmission        = errors.New("请勿重复提交请求")
+	ErrParameter                  = errors.New("参数校验失败")
 	ErrForbidden                  = errors.New("权限不足")
 
 	//------------------------- 注册登录模块 ---------------------------------
@@ -46,6 +47,12 @@ var (
 	ErrCommentDeleted     = errors.New("评论已被删除")
 	ErrCommentRootDeleted = errors.New("主楼评论已被删除，无法回复")
 	ErrCommentPermission  = errors.New("无权操作该评论")
+	//------------------------- redis ---------------------------------
+	ErrLockFailed   = errors.New("获取redis锁失败")
+	ErrLockExpired  = errors.New("redis锁过期")
+	ErrUnLockFailed = errors.New("解除redis锁失败,锁不存在或者非该锁持有者")
+	//------------------------- 通知模块 ---------------------------------
+
 )
 
 func GetCodeByError(err error) int {
@@ -65,7 +72,8 @@ func GetCodeByError(err error) int {
 		return CodeForbidden
 
 	// 参数错误
-	case ErrRegisterInputEmpty,
+	case ErrParameter,
+		ErrRegisterInputEmpty,
 		ErrLoginInputEmpty,
 		ErrRoleInvalid,
 		ErrPasswordTooShort,
@@ -113,6 +121,14 @@ func GetCodeByError(err error) int {
 		return CodeCommentRootDeleted
 	case ErrCommentPermission:
 		return CodeCommentPermission
+
+	// redis
+	case ErrLockExpired:
+		return CodeLockExpired
+	case ErrLockFailed:
+		return CodeLockFailed
+	case ErrUnLockFailed:
+		return CodeUnLockFailed
 	default:
 		return CodeInternalServerError
 

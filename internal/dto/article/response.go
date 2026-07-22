@@ -2,7 +2,7 @@ package article
 
 import (
 	"blog/internal/model"
-	"blog/pkg/iputil"
+	"blog/pkg/util/ip"
 	"strings"
 )
 
@@ -18,10 +18,12 @@ type ArticleDetailResponse struct {
 	IP           string   `json:"ip"` //作者IP
 	CreatedTime  int64    `json:"created_time"`
 	UpdatedTime  int64    `json:"updated_time"`
+	IsLiked      bool     `json:"is_liked"`   // 是否点赞
+	LikeCount    uint64   `json:"like_count"` // 点赞数量
 }
 
 // 构造单条详情响应
-func NewArticleDetailResponse(m *model.Article, nickName, avatar, authorIP string) *ArticleDetailResponse {
+func NewArticleDetailResponse(m *model.Article, nickName, avatar, authorIP string, isLiked bool) *ArticleDetailResponse {
 	if m == nil {
 		return nil
 	}
@@ -37,9 +39,11 @@ func NewArticleDetailResponse(m *model.Article, nickName, avatar, authorIP strin
 		Status:       int8(m.Status),
 		AuthorNick:   nickName,
 		AuthorAvatar: avatar,
-		IP:           iputil.ConvertIPToRegion(authorIP),
+		IP:           ip.ConvertIPToRegion(authorIP),
 		CreatedTime:  m.CreatedTime.Unix(),
 		UpdatedTime:  m.UpdatedTime.Unix(),
+		IsLiked:      isLiked,
+		LikeCount:    uint64(m.LikeCount),
 	}
 }
 
@@ -55,15 +59,21 @@ type ArticleListItem struct {
 
 // 列表返回
 type ArticleListResponse struct {
-	List  []*ArticleListItem `json:"list"`
-	Total int                `json:"total"`
+	List     []*ArticleListItem `json:"list"`
+	LastID   uint64             `json:"last_id"`
+	Total    uint64             `json:"total"`
+	Page     uint64             `json:"page"`      // 页码
+	PageSize uint64             `json:"page_size"` // 页面大小
 }
 
 // 构造列表响应
-func NewArticleListResponse(models []*model.Article) *ArticleListResponse {
+func NewArticleListResponse(models []*model.Article, total, lastID, page, page_size uint64) *ArticleListResponse {
 	resp := &ArticleListResponse{
-		List:  make([]*ArticleListItem, 0),
-		Total: 0,
+		List:     make([]*ArticleListItem, 0),
+		Total:    total,
+		LastID:   lastID,
+		Page:     page,
+		PageSize: page_size,
 	}
 
 	for _, m := range models {
@@ -81,7 +91,6 @@ func NewArticleListResponse(models []*model.Article) *ArticleListResponse {
 			UpdatedTime: m.UpdatedTime.Unix(),
 		})
 	}
-	resp.Total = len(resp.List)
 	return resp
 }
 
@@ -95,15 +104,21 @@ type AdminListItem struct {
 	UpdatedTime int64    `json:"updated_time"`
 }
 type AdminListResponse struct {
-	List  []*AdminListItem `json:"list"`
-	Total int              `json:"total"`
+	List     []*AdminListItem `json:"list"`
+	LastID   uint64           `json:"last_id"`
+	Total    uint64           `json:"total"`
+	Page     uint64           `json:"page"`      // 页码
+	PageSize uint64           `json:"page_size"` // 页面大小
 }
 
 // 构建后台列表
-func NewAdminListResponse(models []*model.Article) *AdminListResponse {
+func NewAdminListResponse(models []*model.Article, total, lastID, page, page_size uint64) *AdminListResponse {
 	resp := &AdminListResponse{
-		List:  make([]*AdminListItem, 0),
-		Total: len(models),
+		List:     make([]*AdminListItem, 0),
+		Total:    total,
+		LastID:   lastID,
+		Page:     page,
+		PageSize: page_size,
 	}
 
 	for _, m := range models {
@@ -119,6 +134,26 @@ func NewAdminListResponse(models []*model.Article) *AdminListResponse {
 			CreatedTime: m.CreatedTime.Unix(),
 			UpdatedTime: m.UpdatedTime.Unix(),
 		})
+	}
+	return resp
+}
+
+// ====================  文章排行榜列表返回  ====================
+type HotRankResponse struct {
+	List *[]HotRankItem `json:"list"`
+}
+type HotRankItem struct {
+	ArticleID    uint64  `json:"article_id"`    // 文章id
+	Title        string  `json:"title"`         // 文章标题
+	Hot          float64 `json:"hot"`           // 热度
+	ViewCount    uint32  `json:"view_count"`    // 浏览量
+	CommentCount uint32  `json:"comment_count"` // 评论数
+	LikeCount    uint32  `json:"like_count"`    // 点赞数
+}
+
+func NewHotRankResponse(list []HotRankItem) *HotRankResponse {
+	resp := &HotRankResponse{
+		List: &list,
 	}
 	return resp
 }

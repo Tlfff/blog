@@ -6,6 +6,7 @@ import (
 	"blog/internal/dto/user"
 	"blog/internal/model"
 	"blog/internal/repository"
+	"context"
 	"errors"
 	"log"
 	"time"
@@ -22,9 +23,9 @@ func NewUserAuthService(repo *repository.UserRepository) *UserAuthService {
 }
 
 // 注册新用户
-func (s *UserAuthService) Register(phone, password, nickname, clientIP string) error {
+func (s *UserAuthService) Register(ctx context.Context, phone, password, nickname, clientIP string) error {
 	// 1. 检查用户是否已存在
-	_, err := s.repo.GetUserByAccount(phone, nickname)
+	_, err := s.repo.GetUserByAccount(ctx, phone, nickname)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
@@ -51,14 +52,14 @@ func (s *UserAuthService) Register(phone, password, nickname, clientIP string) e
 	}
 
 	log.Printf("Registering user: %+v\n", newUser)
-	return s.repo.CreateUser(newUser)
+	return s.repo.CreateUser(ctx, newUser)
 }
 
 // 登录验证
-func (s *UserAuthService) Login(phone, nickname, password, clientIP string) (*user.LoginResponse, error) {
+func (s *UserAuthService) Login(ctx context.Context, phone, nickname, password, clientIP string) (*user.LoginResponse, error) {
 
 	// 1. 查找用户
-	dbUser, err := s.repo.GetUserByAccount(phone, nickname)
+	dbUser, err := s.repo.GetUserByAccount(ctx, phone, nickname)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, common.ErrUserNotFound
@@ -81,7 +82,7 @@ func (s *UserAuthService) Login(phone, nickname, password, clientIP string) (*us
 	dbUser.LastLoginIp = clientIP
 	dbUser.LastLoginTime = time.Now()
 	dbUser.UpdatedTime = time.Now()
-	if err := s.repo.UpdateUser(dbUser); err != nil {
+	if err := s.repo.UpdateUser(ctx, dbUser); err != nil {
 		// 登录中，更新 IP 失败通常不阻断登录，这里选择仅记录日志或非核心报错处理
 		log.Printf("更新用户登录信息失败: %v", err)
 	}

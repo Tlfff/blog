@@ -8,7 +8,7 @@ type Article struct {
 	Title        string    `gorm:"column:title" `                       // 文章标题
 	Content      string    `gorm:"column:content" `                     // 文章正文内容（支持Markdown）
 	Tags         string    `gorm:"column:tags" `                        // 文章标签
-	Status       int8      `gorm:"column:status" `                      // 文章状态：0-已删除 1-草稿 2-已发表
+	Status       int8      `gorm:"column:status" `                      // 文章状态：1-已删除 2-草稿 3-已发表
 	ViewCount    uint32    `gorm:"column:view_count" `                  // 浏览量
 	LikeCount    uint32    `gorm:"column:like_count"`                   // 点赞数
 	CommentCount uint32    `gorm:"column:comment_count" `               // 评论数

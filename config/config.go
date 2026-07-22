@@ -8,6 +8,8 @@ import (
 
 type Config struct {
 	Database Database `yaml:"database"`
+	Redis    Redis    `yaml:"redis"`
+	Mongodb  Mongodb  `yaml:"mongodb"`
 }
 type Database struct {
 	Username string `yaml:"username"`
@@ -15,6 +17,19 @@ type Database struct {
 	Host     string `yaml:"host"`
 	Port     int    `yaml:"port"`
 	DBName   string `yaml:"dbname"`
+}
+
+type Redis struct {
+	Addr     string `yaml:"addr"`
+	DB       int    `yaml:"db"`
+	Password string `yaml:"password"`
+}
+type Mongodb struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	DBName   string `yaml:"dbname"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
 }
 
 func LoadConfig(filePath string) (*Config, error) {

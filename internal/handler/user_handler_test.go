@@ -65,7 +65,7 @@ func TestUserHandler_AllRoutes(t *testing.T) {
 	// 把真实组装好的服务喂给 Handler
 	h := NewUserHandler(userService)
 
-	_ = userAuthService.Register("13800000000", "123456", "测试用户", "120.0.0.1")
+	_ = userAuthService.Register(t.Context(), "13800000000", "123456", "测试用户", "120.0.0.1")
 	// 2.  定义大表格
 	tests := []struct {
 		name           string

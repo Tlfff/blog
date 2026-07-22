@@ -4,6 +4,7 @@ import (
 	"blog/internal/common"
 	"blog/internal/model"
 	"blog/internal/repository"
+	"context"
 	"log"
 	"time"
 )
@@ -25,14 +26,17 @@ func NewArticleViewHistoryService(repo *repository.ArticleViewHistoryRepository)
 func (s *ArticleViewHistoryService) RecordView(userID, articleID uint64, ip string) {
 	// 开启异步协程，让调用方瞬间返回，不阻塞主协程
 	go func() {
-		// 捕获panic，防止服务崩溃
+		// 捕获异常
 		defer func() {
 			if err := recover(); err != nil {
-				// 打印崩溃日志，接入日志框架
-				log.Printf("浏览统计协程panic recover: %v", err)
+				log.Printf("协程异常，方法：%s,异常：%v", "recordView", err)
 			}
 		}()
-		// todo: 传入context
+
+		// 设置个过期时间3s
+		newCtx, cancle := context.WithTimeout(context.Background(), 3*time.Second)
+		// 程序退出前释放上下文资源
+		defer cancle()
 		//  如果返回 true，说明该用户在这 10 分钟内是第一次看这篇文章
 		if s.viewMap.CheckAndSet(userID, articleID, ip, 10*time.Minute) {
 			// 如果是登录用户，记录浏览历史
@@ -44,11 +48,15 @@ func (s *ArticleViewHistoryService) RecordView(userID, articleID uint64, ip stri
 				}
 
 				// 2. 写入浏览历史表
-				_ = s.repo.CreateViewHistory(history)
+				if err := s.repo.CreateViewHistory(newCtx, history); err != nil {
+					log.Printf("写入浏览历史失败 uid=%d aid=%d err=%v", userID, articleID, err)
+				}
 			}
 
 			// 3. 文章主表的 view_count 原子自增 1
-			_ = s.repo.IncrementViewCount(articleID)
+			if err := s.repo.IncrementViewCount(newCtx, articleID); err != nil {
+				log.Printf("阅读量自增失败 aid=%d err=%v", articleID, err)
+			}
 		}
 	}()
 }

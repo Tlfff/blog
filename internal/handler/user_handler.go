@@ -23,7 +23,7 @@ func (h *UserHandler) GetMyProfile(c *gin.Context) {
 	userCtx := c.MustGet("currentUser").(*auth.UserContext)
 
 	// 2. 获取用户个人资料
-	res, err := h.user.GetMyProfile(userCtx.UserID)
+	res, err := h.user.GetMyProfile(c, userCtx.UserID)
 	if err != nil {
 
 		c.Error(err)
@@ -42,7 +42,7 @@ func (h *UserHandler) GetPublicProfile(c *gin.Context) {
 	}
 
 	// 2. 获取用户主页信息
-	res, err := h.user.GetUserProfile(req.UserId)
+	res, err := h.user.GetUserProfile(c, req.UserId)
 	if err != nil {
 		c.Error(err)
 		return
@@ -64,7 +64,7 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	userCtx := c.MustGet("currentUser").(*auth.UserContext)
 
 	// 3. 更新资料
-	err := h.user.UpdateProfile(userCtx.UserID, req.Nickname, req.Avatar)
+	err := h.user.UpdateProfile(c, userCtx.UserID, req.Nickname, req.Avatar)
 	if err != nil {
 
 		c.Error(err)
@@ -86,7 +86,7 @@ func (h *UserHandler) UpdatePassword(c *gin.Context) {
 	userCtx := c.MustGet("currentUser").(*auth.UserContext)
 
 	// 3. 更新密码
-	err := h.user.UpdatePassword(userCtx.UserID, req.OldPassword, req.NewPassword)
+	err := h.user.UpdatePassword(c, userCtx.UserID, req.OldPassword, req.NewPassword)
 	if err != nil {
 		c.Error(err)
 		return
@@ -107,7 +107,7 @@ func (h *UserHandler) UpdateAccount(c *gin.Context) {
 	userCtx := c.MustGet("currentUser").(*auth.UserContext)
 
 	// 3. 更新密码
-	err := h.user.UpdateAccount(userCtx.UserID, req.Phone)
+	err := h.user.UpdateAccount(c, userCtx.UserID, req.Phone)
 	if err != nil {
 		c.Error(err)
 		return
