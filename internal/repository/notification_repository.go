@@ -32,7 +32,7 @@ func NewNotificationRepository(db *mongo.Database) NotificationRepository {
 //	   "receiver_id": NumberLong(9527),
 //	   "type": NumberInt(1),
 //	   "is_read": false,
-//	   "sender": { "user_id": 1001, "nickname": "xxx", "avatar": "xxx" },
+//	   "sender": { "user_id": ？, "nickname": "xxx", "avatar": "xxx" },
 //	   "content": { "article_id": 123, "article_title": "xxx" },
 //	   "created_time": ISODate("2026-07-20T18:00:00Z")
 //	})

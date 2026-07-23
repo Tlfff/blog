@@ -10,10 +10,12 @@ import (
 	"blog/internal/service"
 	"blog/pkg/database"
 	iputil "blog/pkg/util/ip"
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
@@ -71,34 +73,41 @@ var serverCmd = &cobra.Command{
 		// 4.1  初始化基础 Repository
 		userRepo := repository.NewUserRepository(db)
 		historyRepo := repository.NewArticleViewHistoryRepository(db)
-		articleRepo := repository.NewArticleRepository(db)
+		artRepo := repository.NewArticleRepository(db)
 		commentRepo := repository.NewCommentRepository(db)
-		articleLikeRepo := repository.NewArticleLikeRepository(db)
+		artLikeRepo := repository.NewArticleLikeRepository(db)
 		commentLikeRepo := repository.NewCommentLikeRepository(db)
 		ntfRepo := repository.NewNotificationRepository(mongodb)
 
 		// 4.2 初始化service
 		ntfService := service.NewNotificationService(ntfRepo)
-		artLikeService := service.NewArticleLikeService(articleLikeRepo, articleRepo, rdb, ntfService, userRepo)
+		artLikeService := service.NewArticleLikeService(artLikeRepo, artRepo, rdb, ntfService, userRepo)
 		comLikeService := service.NewCommentLikeService(commentLikeRepo, commentRepo, rdb)
 		userAuthService := service.NewUserAuthService(userRepo)
 		userService := service.NewUserService(userRepo)
 		historyService := service.NewArticleViewHistoryService(historyRepo)
-		articleService := service.NewArticleService(articleRepo, historyService, artLikeService, rdb)
-		articleRankService := service.NewArticleRankService(articleRepo, rdb)
-		commentService := service.NewCommentService(commentRepo, articleRepo, rdb)
+		artService := service.NewArticleService(artRepo, historyService, artLikeService, rdb)
+		artRankService := service.NewArticleRankService(artRepo, rdb)
+		commentService := service.NewCommentService(commentRepo, artRepo, rdb)
+
+		// 初始化排行榜
+		initCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		if err := artRankService.RebuildHotRank(initCtx); err != nil {
+			log.Printf("[WARN] 热门文章排行榜初始化失败或超时, err: %v", err)
+		}
+		cancel() //释放定时器资源
 
 		// 4.3 初始化handler
 		userAuthHandler := handler.NewUserAuthHandler(userAuthService)
 		userHandler := handler.NewUserHandler(userService)
-		articleHandler := handler.NewArticleHandler(articleService, articleRankService)
+		articleHandler := handler.NewArticleHandler(artService, artRankService)
 		commentHandler := handler.NewCommentHandler(commentService)
 		likeHandler := handler.NewLikeHandler(artLikeService, comLikeService)
 		ntfHandler := handler.NewNotificationHandler(ntfService)
 
 		// 4.4 初始化定时器
 		// likeSyncJob := cron.NewLikeSyncJob(likeService)
-		rankJob := cron.NewRankSyncJob(articleRankService)
+		rankJob := cron.NewRankSyncJob(artRankService)
 		// 传入所有定时任务，由全局管理器统一调度
 		cronMgr := cron.NewCronManager(rankJob)
 		cronMgr.Start()

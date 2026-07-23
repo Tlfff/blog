@@ -29,12 +29,14 @@ func (s *NotificationService) GetMyNotifications(ctx context.Context, userID uin
 		pageSize = 10
 	}
 
-	// 2. 直接调用封装好的 Repo，底层通过 MQL 的 skip 和 limit 捞出数据
+	// 2. 获取通知数据
 	list, err := s.notifyRepo.GetList(ctx, userID, page, pageSize)
 	if err != nil {
 		return nil, err
 	}
-	// 3. 封装返回体
+	// 3. todo 获取通知总数
+
+	// 4. 封装返回体
 	rep := notification.NewNotificationListResponse(list, int64(page), int64(pageSize))
 	return rep, nil
 }
