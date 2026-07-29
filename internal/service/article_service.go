@@ -7,6 +7,7 @@ import (
 	"blog/internal/repository"
 	"context"
 	"errors"
+	"log"
 	"strings"
 
 	"github.com/redis/go-redis/v9"
@@ -119,8 +120,11 @@ func (s *ArticleService) GetPublishedArticle(ctx context.Context, articleId uint
 		return nil, common.ErrArticlePermissionDenied
 	}
 
-	// 2.记录浏览历史
-	s.historyView.RecordView(userId, articleId, ip)
+	// 2.记录浏览历史（同步发送 Kafka，获取 ACK 确认）
+	if err := s.historyView.RecordView(ctx, userId, articleId, ip); err != nil {
+		// 记录失败日志，但不影响主流程返回
+		log.Printf("[ArticleService] 记录浏览历史失败, userId: %d, articleId: %d, err: %v", userId, articleId, err)
+	}
 
 	// 3. 判断当前登录用户是否点赞过该文章
 	var isLiked bool

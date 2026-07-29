@@ -9,6 +9,7 @@ import (
 	"blog/internal/routes"
 	"blog/internal/service"
 	"blog/pkg/database"
+	"blog/pkg/kafka"
 	iputil "blog/pkg/util/ip"
 	"context"
 	"fmt"
@@ -68,6 +69,16 @@ var serverCmd = &cobra.Command{
 			return
 		}
 		defer rdb.Close()
+		// 3.1 初始化Kafka客户端
+		kafkaClient, err := kafka.NewClient(config.Kafka)
+		if err != nil {
+			fmt.Printf("[error]:Kafka客户端初始化失败:%v\n", err)
+			return
+		}
+		// 如果初始化成功，在程序退出时关闭
+		if kafkaClient != nil {
+			defer kafkaClient.Close()
+		}
 
 		// 4. 初始化模块
 		// 4.1  初始化基础 Repository
@@ -81,11 +92,11 @@ var serverCmd = &cobra.Command{
 
 		// 4.2 初始化service
 		ntfService := service.NewNotificationService(ntfRepo)
-		artLikeService := service.NewArticleLikeService(artLikeRepo, artRepo, rdb, ntfService, userRepo)
+		artLikeService := service.NewArticleLikeService(artLikeRepo, artRepo, rdb, ntfService, userRepo, kafkaClient)
 		comLikeService := service.NewCommentLikeService(commentLikeRepo, commentRepo, rdb)
 		userAuthService := service.NewUserAuthService(userRepo)
 		userService := service.NewUserService(userRepo)
-		historyService := service.NewArticleViewHistoryService(historyRepo)
+		historyService := service.NewArticleViewHistoryService(historyRepo, kafkaClient)
 		artService := service.NewArticleService(artRepo, historyService, artLikeService, rdb)
 		artRankService := service.NewArticleRankService(artRepo, rdb)
 		commentService := service.NewCommentService(commentRepo, artRepo, rdb)

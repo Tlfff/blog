@@ -10,6 +10,7 @@ require (
 	github.com/lionsoul2014/ip2region/binding/golang v0.0.0-20260630140118-a99989343ebd
 	github.com/redis/go-redis/v9 v9.21.0
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/segmentio/kafka-go v0.4.51
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	go.mongodb.org/mongo-driver v1.17.9
@@ -46,6 +47,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.1 // indirect
+	github.com/pierrec/lz4/v4 v4.1.15 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.60.0 // indirect

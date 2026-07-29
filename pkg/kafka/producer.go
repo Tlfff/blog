@@ -1,0 +1,182 @@
+package kafka
+
+import (
+	"blog/config"
+	"blog/internal/common"
+	"blog/internal/message"
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/segmentio/kafka-go"
+	"github.com/segmentio/kafka-go/compress"
+)
+
+type Producer struct {
+	writers map[string]*kafka.Writer
+	config  config.Kafka
+}
+
+// 创建 Kafka 生产者。
+func NewProducer(cfg config.Kafka) (*Producer, error) {
+	// 1. 获取配置信息
+	// 1.1 验证 broker 地址列表是否为空
+	brokers := cfg.GetBrokerList()
+	if len(brokers) == 0 {
+		return nil, common.ErrKafkaBrokerEmpty
+	}
+
+	// 1.2 解析压缩类型
+	compression := parseCompression(cfg.Producer.CompressionType)
+
+	// 1.3 解析确认级别
+	requiredAcks := parseRequiredAcks(cfg.Producer.Acks)
+
+	// 2. 为每个 topic 创建 writer
+	writers := make(map[string]*kafka.Writer)
+	for topicKey, topicCfg := range cfg.Topics {
+
+		// 2.1 验证 topic 名称是否为空
+		if topicCfg.Name == "" {
+			return nil, common.ErrKafkaTopicNotConfig
+		}
+		balancer := getBalancer(topicKey)
+		// 2.2 创建 writer
+		writer := &kafka.Writer{
+			Addr:         kafka.TCP(brokers...),                                       // 配置 broker 地址
+			Topic:        topicCfg.Name,                                               // 配置 topic 名称
+			Balancer:     balancer,                                                    // 配置负载均衡器
+			RequiredAcks: requiredAcks,                                                // 配置确认级别
+			Compression:  compression,                                                 // 配置压缩类型
+			MaxAttempts:  cfg.Producer.MaxRetries,                                     // 配置最大重试次数
+			BatchSize:    cfg.Producer.BatchSize,                                      // 配置批量大小
+			BatchBytes:   int64(cfg.Producer.BatchSizeBytes),                          // 配置批量大小（字节）
+			BatchTimeout: time.Duration(cfg.Producer.BatchTimeout) * time.Millisecond, // 配置批量超时时间
+			Async:        false,                                                       // 同步发送，可以获取ack
+		}
+		writers[topicKey] = writer
+	}
+	// 2.3 验证是否有有效 topic 配置
+	if len(writers) == 0 {
+		return nil, common.ErrKafkaTopicNotConfig
+	}
+
+	// 3. 返回生产者实例
+	return &Producer{
+		writers: writers,
+		config:  cfg,
+	}, nil
+}
+func getBalancer(topicKey string) kafka.Balancer {
+	switch topicKey {
+	case "notification":
+		return &kafka.RoundRobin{} // 通知消息使用轮询分区，提高吞吐量
+	case "view_history":
+		return &kafka.Hash{} // 浏览历史消息使用 Key Hash 分区，保证同一用户的消息有序
+	default:
+		return &kafka.LeastBytes{} // 其他消息使用 Least Bytes 分区，确保消息均匀分布
+	}
+}
+
+// 发送通知消息（无 Key，使用轮询分区）
+func (p *Producer) SendNotification(ctx context.Context, msg *message.NotificationMsg) error {
+	return p.sendMessage(ctx, "notification", nil, msg)
+}
+
+// 发送浏览历史消息（使用 UserID 作为 Key，保证同一用户的消息有序）
+func (p *Producer) SendViewHistory(ctx context.Context, msg *message.ViewHistoryMsg) error {
+	key := fmt.Sprintf("%d", msg.UserID)
+	return p.sendMessage(ctx, "view_history", []byte(key), msg)
+}
+
+// 通用发送方法
+// key 为 nil 时，Kafka 使用轮询分区（Round-Robin）
+// key 不为 nil 时，Kafka 使用 Key Hash 分区（相同 Key 分配到同一分区）
+func (p *Producer) sendMessage(ctx context.Context, topicKey string, key []byte, value interface{}) error {
+	// 1. 获取 writer
+	writer, exists := p.writers[topicKey]
+	if !exists {
+		return common.ErrKafkaTopicNotConfig
+	}
+	// 2. 序列化消息
+	data, err := json.Marshal(value)
+	if err != nil {
+		return common.ErrKafkaSerializeFailed
+	}
+	// 3. 构建消息
+	msg := kafka.Message{
+		Key:   key, // nil = 轮询分区，非 nil = Key Hash 分区
+		Value: data,
+	}
+
+	// 4. 同步发送，获取 ACK 确认
+	return writer.WriteMessages(ctx, msg)
+}
+
+// 关闭所有 writer
+func (p *Producer) Close() error {
+	var errs []error
+	// 1. 关闭所有 writer
+	for topicKey, writer := range p.writers {
+		if err := writer.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("关闭 topic %s 失败，错误: %w", topicKey, err))
+		}
+	}
+	// 2. 检查是否有错误
+	if len(errs) > 0 {
+		return common.ErrKafkaCloseFailed
+	}
+	return nil
+}
+
+// Ping 预热连接
+func (p *Producer) Ping(ctx context.Context) error {
+	// 获取任意一个 writer
+	var writer *kafka.Writer
+	for _, w := range p.writers {
+		writer = w
+		break
+	}
+	if writer == nil {
+		return fmt.Errorf("没有可用的 writer")
+	}
+
+	// 发送空消息建立连接
+	msg := kafka.Message{
+		Value: []byte("ping"),
+	}
+	return writer.WriteMessages(ctx, msg)
+}
+
+// 辅助函数：解析压缩类型
+func parseCompression(compressionType string) compress.Compression {
+	switch compressionType {
+	case "none":
+		return compress.None
+	case "gzip":
+		return compress.Gzip
+	case "snappy":
+		return compress.Snappy
+	case "lz4":
+		return compress.Lz4
+	case "zstd":
+		return compress.Zstd
+	default:
+		return compress.Snappy // 默认使用 snappy
+	}
+}
+
+// 辅助函数：解析确认级别
+func parseRequiredAcks(acks string) kafka.RequiredAcks {
+	switch acks {
+	case "none":
+		return kafka.RequireNone
+	case "one":
+		return kafka.RequireOne
+	case "all":
+		return kafka.RequireAll
+	default:
+		return kafka.RequireOne // 默认使用 one
+	}
+}
