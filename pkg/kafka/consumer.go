@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sort"
 	"sync"
 	"time"
 
@@ -20,7 +19,7 @@ import (
 //   - key: 消息的 key（字符串格式）
 //   - value: 消息的 value（原始 JSON 字节数组）
 //
-// 返回 error 表示处理失败，消息将不会被提交（等待重试）
+// 返回 error 表示本次处理失败；消费者会自动重试，超过最大重试次数后记录并丢弃消息，继续提交后续安全 offset。
 type MessageHandler func(ctx context.Context, key string, value []byte) error
 
 const (
@@ -82,7 +81,7 @@ func NewConsumer(cfg config.Kafka, handlers map[string]MessageHandler) (*Consume
 			Topic:          topicCfg.Name,                                                 // topic 名称
 			GroupID:        topicCfg.GroupID,                                              // 消费者组 ID
 			GroupBalancers: parseGroupBalancers(cfg.Consumer.GroupBalancer),               // 消费者组均衡器,范围均衡器
-			StartOffset:    startOffset,                                                   // 消费起始位置：latest
+			StartOffset:    startOffset,                                                   // 消费起始位置
 			MinBytes:       cfg.Consumer.MinBytes,                                         // 最小拉取字节数
 			MaxBytes:       cfg.Consumer.MaxBytes,                                         // 最大拉取字节数
 			MaxWait:        time.Duration(cfg.Consumer.MaxWait) * time.Millisecond,        // 最大等待时间（毫秒）
@@ -150,7 +149,7 @@ func (c *Consumer) Start(ctx context.Context) error {
 	return nil
 }
 
-// 消费 topic 的消息
+// 消费单个 topic 的消息
 func (c *Consumer) consumeTopic(ctx context.Context, topicKey string, reader *kafka.Reader) {
 	// 1. 确保在退出时关闭 reader，释放资源
 	// wg 计数 - 1，标记当前Topic消费协程结束
@@ -167,157 +166,168 @@ func (c *Consumer) consumeTopic(ctx context.Context, topicKey string, reader *ka
 	// 3. 从配置中读取批量大小和超时时间
 	batchSize := c.config.GetTopicBatchSize(topicKey)
 	batchTimeout := time.Duration(c.config.GetTopicBatchTimeout(topicKey)) * time.Millisecond
-
+	fetchTimeout := time.Duration(c.config.GetTopicFetchTimeout(topicKey)) * time.Millisecond
+	maxRetries := c.config.GetTopicMaxRetries(topicKey)
+	retryWait := time.Duration(c.config.GetTopicRetryWait(topicKey)) * time.Millisecond
+	commitMaxRetries := c.config.GetCommitRetries(topicKey)
+	commitWait := time.Duration(c.config.GetCommitWait(topicKey)) * time.Millisecond
 	// 4. 批量消费模式
 	batch := make([]kafka.Message, 0, batchSize)
 	ticker := time.NewTicker(batchTimeout) // 超时时间定时器，如果超过超时时间，处理当前批量消息
 	defer ticker.Stop()
 
-	// 5. 循环拉取消费消息
+	//5. 循环拉取消息
 	for {
 		select {
-		// 5.1 监听上下文取消信号
-		case <-ctx.Done():
-			// 退出前处理剩余消息
+		case <-ctx.Done(): // 5.1 监听上下文取消信号
 			if len(batch) > 0 {
-				if err := c.flushBatch(ctx, topicKey, batch, handler, reader); err != nil {
-					log.Printf("退出前处理 topic %s 剩余消息失败: %v", topicKey, err)
-				}
+				log.Printf("仍然有%条消息未处理, topic: %s", len(batch), topicKey)
 			}
 			return
-		// 5.2 监听批量超时
-		case <-ticker.C:
+		case <-ticker.C: // 5.2 监听超时时间定时器信号
 			if len(batch) > 0 {
-				if err := c.flushBatch(ctx, topicKey, batch, handler, reader); err != nil {
-					// 提交失败时不能继续拉取后续消息，否则后续 offset 可能越过未提交消息。
-					log.Printf("topic %s 批量消费异常，停止当前 topic 消费: %v", topicKey, err)
-					return
-				}
-				// 重置批量队列
-				batch = make([]kafka.Message, 0, batchSize)
+				// 处理当前批量消息
+				c.flushBatch(ctx, topicKey, batch, handler, reader, maxRetries, retryWait, commitMaxRetries, commitWait)
+				batch = batch[:0] // 清空批量消息
 			}
-		default:
-			// 5.3 阻塞拉取单条Kafka消息，可被ctx中断，拉取当前 Reader 分配分区的一条消息
-			msg, err := reader.FetchMessage(ctx)
+		default: // 5.3 监听默认信号
+
+			// 创建新的上下文，用于拉取单条消息
+			newCtx, cancel := context.WithTimeout(ctx, fetchTimeout)
+			// 拉取消息
+			msg, err := reader.FetchMessage(newCtx)
+			// 取消上下文，释放资源
+			defer func() {
+				cancel()
+			}()
 			if err != nil {
-				// 若为上下文取消导致的报错，正常退出，退出前处理剩余消息
-				if ctx.Err() != nil {
-					if len(batch) > 0 {
-						if err := c.flushBatch(ctx, topicKey, batch, handler, reader); err != nil {
-							log.Printf("退出前处理 topic %s 剩余消息失败: %v", topicKey, err)
-						}
-					}
-					return
-				}
-				// 网络/集群临时故障，不退出，继续循环重试拉取
+				log.Printf("拉取消息失败, topic: %s, err: %v", topicKey, err)
 				continue
 			}
-			// 5.3  累加消息到批量处理队列
+			//  将消息加入批量缓存
 			batch = append(batch, msg)
 
-			// 5.4 批量处理
-			// 如果批量队列大小超过配置的批量大小，处理当前批量消息
+			//  如果批量缓存达到批量大小，立即处理
 			if len(batch) >= batchSize {
-				if err := c.flushBatch(ctx, topicKey, batch, handler, reader); err != nil {
-					// 提交失败时保守停止，避免消费并提交后续消息。
-					log.Printf("topic %s 批量消费异常，停止当前 topic 消费: %v", topicKey, err)
-					return
-				}
+				c.flushBatch(ctx, topicKey, batch, handler, reader, maxRetries, retryWait, commitMaxRetries, commitWait)
 				batch = make([]kafka.Message, 0, batchSize)
 				ticker.Reset(batchTimeout) // 重置定时器
 			}
+
 		}
+
 	}
+
 }
 
-// flushBatch 处理一个 topic 的批次，并只提交每个 partition 的最后一条安全消息。
-func (c *Consumer) flushBatch(ctx context.Context, topicKey string, batch []kafka.Message, handler MessageHandler, reader *kafka.Reader) error {
+// 批量消费消息，按照 partition 分组处理，每个 partition 内按 offset 排序处理
+func (c *Consumer) flushBatch(ctx context.Context, topicKey string, batch []kafka.Message, handler MessageHandler, reader *kafka.Reader, maxRetries int, retryWait time.Duration, commitMaxRetries int, commitWait time.Duration) {
+	// 1. 如果批次为空，直接返回
 	if len(batch) == 0 {
-		return nil
+		return
 	}
 
-	commitMessages, err := c.processBatch(ctx, topicKey, batch, handler)
-	if err != nil {
-		return err
-	}
-	if len(commitMessages) == 0 {
-		return nil
-	}
+	// 2. 记录每个 partition 的最新 offset
+	lastOffsets := make(map[int]int64)
 
-	for attempt := 1; attempt <= maxCommitAttempts; attempt++ {
-		if err := reader.CommitMessages(ctx, commitMessages...); err == nil {
-			log.Printf("批量处理成功, topic: %s, count: %d, partitions: %d", topicKey, len(batch), len(commitMessages))
-			return nil
-		} else {
-			log.Printf("批量提交 offset 失败, topic: %s, attempt: %d/%d, err: %v", topicKey, attempt, maxCommitAttempts, err)
-			if attempt == maxCommitAttempts {
-				return err
-			}
-		}
-
-		if err := waitForRetry(ctx, time.Duration(attempt)*100*time.Millisecond); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// processBatch 按 partition 分组处理消息，并返回每个 partition 可安全提交的最后一条消息。
-// 消息首次处理失败后最多再重试 3 次，仍失败则记录并丢弃，然后继续处理同批次后续消息。
-func (c *Consumer) processBatch(ctx context.Context, topicKey string, batch []kafka.Message, handler MessageHandler) ([]kafka.Message, error) {
-	grouped := make(map[int][]kafka.Message)
+	// 3. 逐条处理消息（按 batch 原始顺序）
 	for _, msg := range batch {
-		grouped[msg.Partition] = append(grouped[msg.Partition], msg)
-	}
-
-	commitMessages := make([]kafka.Message, 0, len(grouped))
-	for partition, messages := range grouped {
-		sort.SliceStable(messages, func(i, j int) bool {
-			return messages[i].Offset < messages[j].Offset
-		})
-
-		var lastSafe kafka.Message
-		for _, msg := range messages {
-			if err := c.handleMessageWithRetry(ctx, topicKey, msg, handler); err != nil {
-				if ctx.Err() != nil {
-					return nil, ctx.Err()
-				}
-				// 当前策略：达到最大重试次数后丢弃消息，并将其视为已处理，
-				// 这样该 partition 才能继续向后推进。
-				log.Printf("消息重试 %d 次后丢弃, topic: %s, partition: %d, offset: %d, key: %q, err: %v", maxMessageRetries, topicKey, partition, msg.Offset, string(msg.Key), err)
-			}
-			lastSafe = msg
+		// 3.1 处理消息（含重试）
+		err := c.handleMessageWithRetry(ctx, topicKey, msg, handler, maxRetries, retryWait)
+		if err != nil {
+			// 3.2 重试失败，发送到死信队列
+			c.sendToDeadLetter(ctx, topicKey, msg, err)
+			// 继续处理下一条，不阻塞
 		}
-
-		commitMessages = append(commitMessages, lastSafe)
+		// 3.3 记录该 partition 的最新 offset（无论成功还是失败）
+		lastOffsets[msg.Partition] = msg.Offset
 	}
 
-	return commitMessages, nil
+	// 4. 如果没有处理任何消息，直接返回
+	if len(lastOffsets) == 0 {
+		return
+	}
+
+	// 5. 构建提交消息列表
+	commitMsgs := make([]kafka.Message, 0, len(lastOffsets))
+	for partition, offset := range lastOffsets {
+		commitMsgs = append(commitMsgs, kafka.Message{
+			Partition: partition,
+			Offset:    offset,
+		})
+	}
+
+	// 6. 提交所有 partition 的 offset（含重试）
+	for attempt := 0; attempt <= commitMaxRetries; attempt++ {
+		// 如果超出最大重试次数，记录日志并返回
+		if attempt == commitMaxRetries {
+			log.Printf("批量提交最终失败, topic: %s, 消息可能会被重新消费", topicKey)
+			return
+		}
+		// 提交 offset
+		err := reader.CommitMessages(ctx, commitMsgs...)
+		if err == nil {
+			log.Printf("批量提交成功, topic: %s, count: %d, partitions: %d",
+				topicKey, len(batch), len(lastOffsets))
+			return
+		}
+		log.Printf("批量提交 offset 失败, topic: %s, attempt: %d/%d, err: %v",
+			topicKey, attempt, commitMaxRetries, err)
+
+		if err := waitForRetry(ctx, time.Duration(attempt)*commitWait); err != nil {
+			return
+		}
+	}
 }
 
-func (c *Consumer) handleMessageWithRetry(ctx context.Context, topicKey string, msg kafka.Message, handler MessageHandler) error {
+func (c *Consumer) handleMessageWithRetry(ctx context.Context, topicKey string, msg kafka.Message, handler MessageHandler, maxRetries int, retryIntervalBase time.Duration) error {
 	var lastErr error
-	for attempt := 0; attempt <= maxMessageRetries; attempt++ {
+
+	// 1. 尝试处理消息（最多 maxRetries+1 次：首次 + maxRetries 次重试）
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		// 1.1 调用业务处理器
 		lastErr = handler(ctx, string(msg.Key), msg.Value)
 		if lastErr == nil {
 			return nil
 		}
+
+		// 1.2 检查上下文是否取消
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 
-		log.Printf("消息处理失败，将重试, topic: %s, partition: %d, offset: %d, attempt: %d/%d, err: %v", topicKey, msg.Partition, msg.Offset, attempt+1, maxMessageRetries+1, lastErr)
-		if attempt < maxMessageRetries {
-			if err := waitForRetry(ctx, time.Duration(attempt+1)*100*time.Millisecond); err != nil {
+		// 1.3 记录失败日志
+		log.Printf("消息处理失败, topic: %s, partition: %d, offset: %d, attempt: %d/%d, err: %v",
+			topicKey, msg.Partition, msg.Offset, attempt+1, maxRetries+1, lastErr)
+
+		// 1.4 如果不是最后一次尝试，等待后重试
+		if attempt < maxRetries {
+			if err := waitForRetry(ctx, time.Duration(attempt+1)*retryIntervalBase); err != nil {
 				return err
 			}
 		}
 	}
 
+	// 2. 所有重试都失败，返回最后一次错误
 	return lastErr
 }
 
+// 发送消息到死信队列
+func (c *Consumer) sendToDeadLetter(ctx context.Context, topicKey string, msg kafka.Message, err error) {
+	// 1. 记录日志
+	log.Printf("消息进入死信队列, topic: %s, partition: %d, offset: %d, key: %q, err: %v",
+		topicKey, msg.Partition, msg.Offset, string(msg.Key), err)
+
+	// // 2. 发送到死信队列
+	// if c.deadLetterHandler != nil {
+	// 	if dlErr := c.deadLetterHandler(ctx, topicKey, msg, err); dlErr != nil {
+	// 		log.Printf("发送死信队列失败, topic: %s, offset: %d, err: %v",
+	// 			topicKey, msg.Offset, dlErr)
+	// 	}
+	// }
+}
+
+// 等待重试，支持上下文取消
 func waitForRetry(ctx context.Context, delay time.Duration) error {
 	timer := time.NewTimer(delay)
 	defer timer.Stop()

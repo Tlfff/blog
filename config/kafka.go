@@ -16,6 +16,9 @@ type TopicConfig struct {
 	StartOffset  string `yaml:"start_offset"`     // 消费起始位置：oldest/latest
 	BatchSize    int    `yaml:"batch_size"`       // 批量消费条数，默认 50
 	BatchTimeout int    `yaml:"batch_timeout_ms"` // 批量超时时间（毫秒），默认 1000
+	FetchTimeout int    `yaml:"fetch_timeout_ms"` // 拉取单条消息的超时时间（毫秒），默认 300
+	MaxRetries   int    `yaml:"max_retries"`      // 消息处理最大重试次数，默认 3
+	RetryWait    int    `yaml:"retry_wait_ms"`    // 重试间隔（毫秒），默认 100
 }
 
 // kafka 生产者配置
@@ -30,11 +33,13 @@ type KafkaProducer struct {
 
 // kafka 消费者配置
 type KafkaConsumer struct {
-	MaxBytes       int `yaml:"max_bytes"`          // 最大拉取字节数
-	MinBytes       int `yaml:"min_bytes"`          // 最小拉取字节数
-	MaxWait        int `yaml:"max_wait_ms"`        // 最大等待时间（毫秒）
-	SessionTimeout int `yaml:"session_timeout_ms"` // 会话超时时间（毫秒）
-	GroupBalancer   string `yaml:"group_balancer"`
+	MaxBytes       int    `yaml:"max_bytes"`          // 最大拉取字节数
+	MinBytes       int    `yaml:"min_bytes"`          // 最小拉取字节数
+	MaxWait        int    `yaml:"max_wait_ms"`        // 最大等待时间（毫秒）
+	SessionTimeout int    `yaml:"session_timeout_ms"` // 会话超时时间（毫秒）
+	GroupBalancer  string `yaml:"group_balancer"`     // 消费者组分配策略，默认 round_robin
+	CommitRetries  int    `yaml:"commit_retries"`     // 提交偏移量重试次数，默认 3 次
+	CommitWait     int    `yaml:"commit_wait_ms"`     // 提交偏移量间隔，默认 100 毫秒
 }
 
 // 获取 kafka broker 地址列表
@@ -74,4 +79,44 @@ func (k *Kafka) GetTopicBatchTimeout(topicKey string) int {
 		return topic.BatchTimeout
 	}
 	return 1000 // 默认 1000ms
+}
+
+// 获取 topic 的拉取单条消息的超时时间，如果未配置则使用默认值
+func (k *Kafka) GetTopicFetchTimeout(topicKey string) int {
+	if topic, exists := k.Topics[topicKey]; exists && topic.FetchTimeout > 0 {
+		return topic.FetchTimeout
+	}
+	return 300 // 默认 300ms
+}
+
+// 获取 topic 的最大重试次数，如果未配置则使用默认值
+func (k *Kafka) GetTopicMaxRetries(topicKey string) int {
+	if topic, exists := k.Topics[topicKey]; exists && topic.MaxRetries > 0 {
+		return topic.MaxRetries
+	}
+	return 3 // 默认 3 次
+}
+
+// 获取 topic 的重试间隔，如果未配置则使用默认值
+func (k *Kafka) GetTopicRetryWait(topicKey string) int {
+	if topic, exists := k.Topics[topicKey]; exists && topic.RetryWait > 0 {
+		return topic.RetryWait
+	}
+	return 100 // 默认 100ms
+}
+
+// 获取提交offset的重试次数，如果未配置则使用默认值
+func (k *Kafka) GetCommitRetries(topicKey string) int {
+	if k.Consumer.CommitRetries > 0 {
+		return k.Consumer.CommitRetries
+	}
+	return 3 // 默认 3 次
+}
+
+// 获取提交offset的间隔，如果未配置则使用默认值
+func (k *Kafka) GetCommitWait(topicKey string) int {
+	if k.Consumer.CommitWait > 0 {
+		return k.Consumer.CommitWait
+	}
+	return 100 // 默认 100ms
 }
