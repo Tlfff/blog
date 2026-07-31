@@ -126,10 +126,13 @@ func (h *ArticleHandler) GetArticleDetail(c *gin.Context) {
 		return
 	}
 
-	userId := c.GetUint64("userID")
-	ip := c.ClientIP()
-	// 2. 获取详情
-	res, err := h.article.GetPublishedArticle(c, req.ID, userId, ip)
+	// 2. 从Gin 上下文获取用户信息，可能未登录
+	userID := uint64(0)
+	if userCtx, exists := c.Get("currentUser"); exists {
+		userID = userCtx.(*auth.UserContext).UserID
+	}
+	// 3. 获取详情
+	res, err := h.article.GetPublishedArticle(c, req.ID, userID)
 	if err != nil {
 		c.Error(err)
 		return
@@ -162,7 +165,7 @@ func (h *ArticleHandler) GetPublishedList(c *gin.Context) {
 	var req article.GetPublishListRequest
 	// 1. 自动去 Query 拿 ?id=xxx，自动转成 int64，自动校验 min=1
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.Error(common.ErrUserNotFound)
+		c.Error(common.ErrParameter)
 		return
 	}
 

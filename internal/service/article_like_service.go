@@ -2,11 +2,14 @@ package service
 
 import (
 	"blog/internal/consts"
+	"blog/internal/message"
 	"blog/internal/model"
 	"blog/internal/repository"
 	"blog/pkg/database"
+	"blog/pkg/kafka"
 	redisUtil "blog/pkg/util/redis"
 	"context"
+	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -21,15 +24,17 @@ type ArticleLikeService struct {
 	rdb         *redis.Client
 	ntfService  *NotificationService
 	userRepo    *repository.UserRepository
+	kafkaClient *kafka.Client
 }
 
-func NewArticleLikeService(artLikeRepo repository.ArticleLikeRepository, artRepo *repository.ArticleRepository, rbd *redis.Client, ntfService *NotificationService, userRepo *repository.UserRepository) *ArticleLikeService {
+func NewArticleLikeService(artLikeRepo repository.ArticleLikeRepository, artRepo *repository.ArticleRepository, rbd *redis.Client, ntfService *NotificationService, userRepo *repository.UserRepository, kafkaClient *kafka.Client) *ArticleLikeService {
 	return &ArticleLikeService{
 		artlikeRepo: artLikeRepo,
 		artRepo:     artRepo,
 		rdb:         rbd,
 		ntfService:  ntfService,
 		userRepo:    userRepo,
+		kafkaClient: kafkaClient,
 	}
 }
 
@@ -75,12 +80,13 @@ func (s *ArticleLikeService) ArticleLike(ctx context.Context, userID, articleID 
 	if err := s.rdb.SAdd(ctx, key, userID).Err(); err != nil {
 		log.Printf("更新点赞缓存失败,article_id:%d,user_id:%d,err:%v", articleID, userID, err)
 	}
-	// 4. 更新排行榜
-	if err := s.updateRankZSet(ctx, articleID); err != nil {
-		log.Printf("更新排行榜失败,article_id:%d,err:%v", articleID, err)
-	}
-	// 5. 异步发送通知
-	s.asyncSendLikeNotification(userID, articleID)
+	// // 4. 更新排行榜
+	// if err := s.updateRankZSet(ctx, articleID); err != nil {
+	// 	log.Printf("更新排行榜失败,article_id:%d,err:%v", articleID, err)
+	// }
+
+	// 5. 异步发送通知消息到Kafka
+	s.sendLikeNotificationToKafka(userID, articleID)
 	return nil
 }
 
@@ -129,10 +135,10 @@ func (s *ArticleLikeService) ArticleCancelLike(ctx context.Context, userID, arti
 		log.Printf("更新取消点赞缓存失败,article_id:%d,user_id:%d,err:%v", articleID, userID, err)
 	}
 
-	// 4. 更新排行榜
-	if err := s.updateRankZSet(ctx, articleID); err != nil {
-		log.Printf("更新排行榜失败,article_id:%d,err:%v", articleID, err)
-	}
+	// // 4. 更新排行榜
+	// if err := s.updateRankZSet(ctx, articleID); err != nil {
+	// 	log.Printf("更新排行榜失败,article_id:%d,err:%v", articleID, err)
+	// }
 
 	return nil
 }
@@ -274,4 +280,62 @@ func (s *ArticleLikeService) asyncSendLikeNotification(userID, articleID uint64)
 		}
 
 	}()
+}
+
+// 通过 Kafka 异步发送点赞通知
+func (s *ArticleLikeService) sendLikeNotificationToKafka(userID, articleID uint64) {
+	// 1. 检查 Kafka 客户端是否可用
+	if s.kafkaClient == nil {
+		return
+	}
+	producer := s.kafkaClient.GetProducer()
+	if producer == nil {
+		return
+	}
+
+	// 2. 构造消息
+	msg := &message.NotificationMsg{
+		NotifyType:  model.NotifyTypeLikeArticle,
+		SenderID:    userID,
+		TargetID:    articleID,
+		CreatedTime: time.Now(),
+	}
+
+	// 3. 异步发送，ACK 确认在后台 goroutine 中等待，不阻塞点赞主流程
+	producer.SendNotificationAsync(msg)
+}
+
+// ------------------------------ 消费通知消息函数 ------------------------------
+// 创建点赞通知（供 Kafka 消费者调用）
+func (s *ArticleLikeService) CreateLikeNotification(ctx context.Context, msg *message.NotificationMsg) error {
+	log.Printf("发送点赞文章通知,article_id:%d,user_id:%d", msg.TargetID, msg.SenderID)
+	// 1. 根据 TargetID 查询文章
+	article, err := s.artRepo.FindArticleByID(ctx, msg.TargetID)
+	if err != nil {
+		log.Printf("[MQ] 获取文章信息失败, article_id: %d, err: %v", msg.TargetID, err)
+		return err
+	}
+
+	// 2. 根据 SenderID 查询用户
+	user, err := s.userRepo.FindUserByID(ctx, msg.SenderID)
+	if err != nil {
+		log.Printf("[MQ] 获取用户信息失败, user_id: %d, err: %v", msg.SenderID, err)
+		return err
+	}
+
+	// 3. 发送通知
+	err = s.ntfService.SendLikeArticleNotification(
+		ctx,
+		msg.SenderID,
+		user.Nickname,
+		user.Avatar,
+		article.AuthorID,
+		msg.TargetID,
+		article.Title,
+	)
+	if err != nil {
+		return fmt.Errorf("发送通知失败: %w", err)
+	}
+
+	return nil
 }

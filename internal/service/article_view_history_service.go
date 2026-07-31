@@ -2,61 +2,78 @@ package service
 
 import (
 	"blog/internal/common"
+	"blog/internal/message"
 	"blog/internal/model"
 	"blog/internal/repository"
+	"blog/pkg/kafka"
 	"context"
 	"log"
 	"time"
 )
 
 type ArticleViewHistoryService struct {
-	repo    *repository.ArticleViewHistoryRepository
-	viewMap *common.ViewCacheMap // 维护一个内存中的浏览历史记录，key: userID_articleID, value: lastViewTime
+	repo        *repository.ArticleViewHistoryRepository
+	kafkaClient *kafka.Client
 }
 
 // NewArticleViewHistoryService 初始化独立的浏览历史服务
-func NewArticleViewHistoryService(repo *repository.ArticleViewHistoryRepository) *ArticleViewHistoryService {
+func NewArticleViewHistoryService(repo *repository.ArticleViewHistoryRepository, kafkaClient *kafka.Client) *ArticleViewHistoryService {
 	return &ArticleViewHistoryService{
-		repo:    repo,
-		viewMap: common.NewViewCacheMap(),
+		repo:        repo,
+		kafkaClient: kafkaClient,
 	}
 }
 
-// RecordView 核心业务逻辑：异步检查并记录浏览历史
-func (s *ArticleViewHistoryService) RecordView(userID, articleID uint64, ip string) {
-	// 开启异步协程，让调用方瞬间返回，不阻塞主协程
-	go func() {
-		// 捕获异常
-		defer func() {
-			if err := recover(); err != nil {
-				log.Printf("协程异常，方法：%s,异常：%v", "recordView", err)
-			}
-		}()
+// ---------------------------- 发送Kafka消息 ----------------------------
+// 发送浏览历史消息到 Kafka topic
+func (s *ArticleViewHistoryService) SendViewHistory(ctx context.Context, userID, articleID uint64) error {
+	// 1. 检查 Kafka 客户端是否可用
+	if s.kafkaClient == nil {
+		return common.ErrKafkaClientClosed
+	}
+	producer := s.kafkaClient.GetProducer()
+	if producer == nil {
+		return common.ErrKafkaClientClosed
+	}
 
-		// 设置个过期时间3s
-		newCtx, cancle := context.WithTimeout(context.Background(), 3*time.Second)
-		// 程序退出前释放上下文资源
-		defer cancle()
-		//  如果返回 true，说明该用户在这 10 分钟内是第一次看这篇文章
-		if s.viewMap.CheckAndSet(userID, articleID, ip, 10*time.Minute) {
-			// 如果是登录用户，记录浏览历史
-			if userID > 0 {
-				// 1. 构造流水记录
-				history := &model.ArticleViewHistory{
-					UserID:    userID,
-					ArticleID: articleID,
-				}
+	// 2. 构造消息
+	msg := &message.ViewHistoryMsg{
+		ArticleID:   articleID,
+		UserID:      userID,
+		CreatedTime: time.Now(),
+	}
 
-				// 2. 写入浏览历史表
-				if err := s.repo.CreateViewHistory(newCtx, history); err != nil {
-					log.Printf("写入浏览历史失败 uid=%d aid=%d err=%v", userID, articleID, err)
-				}
-			}
+	// 3， 发送消息
+	if err := producer.SendViewHistory(ctx, msg); err != nil {
+		log.Printf("[Kafka] 发送浏览历史失败, user: %d, article: %d, err: %v", userID, articleID, err)
+		return err
+	}
 
-			// 3. 文章主表的 view_count 原子自增 1
-			if err := s.repo.IncrementViewCount(newCtx, articleID); err != nil {
-				log.Printf("阅读量自增失败 aid=%d err=%v", articleID, err)
-			}
+	log.Printf("[Kafka] 发送浏览历史成功, user: %d, article: %d", userID, articleID)
+	return nil
+}
+
+// ---------------------------- 消费Kafka消息 ----------------------------
+
+// 处理从 notification topic 消费的消息，记录浏览历史
+func (s *ArticleViewHistoryService) CreateViewHistory(ctx context.Context, userID, articleID uint64, timestamp time.Time) error {
+	// 1. 如果是登录用户，记录浏览历史
+	if userID > 0 {
+		history := &model.ArticleViewHistory{
+			UserID:      userID,
+			ArticleID:   articleID,
+			CreatedTime: timestamp,
+			UpdatedTime: timestamp,
 		}
-	}()
+		if err := s.repo.CreateViewHistory(ctx, history); err != nil {
+			log.Printf("写入浏览历史失败 uid=%d aid=%d err=%v", userID, articleID, err)
+		}
+	}
+
+	// 2. 文章主表的 view_count 原子自增 1
+	if err := s.repo.IncrementViewCount(ctx, articleID); err != nil {
+		log.Printf("阅读量自增失败 aid=%d err=%v", articleID, err)
+		return err
+	}
+	return nil
 }

@@ -50,11 +50,14 @@ func NewArticleDetailResponse(m *model.Article, nickName, avatar, authorIP strin
 // ====================  前台文章列表返回  ====================
 // 列表项
 type ArticleListItem struct {
-	ID          uint64 `json:"id"`
-	Title       string `json:"title"`
-	Summary     string `json:"summary"` // 摘要
-	AuthorID    uint64 `json:"author_id"`
-	UpdatedTime int64  `json:"updated_time"`
+	ID           uint64 `json:"id"`
+	Title        string `json:"title"`
+	Summary      string `json:"summary"` // 摘要
+	AuthorID     uint64 `json:"author_id"`
+	UpdatedTime  int64  `json:"updated_time"`
+	ViewCount    uint32 `json:"view_count"`
+	LikeCount    uint32 `json:"like_count"`
+	CommentCount uint32 `json:"comment_count"`
 }
 
 // 列表返回
@@ -84,11 +87,14 @@ func NewArticleListResponse(models []*model.Article, total, lastID, page, page_s
 		}
 
 		resp.List = append(resp.List, &ArticleListItem{
-			ID:          m.ID,
-			Title:       m.Title,
-			Summary:     summary,
-			AuthorID:    m.AuthorID,
-			UpdatedTime: m.UpdatedTime.Unix(),
+			ID:           m.ID,
+			Title:        m.Title,
+			Summary:      summary,
+			AuthorID:     m.AuthorID,
+			UpdatedTime:  m.UpdatedTime.Unix(),
+			CommentCount: m.CommentCount,
+			ViewCount:    m.ViewCount,
+			LikeCount:    m.LikeCount,
 		})
 	}
 	return resp

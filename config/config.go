@@ -10,6 +10,7 @@ type Config struct {
 	Database Database `yaml:"database"`
 	Redis    Redis    `yaml:"redis"`
 	Mongodb  Mongodb  `yaml:"mongodb"`
+	Kafka    Kafka    `yaml:"kafka"`
 }
 type Database struct {
 	Username string `yaml:"username"`
