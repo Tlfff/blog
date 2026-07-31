@@ -13,7 +13,6 @@ import (
 
 type ArticleViewHistoryService struct {
 	repo        *repository.ArticleViewHistoryRepository
-	viewMap     *common.ViewCacheMap // 维护一个内存中的浏览历史记录，key: userID_articleID, value: lastViewTime
 	kafkaClient *kafka.Client
 }
 
@@ -21,26 +20,13 @@ type ArticleViewHistoryService struct {
 func NewArticleViewHistoryService(repo *repository.ArticleViewHistoryRepository, kafkaClient *kafka.Client) *ArticleViewHistoryService {
 	return &ArticleViewHistoryService{
 		repo:        repo,
-		viewMap:     common.NewViewCacheMap(),
 		kafkaClient: kafkaClient,
 	}
 }
 
-// 记录浏览历史
-func (s *ArticleViewHistoryService) RecordView(ctx context.Context, userID, articleID uint64, ip string) error {
-	// // 1. 防刷检查
-	// if !s.viewMap.CheckAndSet(userID, articleID, ip, 10*time.Minute) {
-	// 	// 10 分钟内已记录过，不发送消息
-	// 	return
-	// }
-
-	// 2. 发送 Kafka 消息
-	return s.sendViewHistoryToKafka(ctx, userID, articleID)
-}
-
 // ---------------------------- 发送Kafka消息 ----------------------------
 // 发送浏览历史消息到 Kafka topic
-func (s *ArticleViewHistoryService) sendViewHistoryToKafka(ctx context.Context, userID, articleID uint64) error {
+func (s *ArticleViewHistoryService) SendViewHistory(ctx context.Context, userID, articleID uint64) error {
 	// 1. 检查 Kafka 客户端是否可用
 	if s.kafkaClient == nil {
 		return common.ErrKafkaClientClosed
@@ -57,12 +43,8 @@ func (s *ArticleViewHistoryService) sendViewHistoryToKafka(ctx context.Context, 
 		CreatedTime: time.Now(),
 	}
 
-	// 3. 使用传入的 ctx，创建子sendCtx上下文，并设置发送超时时间，确保 Kafka 发送在 5s 内完成
-	// 如果 HTTP 请求超时或被取消，这里的 Kafka 发送也会立即终止
-	sendCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	if err := producer.SendViewHistory(sendCtx, msg); err != nil {
+	// 3， 发送消息
+	if err := producer.SendViewHistory(ctx, msg); err != nil {
 		log.Printf("[Kafka] 发送浏览历史失败, user: %d, article: %d, err: %v", userID, articleID, err)
 		return err
 	}

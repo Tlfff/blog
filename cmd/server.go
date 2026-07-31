@@ -97,7 +97,7 @@ var serverCmd = &cobra.Command{
 		userAuthService := service.NewUserAuthService(userRepo)
 		userService := service.NewUserService(userRepo)
 		historyService := service.NewArticleViewHistoryService(historyRepo, kafkaClient)
-		artService := service.NewArticleService(artRepo, historyService, artLikeService, rdb)
+		artService := service.NewArticleService(artRepo, artLikeService, rdb)
 		artRankService := service.NewArticleRankService(artRepo, rdb)
 		commentService := service.NewCommentService(commentRepo, artRepo, rdb)
 
@@ -126,12 +126,13 @@ var serverCmd = &cobra.Command{
 
 		// 5. 组装成统一的路由容器
 		appHandler := &routes.AppHandler{
-			UserAuth: userAuthHandler,
-			User:     userHandler,
-			Article:  articleHandler,
-			Comment:  commentHandler,
-			Like:     likeHandler,
-			Notify:   ntfHandler,
+			UserAuth:    userAuthHandler,
+			User:        userHandler,
+			Article:     articleHandler,
+			Comment:     commentHandler,
+			Like:        likeHandler,
+			Notify:      ntfHandler,
+			ViewHistory: historyService,
 		}
 
 		// 6. 创建路由引擎

@@ -85,8 +85,8 @@ func (s *ArticleLikeService) ArticleLike(ctx context.Context, userID, articleID 
 	// 	log.Printf("更新排行榜失败,article_id:%d,err:%v", articleID, err)
 	// }
 
-	// 5. 发送通知消息到Kafka
-	s.sendLikeNotificationToKafka(ctx, userID, articleID)
+	// 5. 异步发送通知消息到Kafka
+	s.sendLikeNotificationToKafka(userID, articleID)
 	return nil
 }
 
@@ -282,9 +282,8 @@ func (s *ArticleLikeService) asyncSendLikeNotification(userID, articleID uint64)
 	}()
 }
 
-// 通过 Kafka 发送点赞通知
-func (s *ArticleLikeService) sendLikeNotificationToKafka(ctx context.Context, userID, articleID uint64) {
-	log.Printf("发送消息到Kafka,article_id:%d,user_id:%d", articleID, userID)
+// 通过 Kafka 异步发送点赞通知
+func (s *ArticleLikeService) sendLikeNotificationToKafka(userID, articleID uint64) {
 	// 1. 检查 Kafka 客户端是否可用
 	if s.kafkaClient == nil {
 		return
@@ -302,13 +301,8 @@ func (s *ArticleLikeService) sendLikeNotificationToKafka(ctx context.Context, us
 		CreatedTime: time.Now(),
 	}
 
-	// 3. 同步发送通知消息到Kafka，创建子上下文，设置超时时间5s
-	sendCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	if err := producer.SendNotification(sendCtx, msg); err != nil {
-		log.Printf("[Kafka] 发送点赞通知失败: %v", err)
-	}
+	// 3. 异步发送，ACK 确认在后台 goroutine 中等待，不阻塞点赞主流程
+	producer.SendNotificationAsync(msg)
 }
 
 // ------------------------------ 消费通知消息函数 ------------------------------

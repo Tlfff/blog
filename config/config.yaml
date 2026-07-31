@@ -27,8 +27,8 @@ kafka:
       group_id: "blog_notification_consumer"
       start_offset: "oldest"
       batch_size: 50          # 批量消费条数，消费者拉取用的条数
-      batch_timeout_ms: 3000  # 批量超时时间（毫秒）
-      fetch_timeout_ms: 300  # 拉取单条消息的超时时间（毫秒）
+      batch_timeout_ms: 10000  # 批量超时时间（毫秒）
+      fetch_timeout_ms: 3000  # 拉取单条消息的超时时间（毫秒）
       max_retries: 3                      # 消息处理最大重试次数
       retry_wait_ms: 100         # 重试间隔（毫秒）
 
@@ -37,8 +37,8 @@ kafka:
       group_id: "blog_view_consumer"
       start_offset: "oldest"
       batch_size: 100         # 批量消费条数，消费者拉取用的条数
-      batch_timeout_ms: 1000   # 批量超时时间（毫秒）
-      fetch_timeout_ms: 300  # 拉取单条消息的超时时间（毫秒）
+      batch_timeout_ms: 10000   # 批量超时时间（毫秒）
+      fetch_timeout_ms: 3000  # 拉取单条消息的超时时间（毫秒）
       max_retries: 3                      # 消息处理最大重试次数
       retry_wait_ms: 100         # 重试间隔（毫秒）
     

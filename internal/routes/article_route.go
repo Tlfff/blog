@@ -3,6 +3,7 @@ package routes
 import (
 	"blog/internal/handler"
 	"blog/internal/middleware"
+	"blog/internal/service"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,9 +14,12 @@ func InitArticlePublicRoutes(r *gin.RouterGroup, articleHandler *handler.Article
 	r.GET("/article/list", articleHandler.GetPublishedList)
 	r.GET("/article/hot-rank", articleHandler.GetHotArticleRank)
 }
-func InitArticleOptionalRoutes(r *gin.RouterGroup, articleHandler *handler.ArticleHandler) {
-	// 获取已发表文章详情
-	r.GET("/article/detail", articleHandler.GetArticleDetail)
+func InitArticleOptionalRoutes(r *gin.RouterGroup, articleHandler *handler.ArticleHandler, historyService *service.ArticleViewHistoryService) {
+	// 获取已发表文章详情，浏览历史由中间件异步发送到 Kafka
+	r.GET("/article/detail",
+		middleware.ViewHistoryMiddleware(historyService),
+		articleHandler.GetArticleDetail,
+	)
 }
 func InitArticlePrivateRoutes(r *gin.RouterGroup, articleHandler *handler.ArticleHandler) {
 	//  创建文章,需要防重复

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -79,15 +80,32 @@ func getBalancer(topicKey string) kafka.Balancer {
 	}
 }
 
-// 发送通知消息（无 Key，使用轮询分区）
-func (p *Producer) SendNotification(ctx context.Context, msg *message.NotificationMsg) error {
-	return p.sendMessage(ctx, "notification", nil, msg)
-}
-
 // 发送浏览历史消息（使用 UserID 作为 Key，保证同一用户的消息有序）
 func (p *Producer) SendViewHistory(ctx context.Context, msg *message.ViewHistoryMsg) error {
 	key := fmt.Sprintf("%d", msg.UserID)
 	return p.sendMessage(ctx, "view_history", []byte(key), msg)
+}
+
+// 发送通知消息（无 Key，使用轮询分区）
+func (p *Producer) SendNotificationAsync(msg *message.NotificationMsg) {
+	go func() {
+		// 1. 捕获异常，防止 goroutine 崩溃影响主流程
+		defer func() {
+			if err := recover(); err != nil {
+				log.Printf("[Kafka] 异步发送通知消息 panic: %v", err)
+			}
+		}()
+
+		// 2. 创建新上下文，设置发送超时时间
+		// 注意：不能使用请求的 ctx，请求结束后它会被取消，导致发送失败
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// 3. 发送消息，失败只打日志，通知类消息允许丢失
+		if err := p.sendMessage(ctx, "notification", nil, msg); err != nil {
+			log.Printf("[Kafka] 异步发送通知消息失败: %v", err)
+		}
+	}()
 }
 
 // 通用发送方法

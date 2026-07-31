@@ -4,6 +4,7 @@ import (
 	"blog/config"
 	"blog/internal/common"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -201,7 +202,11 @@ func (c *Consumer) consumeTopic(ctx context.Context, topicKey string, reader *ka
 				cancel()
 			}()
 			if err != nil {
-				log.Printf("拉取消息失败, topic: %s, err: %v", topicKey, err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					continue
+				}
+				// 只有网络错误、连接失败才打印报错
+				log.Printf("拉取消息真正异常, topic: %s, err: %v", topicKey, err)
 				continue
 			}
 			//  将消息加入批量缓存
@@ -252,6 +257,7 @@ func (c *Consumer) flushBatch(ctx context.Context, topicKey string, batch []kafk
 	commitMsgs := make([]kafka.Message, 0, len(lastOffsets))
 	for partition, offset := range lastOffsets {
 		commitMsgs = append(commitMsgs, kafka.Message{
+			Topic:     topicKey,
 			Partition: partition,
 			Offset:    offset,
 		})

@@ -131,9 +131,8 @@ func (h *ArticleHandler) GetArticleDetail(c *gin.Context) {
 	if userCtx, exists := c.Get("currentUser"); exists {
 		userID = userCtx.(*auth.UserContext).UserID
 	}
-	ip := c.ClientIP()
 	// 3. 获取详情
-	res, err := h.article.GetPublishedArticle(c, req.ID, userID, ip)
+	res, err := h.article.GetPublishedArticle(c, req.ID, userID)
 	if err != nil {
 		c.Error(err)
 		return

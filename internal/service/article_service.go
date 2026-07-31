@@ -7,7 +7,6 @@ import (
 	"blog/internal/repository"
 	"context"
 	"errors"
-	"log"
 	"strings"
 
 	"github.com/redis/go-redis/v9"
@@ -17,15 +16,13 @@ import (
 type ArticleService struct {
 	repo           *repository.ArticleRepository
 	userRepo       *repository.UserRepository
-	historyView    *ArticleViewHistoryService
 	rdb            *redis.Client
 	artLikeService *ArticleLikeService
 }
 
-func NewArticleService(repo *repository.ArticleRepository, historyView *ArticleViewHistoryService, artLikeService *ArticleLikeService, rdb *redis.Client) *ArticleService {
+func NewArticleService(repo *repository.ArticleRepository, artLikeService *ArticleLikeService, rdb *redis.Client) *ArticleService {
 	return &ArticleService{
 		repo:           repo,
-		historyView:    historyView,
 		artLikeService: artLikeService,
 		rdb:            rdb,
 	}
@@ -103,7 +100,7 @@ func (s *ArticleService) ClearArticle(ctx context.Context, articleId uint64, use
 }
 
 // 公开：查看文章详情
-func (s *ArticleService) GetPublishedArticle(ctx context.Context, articleId uint64, userId uint64, ip string) (*article.ArticleDetailResponse, error) {
+func (s *ArticleService) GetPublishedArticle(ctx context.Context, articleId uint64, userId uint64) (*article.ArticleDetailResponse, error) {
 
 	// 1 查出文章
 	detail, err := s.repo.FindArticleAndUserInfoByID(ctx, articleId)
@@ -120,19 +117,13 @@ func (s *ArticleService) GetPublishedArticle(ctx context.Context, articleId uint
 		return nil, common.ErrArticlePermissionDenied
 	}
 
-	// 2.记录浏览历史（同步发送 Kafka，获取 ACK 确认）
-	if err := s.historyView.RecordView(ctx, userId, articleId, ip); err != nil {
-		// 记录失败日志，但不影响主流程返回
-		log.Printf("[ArticleService] 记录浏览历史失败, userId: %d, articleId: %d, err: %v", userId, articleId, err)
-	}
-
-	// 3. 判断当前登录用户是否点赞过该文章
+	// 2. 判断当前登录用户是否点赞过该文章
 	var isLiked bool
 	if userId > 0 {
 		isLiked, _ = s.artLikeService.IsUserLikedArticle(ctx, userId, articleId)
 	}
 
-	// 4. 构造详情响应
+	// 3. 构造详情响应
 	resp := article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp, isLiked)
 
 	return resp, nil
