@@ -3,10 +3,11 @@ package config
 import "strings"
 
 type Kafka struct {
-	Brokers  string                 `yaml:"brokers"`  //kafka broker 地址
-	Topics   map[string]TopicConfig `yaml:"topics"`   // 所有 topic 配置
-	Producer KafkaProducer          `yaml:"producer"` // 生产者配置
-	Consumer KafkaConsumer          `yaml:"consumer"` // 消费者配置
+	Brokers    string                 `yaml:"brokers"`     //kafka broker 地址
+	Topics     map[string]TopicConfig `yaml:"topics"`      // 所有 topic 配置
+	Producer   KafkaProducer          `yaml:"producer"`    // 生产者配置
+	Consumer   KafkaConsumer          `yaml:"consumer"`    // 消费者配置
+	DeadLetter DeadLetterConfig       `yaml:"dead_letter"` // 死信队列配置
 }
 
 // kafka 主题名称配置
@@ -40,6 +41,13 @@ type KafkaConsumer struct {
 	GroupBalancer  string `yaml:"group_balancer"`     // 消费者组分配策略，默认 round_robin
 	CommitRetries  int    `yaml:"commit_retries"`     // 提交偏移量重试次数，默认 3 次
 	CommitWait     int    `yaml:"commit_wait_ms"`     // 提交偏移量间隔，默认 100 毫秒
+}
+
+// 死信队列配置
+type DeadLetterConfig struct {
+	Topic         string `yaml:"topic"`          // 死信队列 topic 名称
+	MaxRetries    int    `yaml:"max_retries"`    // 发送到死信队列的重试次数（网络层面）
+	ConsumerGroup string `yaml:"consumer_group"` // 死信队列消费者组 ID
 }
 
 // 获取 kafka broker 地址列表
@@ -119,4 +127,28 @@ func (k *Kafka) GetCommitWait(topicKey string) int {
 		return k.Consumer.CommitWait
 	}
 	return 100 // 默认 100ms
+}
+
+// 获取死信队列 topic 名称
+func (k *Kafka) GetDeadLetterTopic() string {
+	if k.DeadLetter.Topic != "" {
+		return k.DeadLetter.Topic
+	}
+	return "dead_letter" // 默认死信队列 topic 名称
+}
+
+// 获取死信队列最大重试次数
+func (k *Kafka) GetDeadLetterMaxRetries() int {
+	if k.DeadLetter.MaxRetries > 0 {
+		return k.DeadLetter.MaxRetries
+	}
+	return 3 // 默认 3 次
+}
+
+// 获取死信队列消费者组 ID
+func (k *Kafka) GetDeadLetterConsumerGroup() string {
+	if k.DeadLetter.ConsumerGroup != "" {
+		return k.DeadLetter.ConsumerGroup
+	}
+	return "dead_letter_consumer" // 默认死信队列消费者组 ID
 }

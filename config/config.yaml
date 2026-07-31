@@ -16,6 +16,11 @@ mongodb:
   password: "20040614"
 kafka:
   brokers: "127.0.0.1:9092"
+
+  dead_letter:  # 死信队列
+    topic: "dead_letter"             # 统一的死信队列 topic 名称
+    max_retries: 3                   # 发送到死信队列的重试次数
+    consumer_group: "blog_dead_letter_consumer"  # 死信队列消费者组
   topics:
     notification:
       name: "notification"
@@ -36,6 +41,7 @@ kafka:
       fetch_timeout_ms: 300  # 拉取单条消息的超时时间（毫秒）
       max_retries: 3                      # 消息处理最大重试次数
       retry_wait_ms: 100         # 重试间隔（毫秒）
+    
 
   producer:
     acks: "one"

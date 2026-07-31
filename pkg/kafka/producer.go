@@ -130,25 +130,6 @@ func (p *Producer) Close() error {
 	return nil
 }
 
-// Ping 预热连接
-func (p *Producer) Ping(ctx context.Context) error {
-	// 获取任意一个 writer
-	var writer *kafka.Writer
-	for _, w := range p.writers {
-		writer = w
-		break
-	}
-	if writer == nil {
-		return fmt.Errorf("没有可用的 writer")
-	}
-
-	// 发送空消息建立连接
-	msg := kafka.Message{
-		Value: []byte("ping"),
-	}
-	return writer.WriteMessages(ctx, msg)
-}
-
 // 辅助函数：解析压缩类型
 func parseCompression(compressionType string) compress.Compression {
 	switch compressionType {

@@ -181,7 +181,7 @@ func (c *Consumer) consumeTopic(ctx context.Context, topicKey string, reader *ka
 		select {
 		case <-ctx.Done(): // 5.1 监听上下文取消信号
 			if len(batch) > 0 {
-				log.Printf("仍然有%条消息未处理, topic: %s", len(batch), topicKey)
+				log.Printf("仍然有%d条消息未处理, topic: %s", len(batch), topicKey)
 			}
 			return
 		case <-ticker.C: // 5.2 监听超时时间定时器信号
@@ -318,13 +318,6 @@ func (c *Consumer) sendToDeadLetter(ctx context.Context, topicKey string, msg ka
 	log.Printf("消息进入死信队列, topic: %s, partition: %d, offset: %d, key: %q, err: %v",
 		topicKey, msg.Partition, msg.Offset, string(msg.Key), err)
 
-	// // 2. 发送到死信队列
-	// if c.deadLetterHandler != nil {
-	// 	if dlErr := c.deadLetterHandler(ctx, topicKey, msg, err); dlErr != nil {
-	// 		log.Printf("发送死信队列失败, topic: %s, offset: %d, err: %v",
-	// 			topicKey, msg.Offset, dlErr)
-	// 	}
-	// }
 }
 
 // 等待重试，支持上下文取消
