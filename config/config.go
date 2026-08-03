@@ -11,6 +11,11 @@ type Config struct {
 	Redis    Redis    `yaml:"redis"`
 	Mongodb  Mongodb  `yaml:"mongodb"`
 	Kafka    Kafka    `yaml:"kafka"`
+	JWT      JWT      `yaml:"jwt"`
+}
+
+type JWT struct {
+	Secret string `yaml:"secret"` // JWT签名密钥
 }
 type Database struct {
 	Username string `yaml:"username"`

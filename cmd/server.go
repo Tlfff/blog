@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"blog/config"
+	"blog/internal/auth"
 	"blog/internal/common"
 	"blog/internal/cron"
 	"blog/internal/handler"
@@ -37,6 +38,8 @@ var serverCmd = &cobra.Command{
 		}
 		// 1.1 初始化自定义验证器
 		common.InitValidator()
+		// 1.1.1 注入JWT签名密钥
+		auth.InitJWT(config.JWT.Secret)
 		// 1.2 初始化ip工具类
 		dir, _ := os.Getwd() // 获取当前程序运行的绝对路径
 		dbPath := filepath.Join(dir, "pkg/resource/ip2region.xdb")

@@ -14,6 +14,8 @@ mongodb:
   dbname: "blog"
   username: "bloguser"      
   password: "20040614"
+jwt:
+  secret: "7e29acf58d421036b897f31ce05da74918bf2c45e6839021ad654872f90ac165"  # JWT签名密钥，生产环境务必更换
 kafka:
   brokers: "127.0.0.1:9092"
 
