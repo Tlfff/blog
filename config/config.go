@@ -12,10 +12,21 @@ type Config struct {
 	Mongodb  Mongodb  `yaml:"mongodb"`
 	Kafka    Kafka    `yaml:"kafka"`
 	JWT      JWT      `yaml:"jwt"`
+	OpenJWT  OpenJWT  `yaml:"openjwt"`
+	GRPC     GRPC     `yaml:"grpc"`
 }
 
 type JWT struct {
 	Secret string `yaml:"secret"` // JWT签名密钥
+}
+
+// OpenJWT 二方服务专用JWT配置，与C端用户JWT完全隔离
+type OpenJWT struct {
+	Secret string `yaml:"secret"`
+}
+
+type GRPC struct {
+	Port string `yaml:"port"`
 }
 type Database struct {
 	Username string `yaml:"username"`

@@ -16,7 +16,7 @@ const (
 // JWT签名密钥，由启动流程从配置文件注入，禁止硬编码在代码中
 var jwtSecret []byte
 
-// InitJWT 注入JWT签名密钥，服务启动时调用一次
+// 注入JWT签名密钥，服务启动时调用一次
 func InitJWT(secret string) {
 	jwtSecret = []byte(secret)
 }
@@ -43,12 +43,16 @@ func GenerateToken(phone string, role int8, userID uint64) (string, error) {
 // 解析和验证Token
 func VerifyToken(tokenString string) (*Claims, error) {
 	claims := &Claims{}
-	_, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (any, error) {
-		if len(jwtSecret) == 0 {
-			return nil, errors.New("jwt密钥未初始化")
-		}
-		return jwtSecret, nil
-	},
+	// 1. 解析Token
+	_, err := jwt.ParseWithClaims(
+		tokenString, // 解析这个 token
+		claims,      // 解析到这个结构体
+		func(t *jwt.Token) (any, error) { // 校验签名密钥
+			if len(jwtSecret) == 0 {
+				return nil, errors.New("jwt密钥未初始化")
+			}
+			return jwtSecret, nil
+		},
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), // 锁定签名算法，防止算法混淆攻击
 		jwt.WithIssuer(JWTIssuer),                                    // 校验签发者
 		jwt.WithExpirationRequired(),                                 // exp必须存在且未过期

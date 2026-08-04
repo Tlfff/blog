@@ -1,0 +1,24 @@
+syntax="proto3"; // 定义语法为 proto3
+
+package blogopen.v1;// 定义包为 blogopen.v1
+option go_package = "blog/gen/user;user";// 定义 Go 包为 blog/gen/user
+
+// 用户服务定义
+service UserService {
+  // 获取用户基本信息 (ID、头像、昵称、IP)
+  rpc GetUserBasicInfo (GetUserBasicInfoRequest) returns (GetUserBasicInfoResponse);
+}
+
+// 请求：获取单个用户基本信息
+message GetUserBasicInfoRequest {
+  uint64 user_id = 1;
+}
+
+// 响应：用户基本信息
+message GetUserBasicInfoResponse {
+  uint64 user_id = 1; // 用户ID
+  string nickname = 2; // 昵称
+  string avatar = 3; // 头像
+  int64 last_login_time = 4; // 最后登录时间
+  string last_login_ip = 5; // 最后登录IP
+}

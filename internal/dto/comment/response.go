@@ -150,3 +150,18 @@ type CreateCommentResponse struct {
 	ID          uint64 `json:"id"`
 	CreatedTime int64  `json:"created_time"`
 }
+
+// ----------------------------------- 二方服务 -----------------------------------
+type CommentStatsResponse struct {
+	ID        uint64 `json:"id"`
+	HotCount  uint64 `json:"hot_count"`  // 热度值
+	LikeCount uint64 `json:"like_count"` // 点赞数
+}
+
+func NewCommentStatsResponse(commentID, hotCount, likeCount uint64) *CommentStatsResponse {
+	return &CommentStatsResponse{
+		ID:        commentID,
+		HotCount:  hotCount,
+		LikeCount: likeCount,
+	}
+}

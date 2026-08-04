@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package blogopen.v1;
+
+option go_package = "blog/gen/comment;comment";
+
+// 评论服务定义
+service CommentService {
+  // 获取评论的点赞数和热度值
+  rpc GetCommentStats (GetCommentStatsRequest) returns (GetCommentStatsResponse);
+}
+
+// 请求：获取评论统计
+message GetCommentStatsRequest {
+  uint64 comment_id = 1;
+}
+
+// 响应：评论统计信息
+message GetCommentStatsResponse {
+  uint64 comment_id = 1; // 评论ID
+  uint64 hot_value = 2;   // 热度值 (点赞数 + 评论数)
+  uint64 like_count = 3;  // 点赞数
+}
