@@ -1,15 +1,10 @@
 package handler
 
 import (
-	"blog/internal/common"
 	"blog/internal/service"
 	"context"
-	"errors"
 
 	commentv1 "blog/gen/comment"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // 实现二方服务的评论接口
@@ -27,10 +22,7 @@ func (h *CommentHandler) GetCommentStats(ctx context.Context, req *commentv1.Get
 	// 1. 获取评论信息
 	stats, err := h.commentService.GetCommentStats(ctx, req.CommentId)
 	if err != nil {
-		if errors.Is(err, common.ErrCommentNotFound) {
-			return nil, status.Error(codes.NotFound, "评论不存在")
-		}
-		return nil, status.Error(codes.Internal, "服务内部错误")
+		return nil, GRPCError(err)
 	}
 	// 2. 构建返回响应
 	return &commentv1.GetCommentStatsResponse{

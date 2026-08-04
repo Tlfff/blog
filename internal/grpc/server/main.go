@@ -20,9 +20,10 @@ type AppHandler struct {
 
 // 创建gRPC Server，注册所有服务，挂载认证（Auth）+ 授权（AuthZ）拦截器链
 func NewGRPCServer(appHandler *AppHandler, partners []config.Partner) *grpc.Server {
-	// 1. 创建 gRPC Server，挂统一认证拦截器（二方JWT / 三方HMAC）+ 授权拦截器
+	// 1. 创建 gRPC Server，拦截器链：日志 → 认证 → 授权
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
+			interceptor.LoggingInterceptor,                   // 日志：进入/退出全量记录
 			interceptor.NewAuthInterceptor(partners).Unary(), // 认证：回答"身份是谁"
 			interceptor.NewAuthzInterceptor(nil).Unary(),     // 授权：回答"能否调此方法"（权限表暂未实现，先放行）
 		),

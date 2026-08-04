@@ -24,12 +24,12 @@ func NewAuthzInterceptor(authorize AuthorizeFunc) *AuthzInterceptor {
 	return &AuthzInterceptor{authorize: authorize}
 }
 
-// Unary 返回 gRPC 一元拦截器函数
+// 返回 gRPC 一元拦截器函数
 func (a *AuthzInterceptor) Unary() grpc.UnaryServerInterceptor {
 	return a.Intercept
 }
 
-// Intercept 授权判定：先确认请求已认证，再执行授权函数
+// 授权判定：先确认请求已认证，再执行授权函数
 func (a *AuthzInterceptor) Intercept(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	// 1. 从 context 取出认证拦截器注入的身份；取不到说明认证层没跑或未通过
 	identity, ok := IdentityFromContext(ctx)

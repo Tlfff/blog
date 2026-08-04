@@ -21,7 +21,7 @@ const (
 	mdKeyNonce       = "x-nonce"         // 随机数，防重放
 )
 
-// HmacAuthInterceptor 认证拦截器（三方）：校验外部合作方的 HMAC 签名
+// 认证拦截器（三方）：校验外部合作方的 HMAC 签名
 type HmacAuthInterceptor struct {
 	// accessKeyID -> 合作方密钥配置（来自配置文件，不建表）
 	partners map[string]config.Partner
@@ -41,7 +41,7 @@ func (h *HmacAuthInterceptor) Unary() grpc.UnaryServerInterceptor {
 	return h.Intercept
 }
 
-// Intercept 校验三方 HMAC 签名，通过后把合作方身份注入 context
+// 校验三方 HMAC 签名，通过后把合作方身份注入 context
 func (h *HmacAuthInterceptor) Intercept(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	// 1. 从 metadata 取出签名要素
 	md, ok := metadata.FromIncomingContext(ctx)
@@ -75,7 +75,7 @@ func (h *HmacAuthInterceptor) Intercept(ctx context.Context, req any, info *grpc
 	}
 
 	// 5. 校验通过，注入合作方身份（ID 为凭证身份 access_key_id，Group 为组织标识）
-	ctx = context.WithValue(ctx, identityCtxKey{}, &Identity{
+	ctx = withIdentity(ctx, &Identity{
 		Kind:  KindExternal,
 		ID:    accessKeyID,
 		Group: partner.PartnerID,

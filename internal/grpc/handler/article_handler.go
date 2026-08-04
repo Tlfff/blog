@@ -5,9 +5,6 @@ import (
 	"context"
 
 	articlev1 "blog/gen/article"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // ArticleHandler 实现二方服务的文章接口
@@ -25,7 +22,7 @@ func (h *ArticleHandler) GetPublishedList(ctx context.Context, req *articlev1.Ge
 	// 1. 获取已发表文章列表
 	resp, err := h.articleService.GetAvailabledList(ctx, req.Page, req.PageSize, req.IsDesc)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "服务内部错误")
+		return nil, GRPCError(err)
 	}
 	// 2. 构建返回响应
 	items := make([]*articlev1.ArticleItem, 0, len(resp.List))

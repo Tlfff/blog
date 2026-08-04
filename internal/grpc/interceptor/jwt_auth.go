@@ -41,7 +41,7 @@ func JwtAuthInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo
 		return nil, status.Error(codes.Unauthenticated, err.Error())
 	}
 	// 6. 校验通过，把调用方身份注入context（service_id 为授权主体，team_id 仅统计用）
-	ctx = context.WithValue(ctx, identityCtxKey{}, &Identity{
+	ctx = withIdentity(ctx, &Identity{
 		Kind:  KindInternal,
 		ID:    claims.ServiceID,
 		Group: claims.TeamID,
