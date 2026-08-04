@@ -20,6 +20,10 @@ openjwt:
   secret: "f6c2a8e41d903b57b6f2e08c3a91d475ab3f690c2d8e417b5a6f3e920c8b14a72"  # 二方服务专用JWT密钥
 grpc:
   port: "9100"  # 二方gRPC服务监听端口
+thirdparty:
+  - partner_id: "partner-a"        # 合作方组织标识（仅统计用）
+    access_key_id: "ak-partner-a"  # 凭证身份，请求头 x-access-key-id 携带
+    secret_key: "sk-partner-a-secret-key"  # 共享密钥，仅合作方和服务端知道
 kafka:
   brokers: "127.0.0.1:9092"
 

@@ -11,17 +11,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type teamIDCtxKey struct{}
-
-// 从context中取出调用方团队标识（JWT拦截器注入）
-func TeamIDFromContext(ctx context.Context) (string, bool) {
-	teamID, ok := ctx.Value(teamIDCtxKey{}).(string)
-	return teamID, ok
-}
-
-//	gRPC Unary拦截器：统一校验二方JWT
+//	认证拦截器（二方）：统一校验内部服务的JWT
 //
-// 从metadata的authorization字段取 "Bearer <token>"，校验通过才放行
+// 从metadata的authorization字段取 "Bearer <token>"，校验通过后把调用方身份注入context
 func JwtAuthInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	// 1. 从metadata中取出authorization字段
 	md, ok := metadata.FromIncomingContext(ctx)
@@ -48,7 +40,11 @@ func JwtAuthInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, err.Error())
 	}
-	// 6. 校验通过，把调用方团队标识注入context
-	ctx = context.WithValue(ctx, teamIDCtxKey{}, claims.TeamID)
+	// 6. 校验通过，把调用方身份注入context（service_id 为授权主体，team_id 仅统计用）
+	ctx = context.WithValue(ctx, identityCtxKey{}, &Identity{
+		Kind:  KindInternal,
+		ID:    claims.ServiceID,
+		Group: claims.TeamID,
+	})
 	return handler(ctx, req)
 }

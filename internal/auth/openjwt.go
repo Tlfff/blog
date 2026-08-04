@@ -21,20 +21,23 @@ func InitOpenJWT(secret string) {
 	openJWTSecret = []byte(secret)
 }
 
-// 二方服务token的Payload，team_id 标识调用方团队
+// 二方服务token的Payload：
+// service_id 标识调用方服务（授权主体），team_id 标识所属团队（仅用于统计，不参与授权）
 type OpenClaims struct {
-	TeamID string `json:"team_id"`
+	ServiceID string `json:"service_id"`
+	TeamID    string `json:"team_id"`
 	jwt.RegisteredClaims
 }
 
-// 给内部团队颁发token（平台组统一下发）
-func OpenGenerateToken(teamID string) (string, error) {
+// 给内部服务颁发token（平台组统一下发）
+func OpenGenerateToken(serviceID, teamID string) (string, error) {
 	if len(openJWTSecret) == 0 {
 		return "", errors.New("二方jwt密钥未初始化")
 	}
 	now := time.Now()
 	claims := &OpenClaims{
-		TeamID: teamID,
+		ServiceID: serviceID,
+		TeamID:    teamID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    OpenJWTIssuer,
 			IssuedAt:  jwt.NewNumericDate(now),

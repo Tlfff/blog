@@ -60,12 +60,12 @@ var grpcCmd = &cobra.Command{
 		commentHandler := grpchandler.NewCommentHandler(commentService)
 		articleHandler := grpchandler.NewArticleHandler(artService)
 
-		// 8. 组装gRPC Server（含JWT拦截器）
+		// 8. 组装gRPC Server（含统一认证拦截器：二方JWT / 三方HMAC）
 		s := grpcserver.NewGRPCServer(&grpcserver.AppHandler{
 			Article: articleHandler,
 			User:    userHandler,
 			Comment: commentHandler,
-		})
+		}, cfg.ThirdParty)
 
 		// 9. 监听端口（优先命令行参数，默认读config）
 		port := grpcPort

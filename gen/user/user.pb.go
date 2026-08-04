@@ -143,6 +143,112 @@ func (x *GetUserBasicInfoResponse) GetLastLoginIp() string {
 	return ""
 }
 
+// 请求：获取用户公开信息（三方合作方使用）
+type GetUserInfoRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        uint64                 `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserInfoRequest) Reset() {
+	*x = GetUserInfoRequest{}
+	mi := &file_proto_user_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserInfoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserInfoRequest) ProtoMessage() {}
+
+func (x *GetUserInfoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_user_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserInfoRequest.ProtoReflect.Descriptor instead.
+func (*GetUserInfoRequest) Descriptor() ([]byte, []int) {
+	return file_proto_user_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *GetUserInfoRequest) GetUserId() uint64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+// 响应：用户公开信息（仅对外暴露 ID、头像、昵称）
+type GetUserInfoResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`            // 用户ID
+	Avatar        string                 `protobuf:"bytes,2,opt,name=avatar,proto3" json:"avatar,omitempty"`     // 头像
+	Nickname      string                 `protobuf:"bytes,3,opt,name=nickname,proto3" json:"nickname,omitempty"` // 昵称
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserInfoResponse) Reset() {
+	*x = GetUserInfoResponse{}
+	mi := &file_proto_user_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserInfoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserInfoResponse) ProtoMessage() {}
+
+func (x *GetUserInfoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_user_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserInfoResponse.ProtoReflect.Descriptor instead.
+func (*GetUserInfoResponse) Descriptor() ([]byte, []int) {
+	return file_proto_user_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetUserInfoResponse) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *GetUserInfoResponse) GetAvatar() string {
+	if x != nil {
+		return x.Avatar
+	}
+	return ""
+}
+
+func (x *GetUserInfoResponse) GetNickname() string {
+	if x != nil {
+		return x.Nickname
+	}
+	return ""
+}
+
 var File_proto_user_proto protoreflect.FileDescriptor
 
 const file_proto_user_proto_rawDesc = "" +
@@ -155,9 +261,16 @@ const file_proto_user_proto_rawDesc = "" +
 	"\bnickname\x18\x02 \x01(\tR\bnickname\x12\x16\n" +
 	"\x06avatar\x18\x03 \x01(\tR\x06avatar\x12&\n" +
 	"\x0flast_login_time\x18\x04 \x01(\x03R\rlastLoginTime\x12\"\n" +
-	"\rlast_login_ip\x18\x05 \x01(\tR\vlastLoginIp2n\n" +
+	"\rlast_login_ip\x18\x05 \x01(\tR\vlastLoginIp\"-\n" +
+	"\x12GetUserInfoRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\x04R\x06userId\"Y\n" +
+	"\x13GetUserInfoResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x16\n" +
+	"\x06avatar\x18\x02 \x01(\tR\x06avatar\x12\x1a\n" +
+	"\bnickname\x18\x03 \x01(\tR\bnickname2\xc6\x01\n" +
 	"\vUserService\x12_\n" +
-	"\x10GetUserBasicInfo\x12$.blogopen.v1.GetUserBasicInfoRequest\x1a%.blogopen.v1.GetUserBasicInfoResponseB\x14Z\x12blog/gen/user;userb\x06proto3"
+	"\x10GetUserBasicInfo\x12$.blogopen.v1.GetUserBasicInfoRequest\x1a%.blogopen.v1.GetUserBasicInfoResponse\x12V\n" +
+	"\x11GetPublicUserInfo\x12\x1f.blogopen.v1.GetUserInfoRequest\x1a .blogopen.v1.GetUserInfoResponseB\x14Z\x12blog/gen/user;userb\x06proto3"
 
 var (
 	file_proto_user_proto_rawDescOnce sync.Once
@@ -171,16 +284,20 @@ func file_proto_user_proto_rawDescGZIP() []byte {
 	return file_proto_user_proto_rawDescData
 }
 
-var file_proto_user_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_proto_user_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_proto_user_proto_goTypes = []any{
 	(*GetUserBasicInfoRequest)(nil),  // 0: blogopen.v1.GetUserBasicInfoRequest
 	(*GetUserBasicInfoResponse)(nil), // 1: blogopen.v1.GetUserBasicInfoResponse
+	(*GetUserInfoRequest)(nil),       // 2: blogopen.v1.GetUserInfoRequest
+	(*GetUserInfoResponse)(nil),      // 3: blogopen.v1.GetUserInfoResponse
 }
 var file_proto_user_proto_depIdxs = []int32{
 	0, // 0: blogopen.v1.UserService.GetUserBasicInfo:input_type -> blogopen.v1.GetUserBasicInfoRequest
-	1, // 1: blogopen.v1.UserService.GetUserBasicInfo:output_type -> blogopen.v1.GetUserBasicInfoResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	2, // 1: blogopen.v1.UserService.GetPublicUserInfo:input_type -> blogopen.v1.GetUserInfoRequest
+	1, // 2: blogopen.v1.UserService.GetUserBasicInfo:output_type -> blogopen.v1.GetUserBasicInfoResponse
+	3, // 3: blogopen.v1.UserService.GetPublicUserInfo:output_type -> blogopen.v1.GetUserInfoResponse
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -197,7 +314,7 @@ func file_proto_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_user_proto_rawDesc), len(file_proto_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
