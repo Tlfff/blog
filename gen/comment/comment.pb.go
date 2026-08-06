@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.35.1
-// source: proto/comment.proto
+// source: blogopen/v1/comment.proto
 
 package comment
 
@@ -31,7 +31,7 @@ type GetCommentStatsRequest struct {
 
 func (x *GetCommentStatsRequest) Reset() {
 	*x = GetCommentStatsRequest{}
-	mi := &file_proto_comment_proto_msgTypes[0]
+	mi := &file_blogopen_v1_comment_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *GetCommentStatsRequest) String() string {
 func (*GetCommentStatsRequest) ProtoMessage() {}
 
 func (x *GetCommentStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_comment_proto_msgTypes[0]
+	mi := &file_blogopen_v1_comment_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *GetCommentStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCommentStatsRequest.ProtoReflect.Descriptor instead.
 func (*GetCommentStatsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_comment_proto_rawDescGZIP(), []int{0}
+	return file_blogopen_v1_comment_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *GetCommentStatsRequest) GetCommentId() uint64 {
@@ -78,7 +78,7 @@ type GetCommentStatsResponse struct {
 
 func (x *GetCommentStatsResponse) Reset() {
 	*x = GetCommentStatsResponse{}
-	mi := &file_proto_comment_proto_msgTypes[1]
+	mi := &file_blogopen_v1_comment_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -90,7 +90,7 @@ func (x *GetCommentStatsResponse) String() string {
 func (*GetCommentStatsResponse) ProtoMessage() {}
 
 func (x *GetCommentStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_comment_proto_msgTypes[1]
+	mi := &file_blogopen_v1_comment_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -103,7 +103,7 @@ func (x *GetCommentStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCommentStatsResponse.ProtoReflect.Descriptor instead.
 func (*GetCommentStatsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_comment_proto_rawDescGZIP(), []int{1}
+	return file_blogopen_v1_comment_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GetCommentStatsResponse) GetCommentId() uint64 {
@@ -127,11 +127,11 @@ func (x *GetCommentStatsResponse) GetLikeCount() uint64 {
 	return 0
 }
 
-var File_proto_comment_proto protoreflect.FileDescriptor
+var File_blogopen_v1_comment_proto protoreflect.FileDescriptor
 
-const file_proto_comment_proto_rawDesc = "" +
+const file_blogopen_v1_comment_proto_rawDesc = "" +
 	"\n" +
-	"\x13proto/comment.proto\x12\vblogopen.v1\"7\n" +
+	"\x19blogopen/v1/comment.proto\x12\vblogopen.v1\"7\n" +
 	"\x16GetCommentStatsRequest\x12\x1d\n" +
 	"\n" +
 	"comment_id\x18\x01 \x01(\x04R\tcommentId\"t\n" +
@@ -145,23 +145,23 @@ const file_proto_comment_proto_rawDesc = "" +
 	"\x0fGetCommentStats\x12#.blogopen.v1.GetCommentStatsRequest\x1a$.blogopen.v1.GetCommentStatsResponseB\x1aZ\x18blog/gen/comment;commentb\x06proto3"
 
 var (
-	file_proto_comment_proto_rawDescOnce sync.Once
-	file_proto_comment_proto_rawDescData []byte
+	file_blogopen_v1_comment_proto_rawDescOnce sync.Once
+	file_blogopen_v1_comment_proto_rawDescData []byte
 )
 
-func file_proto_comment_proto_rawDescGZIP() []byte {
-	file_proto_comment_proto_rawDescOnce.Do(func() {
-		file_proto_comment_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_comment_proto_rawDesc), len(file_proto_comment_proto_rawDesc)))
+func file_blogopen_v1_comment_proto_rawDescGZIP() []byte {
+	file_blogopen_v1_comment_proto_rawDescOnce.Do(func() {
+		file_blogopen_v1_comment_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_blogopen_v1_comment_proto_rawDesc), len(file_blogopen_v1_comment_proto_rawDesc)))
 	})
-	return file_proto_comment_proto_rawDescData
+	return file_blogopen_v1_comment_proto_rawDescData
 }
 
-var file_proto_comment_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_proto_comment_proto_goTypes = []any{
+var file_blogopen_v1_comment_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_blogopen_v1_comment_proto_goTypes = []any{
 	(*GetCommentStatsRequest)(nil),  // 0: blogopen.v1.GetCommentStatsRequest
 	(*GetCommentStatsResponse)(nil), // 1: blogopen.v1.GetCommentStatsResponse
 }
-var file_proto_comment_proto_depIdxs = []int32{
+var file_blogopen_v1_comment_proto_depIdxs = []int32{
 	0, // 0: blogopen.v1.CommentService.GetCommentStats:input_type -> blogopen.v1.GetCommentStatsRequest
 	1, // 1: blogopen.v1.CommentService.GetCommentStats:output_type -> blogopen.v1.GetCommentStatsResponse
 	1, // [1:2] is the sub-list for method output_type
@@ -171,26 +171,26 @@ var file_proto_comment_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_proto_comment_proto_init() }
-func file_proto_comment_proto_init() {
-	if File_proto_comment_proto != nil {
+func init() { file_blogopen_v1_comment_proto_init() }
+func file_blogopen_v1_comment_proto_init() {
+	if File_blogopen_v1_comment_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_comment_proto_rawDesc), len(file_proto_comment_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_blogopen_v1_comment_proto_rawDesc), len(file_blogopen_v1_comment_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_comment_proto_goTypes,
-		DependencyIndexes: file_proto_comment_proto_depIdxs,
-		MessageInfos:      file_proto_comment_proto_msgTypes,
+		GoTypes:           file_blogopen_v1_comment_proto_goTypes,
+		DependencyIndexes: file_blogopen_v1_comment_proto_depIdxs,
+		MessageInfos:      file_blogopen_v1_comment_proto_msgTypes,
 	}.Build()
-	File_proto_comment_proto = out.File
-	file_proto_comment_proto_goTypes = nil
-	file_proto_comment_proto_depIdxs = nil
+	File_blogopen_v1_comment_proto = out.File
+	file_blogopen_v1_comment_proto_goTypes = nil
+	file_blogopen_v1_comment_proto_depIdxs = nil
 }

@@ -1,7 +1,7 @@
 syntax="proto3"; // 定义语法为 proto3
 
 package blogopen.v1;// 定义包为 blogopen.v1
-option go_package = "blog/gen/user;user";// 定义 Go 包为 blog/gen/user
+option go_package = "blog/gen/user;user";// blog/gen/user为Go 模块导入路径，user为Go 包名
 
 // 用户服务定义
 service UserService {

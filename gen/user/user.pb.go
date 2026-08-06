@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.35.1
-// source: proto/user.proto
+// source: blogopen/v1/user.proto
 
 package user
 
@@ -31,7 +31,7 @@ type GetUserBasicInfoRequest struct {
 
 func (x *GetUserBasicInfoRequest) Reset() {
 	*x = GetUserBasicInfoRequest{}
-	mi := &file_proto_user_proto_msgTypes[0]
+	mi := &file_blogopen_v1_user_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *GetUserBasicInfoRequest) String() string {
 func (*GetUserBasicInfoRequest) ProtoMessage() {}
 
 func (x *GetUserBasicInfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_user_proto_msgTypes[0]
+	mi := &file_blogopen_v1_user_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *GetUserBasicInfoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserBasicInfoRequest.ProtoReflect.Descriptor instead.
 func (*GetUserBasicInfoRequest) Descriptor() ([]byte, []int) {
-	return file_proto_user_proto_rawDescGZIP(), []int{0}
+	return file_blogopen_v1_user_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *GetUserBasicInfoRequest) GetUserId() uint64 {
@@ -80,7 +80,7 @@ type GetUserBasicInfoResponse struct {
 
 func (x *GetUserBasicInfoResponse) Reset() {
 	*x = GetUserBasicInfoResponse{}
-	mi := &file_proto_user_proto_msgTypes[1]
+	mi := &file_blogopen_v1_user_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -92,7 +92,7 @@ func (x *GetUserBasicInfoResponse) String() string {
 func (*GetUserBasicInfoResponse) ProtoMessage() {}
 
 func (x *GetUserBasicInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_user_proto_msgTypes[1]
+	mi := &file_blogopen_v1_user_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -105,7 +105,7 @@ func (x *GetUserBasicInfoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserBasicInfoResponse.ProtoReflect.Descriptor instead.
 func (*GetUserBasicInfoResponse) Descriptor() ([]byte, []int) {
-	return file_proto_user_proto_rawDescGZIP(), []int{1}
+	return file_blogopen_v1_user_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GetUserBasicInfoResponse) GetUserId() uint64 {
@@ -153,7 +153,7 @@ type GetUserInfoRequest struct {
 
 func (x *GetUserInfoRequest) Reset() {
 	*x = GetUserInfoRequest{}
-	mi := &file_proto_user_proto_msgTypes[2]
+	mi := &file_blogopen_v1_user_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -165,7 +165,7 @@ func (x *GetUserInfoRequest) String() string {
 func (*GetUserInfoRequest) ProtoMessage() {}
 
 func (x *GetUserInfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_user_proto_msgTypes[2]
+	mi := &file_blogopen_v1_user_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -178,7 +178,7 @@ func (x *GetUserInfoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserInfoRequest.ProtoReflect.Descriptor instead.
 func (*GetUserInfoRequest) Descriptor() ([]byte, []int) {
-	return file_proto_user_proto_rawDescGZIP(), []int{2}
+	return file_blogopen_v1_user_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetUserInfoRequest) GetUserId() uint64 {
@@ -200,7 +200,7 @@ type GetUserInfoResponse struct {
 
 func (x *GetUserInfoResponse) Reset() {
 	*x = GetUserInfoResponse{}
-	mi := &file_proto_user_proto_msgTypes[3]
+	mi := &file_blogopen_v1_user_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -212,7 +212,7 @@ func (x *GetUserInfoResponse) String() string {
 func (*GetUserInfoResponse) ProtoMessage() {}
 
 func (x *GetUserInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_user_proto_msgTypes[3]
+	mi := &file_blogopen_v1_user_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -225,7 +225,7 @@ func (x *GetUserInfoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserInfoResponse.ProtoReflect.Descriptor instead.
 func (*GetUserInfoResponse) Descriptor() ([]byte, []int) {
-	return file_proto_user_proto_rawDescGZIP(), []int{3}
+	return file_blogopen_v1_user_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetUserInfoResponse) GetId() uint64 {
@@ -249,11 +249,11 @@ func (x *GetUserInfoResponse) GetNickname() string {
 	return ""
 }
 
-var File_proto_user_proto protoreflect.FileDescriptor
+var File_blogopen_v1_user_proto protoreflect.FileDescriptor
 
-const file_proto_user_proto_rawDesc = "" +
+const file_blogopen_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x10proto/user.proto\x12\vblogopen.v1\"2\n" +
+	"\x16blogopen/v1/user.proto\x12\vblogopen.v1\"2\n" +
 	"\x17GetUserBasicInfoRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x04R\x06userId\"\xb3\x01\n" +
 	"\x18GetUserBasicInfoResponse\x12\x17\n" +
@@ -273,25 +273,25 @@ const file_proto_user_proto_rawDesc = "" +
 	"\x11GetPublicUserInfo\x12\x1f.blogopen.v1.GetUserInfoRequest\x1a .blogopen.v1.GetUserInfoResponseB\x14Z\x12blog/gen/user;userb\x06proto3"
 
 var (
-	file_proto_user_proto_rawDescOnce sync.Once
-	file_proto_user_proto_rawDescData []byte
+	file_blogopen_v1_user_proto_rawDescOnce sync.Once
+	file_blogopen_v1_user_proto_rawDescData []byte
 )
 
-func file_proto_user_proto_rawDescGZIP() []byte {
-	file_proto_user_proto_rawDescOnce.Do(func() {
-		file_proto_user_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_user_proto_rawDesc), len(file_proto_user_proto_rawDesc)))
+func file_blogopen_v1_user_proto_rawDescGZIP() []byte {
+	file_blogopen_v1_user_proto_rawDescOnce.Do(func() {
+		file_blogopen_v1_user_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_blogopen_v1_user_proto_rawDesc), len(file_blogopen_v1_user_proto_rawDesc)))
 	})
-	return file_proto_user_proto_rawDescData
+	return file_blogopen_v1_user_proto_rawDescData
 }
 
-var file_proto_user_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_proto_user_proto_goTypes = []any{
+var file_blogopen_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_blogopen_v1_user_proto_goTypes = []any{
 	(*GetUserBasicInfoRequest)(nil),  // 0: blogopen.v1.GetUserBasicInfoRequest
 	(*GetUserBasicInfoResponse)(nil), // 1: blogopen.v1.GetUserBasicInfoResponse
 	(*GetUserInfoRequest)(nil),       // 2: blogopen.v1.GetUserInfoRequest
 	(*GetUserInfoResponse)(nil),      // 3: blogopen.v1.GetUserInfoResponse
 }
-var file_proto_user_proto_depIdxs = []int32{
+var file_blogopen_v1_user_proto_depIdxs = []int32{
 	0, // 0: blogopen.v1.UserService.GetUserBasicInfo:input_type -> blogopen.v1.GetUserBasicInfoRequest
 	2, // 1: blogopen.v1.UserService.GetPublicUserInfo:input_type -> blogopen.v1.GetUserInfoRequest
 	1, // 2: blogopen.v1.UserService.GetUserBasicInfo:output_type -> blogopen.v1.GetUserBasicInfoResponse
@@ -303,26 +303,26 @@ var file_proto_user_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_proto_user_proto_init() }
-func file_proto_user_proto_init() {
-	if File_proto_user_proto != nil {
+func init() { file_blogopen_v1_user_proto_init() }
+func file_blogopen_v1_user_proto_init() {
+	if File_blogopen_v1_user_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_user_proto_rawDesc), len(file_proto_user_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_blogopen_v1_user_proto_rawDesc), len(file_blogopen_v1_user_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_user_proto_goTypes,
-		DependencyIndexes: file_proto_user_proto_depIdxs,
-		MessageInfos:      file_proto_user_proto_msgTypes,
+		GoTypes:           file_blogopen_v1_user_proto_goTypes,
+		DependencyIndexes: file_blogopen_v1_user_proto_depIdxs,
+		MessageInfos:      file_blogopen_v1_user_proto_msgTypes,
 	}.Build()
-	File_proto_user_proto = out.File
-	file_proto_user_proto_goTypes = nil
-	file_proto_user_proto_depIdxs = nil
+	File_blogopen_v1_user_proto = out.File
+	file_blogopen_v1_user_proto_goTypes = nil
+	file_blogopen_v1_user_proto_depIdxs = nil
 }

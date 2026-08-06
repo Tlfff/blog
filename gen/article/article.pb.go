@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.35.1
-// source: proto/article.proto
+// source: blogopen/v1/article.proto
 
 package article
 
@@ -33,7 +33,7 @@ type GetExternalListRequest struct {
 
 func (x *GetExternalListRequest) Reset() {
 	*x = GetExternalListRequest{}
-	mi := &file_proto_article_proto_msgTypes[0]
+	mi := &file_blogopen_v1_article_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45,7 +45,7 @@ func (x *GetExternalListRequest) String() string {
 func (*GetExternalListRequest) ProtoMessage() {}
 
 func (x *GetExternalListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_article_proto_msgTypes[0]
+	mi := &file_blogopen_v1_article_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -58,7 +58,7 @@ func (x *GetExternalListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetExternalListRequest.ProtoReflect.Descriptor instead.
 func (*GetExternalListRequest) Descriptor() ([]byte, []int) {
-	return file_proto_article_proto_rawDescGZIP(), []int{0}
+	return file_blogopen_v1_article_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *GetExternalListRequest) GetPage() uint64 {
@@ -95,7 +95,7 @@ type ExternalListResponse struct {
 
 func (x *ExternalListResponse) Reset() {
 	*x = ExternalListResponse{}
-	mi := &file_proto_article_proto_msgTypes[1]
+	mi := &file_blogopen_v1_article_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -107,7 +107,7 @@ func (x *ExternalListResponse) String() string {
 func (*ExternalListResponse) ProtoMessage() {}
 
 func (x *ExternalListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_article_proto_msgTypes[1]
+	mi := &file_blogopen_v1_article_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -120,7 +120,7 @@ func (x *ExternalListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExternalListResponse.ProtoReflect.Descriptor instead.
 func (*ExternalListResponse) Descriptor() ([]byte, []int) {
-	return file_proto_article_proto_rawDescGZIP(), []int{1}
+	return file_blogopen_v1_article_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ExternalListResponse) GetItems() []*ArticleItem {
@@ -164,7 +164,7 @@ type ArticleItem struct {
 
 func (x *ArticleItem) Reset() {
 	*x = ArticleItem{}
-	mi := &file_proto_article_proto_msgTypes[2]
+	mi := &file_blogopen_v1_article_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -176,7 +176,7 @@ func (x *ArticleItem) String() string {
 func (*ArticleItem) ProtoMessage() {}
 
 func (x *ArticleItem) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_article_proto_msgTypes[2]
+	mi := &file_blogopen_v1_article_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -189,7 +189,7 @@ func (x *ArticleItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArticleItem.ProtoReflect.Descriptor instead.
 func (*ArticleItem) Descriptor() ([]byte, []int) {
-	return file_proto_article_proto_rawDescGZIP(), []int{2}
+	return file_blogopen_v1_article_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ArticleItem) GetId() uint64 {
@@ -227,11 +227,11 @@ func (x *ArticleItem) GetUpdatedTime() int64 {
 	return 0
 }
 
-var File_proto_article_proto protoreflect.FileDescriptor
+var File_blogopen_v1_article_proto protoreflect.FileDescriptor
 
-const file_proto_article_proto_rawDesc = "" +
+const file_blogopen_v1_article_proto_rawDesc = "" +
 	"\n" +
-	"\x13proto/article.proto\x12\vblogopen.v1\"b\n" +
+	"\x19blogopen/v1/article.proto\x12\vblogopen.v1\"b\n" +
 	"\x16GetExternalListRequest\x12\x12\n" +
 	"\x04page\x18\x01 \x01(\x04R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x04R\bpageSize\x12\x17\n" +
@@ -248,30 +248,30 @@ const file_proto_article_proto_rawDesc = "" +
 	"\fcreated_time\x18\x04 \x01(\x03R\vcreatedTime\x12!\n" +
 	"\fupdated_time\x18\x05 \x01(\x03R\vupdatedTime2l\n" +
 	"\x0eArticleService\x12Z\n" +
-	"\x10GetPublishedList\x12#.blogopen.v1.GetExternalListRequest\x1a!.blogopen.v1.ExternalListResponseB\x1aZ\x18blog/gen/article;articleb\x06proto3"
+	"\x10GetAvailableList\x12#.blogopen.v1.GetExternalListRequest\x1a!.blogopen.v1.ExternalListResponseB\x1aZ\x18blog/gen/article;articleb\x06proto3"
 
 var (
-	file_proto_article_proto_rawDescOnce sync.Once
-	file_proto_article_proto_rawDescData []byte
+	file_blogopen_v1_article_proto_rawDescOnce sync.Once
+	file_blogopen_v1_article_proto_rawDescData []byte
 )
 
-func file_proto_article_proto_rawDescGZIP() []byte {
-	file_proto_article_proto_rawDescOnce.Do(func() {
-		file_proto_article_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_article_proto_rawDesc), len(file_proto_article_proto_rawDesc)))
+func file_blogopen_v1_article_proto_rawDescGZIP() []byte {
+	file_blogopen_v1_article_proto_rawDescOnce.Do(func() {
+		file_blogopen_v1_article_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_blogopen_v1_article_proto_rawDesc), len(file_blogopen_v1_article_proto_rawDesc)))
 	})
-	return file_proto_article_proto_rawDescData
+	return file_blogopen_v1_article_proto_rawDescData
 }
 
-var file_proto_article_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
-var file_proto_article_proto_goTypes = []any{
+var file_blogopen_v1_article_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_blogopen_v1_article_proto_goTypes = []any{
 	(*GetExternalListRequest)(nil), // 0: blogopen.v1.GetExternalListRequest
 	(*ExternalListResponse)(nil),   // 1: blogopen.v1.ExternalListResponse
 	(*ArticleItem)(nil),            // 2: blogopen.v1.ArticleItem
 }
-var file_proto_article_proto_depIdxs = []int32{
+var file_blogopen_v1_article_proto_depIdxs = []int32{
 	2, // 0: blogopen.v1.ExternalListResponse.items:type_name -> blogopen.v1.ArticleItem
-	0, // 1: blogopen.v1.ArticleService.GetPublishedList:input_type -> blogopen.v1.GetExternalListRequest
-	1, // 2: blogopen.v1.ArticleService.GetPublishedList:output_type -> blogopen.v1.ExternalListResponse
+	0, // 1: blogopen.v1.ArticleService.GetAvailableList:input_type -> blogopen.v1.GetExternalListRequest
+	1, // 2: blogopen.v1.ArticleService.GetAvailableList:output_type -> blogopen.v1.ExternalListResponse
 	2, // [2:3] is the sub-list for method output_type
 	1, // [1:2] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
@@ -279,26 +279,26 @@ var file_proto_article_proto_depIdxs = []int32{
 	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_proto_article_proto_init() }
-func file_proto_article_proto_init() {
-	if File_proto_article_proto != nil {
+func init() { file_blogopen_v1_article_proto_init() }
+func file_blogopen_v1_article_proto_init() {
+	if File_blogopen_v1_article_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_article_proto_rawDesc), len(file_proto_article_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_blogopen_v1_article_proto_rawDesc), len(file_blogopen_v1_article_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_article_proto_goTypes,
-		DependencyIndexes: file_proto_article_proto_depIdxs,
-		MessageInfos:      file_proto_article_proto_msgTypes,
+		GoTypes:           file_blogopen_v1_article_proto_goTypes,
+		DependencyIndexes: file_blogopen_v1_article_proto_depIdxs,
+		MessageInfos:      file_blogopen_v1_article_proto_msgTypes,
 	}.Build()
-	File_proto_article_proto = out.File
-	file_proto_article_proto_goTypes = nil
-	file_proto_article_proto_depIdxs = nil
+	File_blogopen_v1_article_proto = out.File
+	file_blogopen_v1_article_proto_goTypes = nil
+	file_blogopen_v1_article_proto_depIdxs = nil
 }

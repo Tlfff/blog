@@ -236,7 +236,7 @@ func (s *ArticleService) GetAdminList(ctx context.Context, page, pageSize, lastI
 // ------------------------------------ 二方 ------------------------------------
 
 // 获取可用文章列表
-func (s *ArticleService) GetAvailabledList(ctx context.Context, page, pageSize uint64, isDesc bool) (*article.ExternalListResponse, error) {
+func (s *ArticleService) GetAvailableList(ctx context.Context, page, pageSize uint64, isDesc bool) (*article.ExternalListResponse, error) {
 	var list []*model.Article
 	var err error
 

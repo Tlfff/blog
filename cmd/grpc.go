@@ -65,7 +65,7 @@ var grpcCmd = &cobra.Command{
 			Article: articleHandler,
 			User:    userHandler,
 			Comment: commentHandler,
-		}, cfg.ThirdParty)
+		}, rdb, cfg.ThirdParty)
 
 		// 9. 监听端口（优先命令行参数，默认读config）
 		port := grpcPort

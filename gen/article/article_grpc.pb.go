@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v7.35.1
-// source: proto/article.proto
+// source: blogopen/v1/article.proto
 
 package article
 
@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ArticleService_GetPublishedList_FullMethodName = "/blogopen.v1.ArticleService/GetPublishedList"
+	ArticleService_GetAvailableList_FullMethodName = "/blogopen.v1.ArticleService/GetAvailableList"
 )
 
 // ArticleServiceClient is the client API for ArticleService service.
@@ -29,7 +29,7 @@ const (
 // 文章服务定义
 type ArticleServiceClient interface {
 	// 获取全部可用文章列表 (除已删除)
-	GetPublishedList(ctx context.Context, in *GetExternalListRequest, opts ...grpc.CallOption) (*ExternalListResponse, error)
+	GetAvailableList(ctx context.Context, in *GetExternalListRequest, opts ...grpc.CallOption) (*ExternalListResponse, error)
 }
 
 type articleServiceClient struct {
@@ -40,10 +40,10 @@ func NewArticleServiceClient(cc grpc.ClientConnInterface) ArticleServiceClient {
 	return &articleServiceClient{cc}
 }
 
-func (c *articleServiceClient) GetPublishedList(ctx context.Context, in *GetExternalListRequest, opts ...grpc.CallOption) (*ExternalListResponse, error) {
+func (c *articleServiceClient) GetAvailableList(ctx context.Context, in *GetExternalListRequest, opts ...grpc.CallOption) (*ExternalListResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ExternalListResponse)
-	err := c.cc.Invoke(ctx, ArticleService_GetPublishedList_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ArticleService_GetAvailableList_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (c *articleServiceClient) GetPublishedList(ctx context.Context, in *GetExte
 // 文章服务定义
 type ArticleServiceServer interface {
 	// 获取全部可用文章列表 (除已删除)
-	GetPublishedList(context.Context, *GetExternalListRequest) (*ExternalListResponse, error)
+	GetAvailableList(context.Context, *GetExternalListRequest) (*ExternalListResponse, error)
 	mustEmbedUnimplementedArticleServiceServer()
 }
 
@@ -68,8 +68,8 @@ type ArticleServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedArticleServiceServer struct{}
 
-func (UnimplementedArticleServiceServer) GetPublishedList(context.Context, *GetExternalListRequest) (*ExternalListResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetPublishedList not implemented")
+func (UnimplementedArticleServiceServer) GetAvailableList(context.Context, *GetExternalListRequest) (*ExternalListResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAvailableList not implemented")
 }
 func (UnimplementedArticleServiceServer) mustEmbedUnimplementedArticleServiceServer() {}
 func (UnimplementedArticleServiceServer) testEmbeddedByValue()                        {}
@@ -92,20 +92,20 @@ func RegisterArticleServiceServer(s grpc.ServiceRegistrar, srv ArticleServiceSer
 	s.RegisterService(&ArticleService_ServiceDesc, srv)
 }
 
-func _ArticleService_GetPublishedList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ArticleService_GetAvailableList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetExternalListRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ArticleServiceServer).GetPublishedList(ctx, in)
+		return srv.(ArticleServiceServer).GetAvailableList(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ArticleService_GetPublishedList_FullMethodName,
+		FullMethod: ArticleService_GetAvailableList_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ArticleServiceServer).GetPublishedList(ctx, req.(*GetExternalListRequest))
+		return srv.(ArticleServiceServer).GetAvailableList(ctx, req.(*GetExternalListRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -118,10 +118,10 @@ var ArticleService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ArticleServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetPublishedList",
-			Handler:    _ArticleService_GetPublishedList_Handler,
+			MethodName: "GetAvailableList",
+			Handler:    _ArticleService_GetAvailableList_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/article.proto",
+	Metadata: "blogopen/v1/article.proto",
 }

@@ -4,6 +4,7 @@ import (
 	"blog/config"
 	"context"
 
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -17,10 +18,10 @@ type AuthInterceptor struct {
 }
 
 // 构建统一认证拦截器
-func NewAuthInterceptor(partners []config.Partner) *AuthInterceptor {
+func NewAuthInterceptor(rdb *redis.Client, partners []config.Partner) *AuthInterceptor {
 	return &AuthInterceptor{
 		jwt:  NewJwtInterceptor(),
-		hmac: NewHmacAuthInterceptor(partners),
+		hmac: NewHmacAuthInterceptor(rdb, partners),
 	}
 }
 

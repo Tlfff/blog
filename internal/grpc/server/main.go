@@ -8,6 +8,7 @@ import (
 	grpchandler "blog/internal/grpc/handler"
 	"blog/internal/grpc/interceptor"
 
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 )
 
@@ -19,12 +20,12 @@ type AppHandler struct {
 }
 
 // 创建gRPC Server，注册所有服务，挂载认证拦截器链
-func NewGRPCServer(appHandler *AppHandler, partners []config.Partner) *grpc.Server {
+func NewGRPCServer(appHandler *AppHandler, rdb *redis.Client, partners []config.Partner) *grpc.Server {
 	// 1. 创建 gRPC Server，拦截器链：日志 → 认证（二方JWT / 三方HMAC）
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			interceptor.LoggingInterceptor,                   // 日志：进入/退出全量记录
-			interceptor.NewAuthInterceptor(partners).Unary(), // 认证：不同调用，走不同认证方式
+			interceptor.LoggingInterceptor,                        // 日志：进入/退出全量记录
+			interceptor.NewAuthInterceptor(rdb, partners).Unary(), // 认证：不同调用，走不同认证方式
 		),
 	)
 	// 2. 注册服务
