@@ -16,15 +16,13 @@ import (
 type ArticleService struct {
 	repo           *repository.ArticleRepository
 	userRepo       *repository.UserRepository
-	historyView    *ArticleViewHistoryService
 	rdb            *redis.Client
 	artLikeService *ArticleLikeService
 }
 
-func NewArticleService(repo *repository.ArticleRepository, historyView *ArticleViewHistoryService, artLikeService *ArticleLikeService, rdb *redis.Client) *ArticleService {
+func NewArticleService(repo *repository.ArticleRepository, artLikeService *ArticleLikeService, rdb *redis.Client) *ArticleService {
 	return &ArticleService{
 		repo:           repo,
-		historyView:    historyView,
 		artLikeService: artLikeService,
 		rdb:            rdb,
 	}
@@ -102,7 +100,7 @@ func (s *ArticleService) ClearArticle(ctx context.Context, articleId uint64, use
 }
 
 // 公开：查看文章详情
-func (s *ArticleService) GetPublishedArticle(ctx context.Context, articleId uint64, userId uint64, ip string) (*article.ArticleDetailResponse, error) {
+func (s *ArticleService) GetPublishedArticle(ctx context.Context, articleId uint64, userId uint64) (*article.ArticleDetailResponse, error) {
 
 	// 1 查出文章
 	detail, err := s.repo.FindArticleAndUserInfoByID(ctx, articleId)
@@ -119,16 +117,13 @@ func (s *ArticleService) GetPublishedArticle(ctx context.Context, articleId uint
 		return nil, common.ErrArticlePermissionDenied
 	}
 
-	// 2.记录浏览历史
-	s.historyView.RecordView(userId, articleId, ip)
-
-	// 3. 判断当前登录用户是否点赞过该文章
+	// 2. 判断当前登录用户是否点赞过该文章
 	var isLiked bool
 	if userId > 0 {
 		isLiked, _ = s.artLikeService.IsUserLikedArticle(ctx, userId, articleId)
 	}
 
-	// 4. 构造详情响应
+	// 3. 构造详情响应
 	resp := article.NewArticleDetailResponse(&detail.Article, detail.Nickname, detail.Avatar, detail.LastLoginIp, isLiked)
 
 	return resp, nil
@@ -236,4 +231,24 @@ func (s *ArticleService) GetAdminList(ctx context.Context, page, pageSize, lastI
 	}
 
 	return article.NewAdminListResponse(list, uint64(total), nextLastID, page, pageSize), nil
+}
+
+// ------------------------------------ 二方 ------------------------------------
+
+// 获取可用文章列表
+func (s *ArticleService) GetAvailableList(ctx context.Context, page, pageSize uint64, isDesc bool) (*article.ExternalListResponse, error) {
+	var list []*model.Article
+	var err error
+
+	// 1. 传统分页
+	list, err = s.repo.GetListWithOffset(ctx, int(page), int(pageSize), isDesc, model.Published)
+	if err != nil {
+		return nil, err
+	}
+	// 2. 计算发表的总文章数
+	total, err := s.repo.GetArticleCountByStatus(ctx, model.Published)
+	if err != nil {
+		return nil, err
+	}
+	return article.NewExternalListResponse(list, uint64(total), page, pageSize), nil
 }

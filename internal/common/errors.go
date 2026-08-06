@@ -53,6 +53,18 @@ var (
 	ErrUnLockFailed = errors.New("解除redis锁失败,锁不存在或者非该锁持有者")
 	//------------------------- 通知模块 ---------------------------------
 
+	//------------------------- kafka模块 ---------------------------------
+	ErrKafkaInitFailed       = errors.New("Kafka 初始化失败")
+	ErrKafkaBrokerEmpty      = errors.New("Kafka 地址列表为空")
+	ErrKafkaSendFailed       = errors.New("Kafka消息发送失败")
+	ErrKafkaSerializeFailed  = errors.New("Kafka消息序列化失败")
+	ErrKafkaTopicNotConfig   = errors.New("Kafka Topic未配置")
+	ErrKafkaConsumeFailed    = errors.New("Kafka消息消费失败")
+	ErrKafkaCloseFailed      = errors.New("Kafka关闭失败")
+	ErrKafkaNoValidConsumers = errors.New("Kafka 无有效消费者")
+	ErrKafkaConsumerRunning  = errors.New("Kafka 消费者已运行")
+	ErrKafkaClientClosed     = errors.New("Kafka 客户端已关闭")
+	ErrKafkaPingFailed       = errors.New("Kafka 预热连接失败")
 )
 
 func GetCodeByError(err error) int {
@@ -129,6 +141,28 @@ func GetCodeByError(err error) int {
 		return CodeLockFailed
 	case ErrUnLockFailed:
 		return CodeUnLockFailed
+	// kafka
+	case ErrKafkaInitFailed,
+		ErrKafkaBrokerEmpty:
+		return CodeKafkaInitFailed
+	case ErrKafkaSendFailed:
+		return CodeKafkaSendFailed
+	case ErrKafkaSerializeFailed:
+		return CodeKafkaSerializeFailed
+	case ErrKafkaTopicNotConfig:
+		return CodeKafkaTopicNotConfig
+	case ErrKafkaConsumeFailed:
+		return CodeKafkaConsumeFailed
+	case ErrKafkaCloseFailed:
+		return CodeKafkaCloseFailed
+	case ErrKafkaNoValidConsumers:
+		return CodeKafkaNoValidConsumers
+	case ErrKafkaConsumerRunning:
+		return CodeKafkaConsumerRunning
+	case ErrKafkaClientClosed:
+		return CodeKafkaClientClosed
+	case ErrKafkaPingFailed:
+		return CodeKafkaPingFailed
 	default:
 		return CodeInternalServerError
 

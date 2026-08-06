@@ -42,7 +42,7 @@ type GetPublishListRequest struct {
 
 // 管理者：获取文章列表
 type GetAdminListRequest struct {
-	Status   int8   `form:"status" binding:"required,min=0"`
+	Status   int8   `form:"status" binding:"required"`
 	LastID   uint64 `form:"last_id" binding:"omitempty,min=0"`
 	Page     uint64 `form:"page" binding:"omitempty,min=0"`
 	PageSize uint64 `form:"page_size" binding:"min=10,max=20"`

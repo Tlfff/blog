@@ -15,6 +15,8 @@ import (
 func TestAuthMiddleware_AllRoutes(t *testing.T) {
 	// 设置 Gin 为测试模式
 	gin.SetMode(gin.TestMode)
+	// 注入测试用的JWT密钥
+	auth.InitJWT("test-secret-key")
 
 	// 事先生成一个合法的 Token 备用
 	validToken, err := auth.GenerateToken("13800000000", 2, 123)
@@ -91,7 +93,7 @@ func TestAuthMiddleware_AllRoutes(t *testing.T) {
 					assert.True(t, exists, "应该在上下文中找到 currentUser")
 					userCtx, ok := val.(*auth.UserContext)
 					assert.True(t, ok)
-					assert.Equal(t, int64(123), userCtx.UserID)
+					assert.Equal(t, uint64(123), userCtx.UserID)
 					assert.Equal(t, "13800000000", userCtx.Phone)
 				}
 				c.Status(http.StatusOK)

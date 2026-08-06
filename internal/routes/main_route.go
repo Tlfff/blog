@@ -3,6 +3,7 @@ package routes
 import (
 	"blog/internal/handler"
 	"blog/internal/middleware"
+	"blog/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,6 +16,8 @@ type AppHandler struct {
 	Comment  *handler.CommentHandler
 	Like     *handler.LikeHandler
 	Notify   *handler.NotificationHandler
+	// 浏览历史服务，路由级中间件使用（不经过 handler）
+	ViewHistory *service.ArticleViewHistoryService
 }
 
 func InitRoute(r *gin.Engine, appHandler *AppHandler) {
@@ -54,7 +57,7 @@ func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 	optionalGroup := r.Group("/optional")
 	optionalGroup.Use(middleware.OptionalAuth())
 	{
-		InitArticleOptionalRoutes(optionalGroup, appHandler.Article)
+		InitArticleOptionalRoutes(optionalGroup, appHandler.Article, appHandler.ViewHistory)
 	}
 
 }

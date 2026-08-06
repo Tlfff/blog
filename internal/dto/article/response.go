@@ -50,11 +50,14 @@ func NewArticleDetailResponse(m *model.Article, nickName, avatar, authorIP strin
 // ====================  前台文章列表返回  ====================
 // 列表项
 type ArticleListItem struct {
-	ID          uint64 `json:"id"`
-	Title       string `json:"title"`
-	Summary     string `json:"summary"` // 摘要
-	AuthorID    uint64 `json:"author_id"`
-	UpdatedTime int64  `json:"updated_time"`
+	ID           uint64 `json:"id"`
+	Title        string `json:"title"`
+	Summary      string `json:"summary"` // 摘要
+	AuthorID     uint64 `json:"author_id"`
+	UpdatedTime  int64  `json:"updated_time"`
+	ViewCount    uint32 `json:"view_count"`
+	LikeCount    uint32 `json:"like_count"`
+	CommentCount uint32 `json:"comment_count"`
 }
 
 // 列表返回
@@ -84,11 +87,14 @@ func NewArticleListResponse(models []*model.Article, total, lastID, page, page_s
 		}
 
 		resp.List = append(resp.List, &ArticleListItem{
-			ID:          m.ID,
-			Title:       m.Title,
-			Summary:     summary,
-			AuthorID:    m.AuthorID,
-			UpdatedTime: m.UpdatedTime.Unix(),
+			ID:           m.ID,
+			Title:        m.Title,
+			Summary:      summary,
+			AuthorID:     m.AuthorID,
+			UpdatedTime:  m.UpdatedTime.Unix(),
+			CommentCount: m.CommentCount,
+			ViewCount:    m.ViewCount,
+			LikeCount:    m.LikeCount,
 		})
 	}
 	return resp
@@ -99,7 +105,7 @@ type AdminListItem struct {
 	ID          uint64   `json:"id"`
 	Title       string   `json:"title"`
 	Tags        []string `json:"tags"`
-	Status      int8     `json:"status"` // 状态：1所有，2草稿，3发布，0垃圾箱
+	Status      int8     `json:"status"` // 状态：
 	CreatedTime int64    `json:"created_time"`
 	UpdatedTime int64    `json:"updated_time"`
 }
@@ -154,6 +160,46 @@ type HotRankItem struct {
 func NewHotRankResponse(list []HotRankItem) *HotRankResponse {
 	resp := &HotRankResponse{
 		List: &list,
+	}
+	return resp
+}
+
+// --------------------------------------- 二方服务 ---------------------------------------
+type ExternalListItem struct {
+	ID          uint64   `json:"id"`
+	Title       string   `json:"title"`
+	Tags        []string `json:"tags"`
+	CreatedTime int64    `json:"created_time"`
+	UpdatedTime int64    `json:"updated_time"`
+}
+type ExternalListResponse struct {
+	List     []*ExternalListItem `json:"list"`
+	Total    uint64              `json:"total"`
+	Page     uint64              `json:"page"`      // 页码
+	PageSize uint64              `json:"page_size"` // 页面大小
+}
+
+// 构建已发表文章列表响应
+func NewExternalListResponse(models []*model.Article, total, page, page_size uint64) *ExternalListResponse {
+	resp := &ExternalListResponse{
+		List:     make([]*ExternalListItem, 0),
+		Total:    total,
+		Page:     page,
+		PageSize: page_size,
+	}
+
+	for _, m := range models {
+		tags := strings.Split(m.Tags, ",")
+		if m.Tags == "" {
+			tags = []string{}
+		}
+		resp.List = append(resp.List, &ExternalListItem{
+			ID:          m.ID,
+			Title:       m.Title,
+			Tags:        tags,
+			CreatedTime: m.CreatedTime.Unix(),
+			UpdatedTime: m.UpdatedTime.Unix(),
+		})
 	}
 	return resp
 }

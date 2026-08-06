@@ -14,3 +14,8 @@ type CommentLike struct {
 func (CommentLike) TableName() string {
 	return "comment_likes"
 }
+
+const (
+	CommentLiked       = 1 // 点赞
+	CommentCancelLiked = 2 // 取消点赞
+)

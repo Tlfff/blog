@@ -360,3 +360,21 @@ func (s *CommentService) getCommentsLikeCountMap(ctx context.Context, comments [
 
 	return likeMap
 }
+
+// ------------------------------------ 二方服务 ------------------------------------
+// 返回点赞数和热度值
+func (s *CommentService) GetCommentStats(ctx context.Context, commentID uint64) (*commentDto.CommentStatsResponse, error) {
+	// 1. 获取评论详情
+	comment, err := s.commentRepo.FindByID(ctx, commentID)
+	if err != nil {
+		return nil, err
+	}
+	// 2. 获取点赞数
+	likeCount := uint64(comment.LikeCount)
+	commentCount := uint64(comment.CommentCount)
+	// 3. 获取热度值
+	hotCount := likeCount + commentCount
+	// 4. 封装返回响应
+	resp := commentDto.NewCommentStatsResponse(commentID, hotCount, likeCount)
+	return resp, nil
+}

@@ -37,4 +37,15 @@ const (
 	CodeUnLockFailed = 1500 // 解锁失败
 	CodeLockFailed   = 1501 // 加锁失败
 	CodeLockExpired  = 1502 //锁过期
+	//------------------------- kafka模块 ---------------------------------
+	CodeKafkaInitFailed       = 1600 // Kafka初始化失败
+	CodeKafkaSendFailed       = 1601 // Kafka消息发送失败
+	CodeKafkaSerializeFailed  = 1602 // Kafka消息序列化失败
+	CodeKafkaTopicNotConfig   = 1603 // Kafka Topic未配置
+	CodeKafkaConsumeFailed    = 1604 // Kafka消息消费失败
+	CodeKafkaCloseFailed      = 1605 // Kafka关闭失败
+	CodeKafkaNoValidConsumers = 1606 // Kafka 无有效消费者
+	CodeKafkaConsumerRunning  = 1607 // Kafka 消费者已运行
+	CodeKafkaClientClosed     = 1608 // Kafka 客户端已关闭
+	CodeKafkaPingFailed       = 1609 // Kafka 预热连接失败
 )

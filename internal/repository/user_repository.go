@@ -92,3 +92,34 @@ func (r *UserRepository) UpdateUser(ctx context.Context, user *model.User) error
 
 	return nil
 }
+
+// 获取用户列表
+// select id,nickname,avatar from users where status=1 order by id desc limit ?,?
+func (r *UserRepository) GetUserList(ctx context.Context, page, page_size int, isDesc bool) ([]*model.User, error) {
+	var users []*model.User
+	tx := r.db.WithContext(ctx).
+		Select("ID,Nickname,Avatar").
+		Where("status = ?", model.UserNormal)
+	if isDesc {
+		tx = tx.Order("id desc")
+	} else {
+		tx = tx.Order("id asc")
+	}
+	err := tx.Limit(page_size).
+		Offset((page - 1) * page_size).
+		Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+// 获取总用户数（除了未删除）
+func (r *UserRepository) CountUsers(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&model.User{}).Where("status = ?", model.UserNormal).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}

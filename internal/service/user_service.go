@@ -112,3 +112,36 @@ func (s *UserService) UpdateAccount(ctx context.Context, userID uint64, phone st
 
 	return s.repo.UpdateUser(ctx, u)
 }
+
+// -------------------------------------- 二方服务调用 --------------------------------------
+
+// 获取用户基本信息
+func (s *UserService) GetUserBasicInfo(ctx context.Context, userID uint64) (*user.UserBasicInfoResponse, error) {
+	u, err := s.repo.FindUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, common.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	return user.NewUserBasicInfoResponse(u), nil
+}
+
+// 获取用户基本信息列表
+func (s *UserService) ListUserBasicInfo(ctx context.Context, page, pageSize uint64, isDesc bool) (*user.UserListResponse, error) {
+	// 1. 获取用户列表
+	users, err := s.repo.GetUserList(ctx, int(page), int(pageSize), isDesc)
+	if err != nil {
+		return nil, err
+	}
+	// 2. 获取总用户数
+	total, err := s.repo.CountUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// 3. 构建返回响应
+	resp := user.NewUserListResponse(users, uint64(total), page, pageSize)
+
+	return resp, nil
+}

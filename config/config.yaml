@@ -14,3 +14,57 @@ mongodb:
   dbname: "blog"
   username: "bloguser"      
   password: "20040614"
+jwt:
+  secret: "7e29acf58d421036b897f31ce05da74918bf2c45e6839021ad654872f90ac165"  # JWT签名密钥
+openjwt:
+  secret: "f6c2a8e41d903b57b6f2e08c3a91d475ab3f690c2d8e417b5a6f3e920c8b14a72"  # 二方服务专用JWT密钥
+grpc:
+  port: "9100"  # 二方gRPC服务监听端口
+thirdparty:
+  - partner_id: "partner-a"        # 合作方组织标识（仅统计用）
+    access_key_id: "ak-partner-a"  # 凭证身份，请求头 x-access-key-id 携带
+    secret_key: "sk-partner-a-secret-key"  # 共享密钥，仅合作方和服务端知道
+kafka:
+  brokers: "127.0.0.1:9092"
+
+  dead_letter:  # 死信队列
+    topic: "dead_letter"             # 统一的死信队列 topic 名称
+    max_retries: 3                   # 发送到死信队列的重试次数
+    consumer_group: "blog_dead_letter_consumer"  # 死信队列消费者组
+  topics:
+    notification:
+      name: "notification"
+      group_id: "blog_notification_consumer"
+      start_offset: "oldest"
+      batch_size: 50          # 批量消费条数，消费者拉取用的条数
+      batch_timeout_ms: 10000  # 批量超时时间（毫秒）
+      fetch_timeout_ms: 3000  # 拉取单条消息的超时时间（毫秒）
+      max_retries: 3                      # 消息处理最大重试次数
+      retry_wait_ms: 100         # 重试间隔（毫秒）
+
+    view_history:
+      name: "view_history"
+      group_id: "blog_view_consumer"
+      start_offset: "oldest"
+      batch_size: 100         # 批量消费条数，消费者拉取用的条数
+      batch_timeout_ms: 10000   # 批量超时时间（毫秒）
+      fetch_timeout_ms: 3000  # 拉取单条消息的超时时间（毫秒）
+      max_retries: 3                      # 消息处理最大重试次数
+      retry_wait_ms: 100         # 重试间隔（毫秒）
+    
+
+  producer:
+    acks: "one"
+    batch_size: 10  # 10条消息则发送
+    batch_size_bytes: 16384  # 消息总字节数达到16KB时也发送
+    batch_timeout_ms: 200  # 200ms，如果200ms内没有凑齐batch_size，则强制发送
+    max_retries: 3  # 最大重试次数，默认 3 次
+    compression_type: "snappy"
+  consumer:
+    group_balancer: "range" # 消费者组分区分配策略
+    max_bytes: 1048576 # 消费者一次最多拉取多少字节，默认 1MB
+    min_bytes: 1  # 消费者拉取消息时，至少获取多少字节才返回，默认 1 字节
+    max_wait_ms: 500  # 最大等待时间，默认 500ms
+    session_timeout_ms: 30000  # 会话超时时间，默认 30s
+    commit_retries: 3  # 提交偏移量重试次数，默认 3 次
+    commit_wait_ms: 100  # 提交偏移量间隔，默认 100 毫秒

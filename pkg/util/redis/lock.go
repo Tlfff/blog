@@ -11,7 +11,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// 用embed嵌入整个lua目录，编译后也可正常读取脚本文件
+// 用embed嵌入lua目录（//go:embed 必须紧邻变量声明），编译后也可正常读取脚本文件
+//
+//go:embed lua
 var luaFS embed.FS
 
 type RedisLock struct {
