@@ -232,3 +232,23 @@ func (s *ArticleService) GetAdminList(ctx context.Context, page, pageSize, lastI
 
 	return article.NewAdminListResponse(list, uint64(total), nextLastID, page, pageSize), nil
 }
+
+// ------------------------------------ 二方 ------------------------------------
+
+// 获取可用文章列表
+func (s *ArticleService) GetAvailableList(ctx context.Context, page, pageSize uint64, isDesc bool) (*article.ExternalListResponse, error) {
+	var list []*model.Article
+	var err error
+
+	// 1. 传统分页
+	list, err = s.repo.GetListWithOffset(ctx, int(page), int(pageSize), isDesc, model.Published)
+	if err != nil {
+		return nil, err
+	}
+	// 2. 计算发表的总文章数
+	total, err := s.repo.GetArticleCountByStatus(ctx, model.Published)
+	if err != nil {
+		return nil, err
+	}
+	return article.NewExternalListResponse(list, uint64(total), page, pageSize), nil
+}

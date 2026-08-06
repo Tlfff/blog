@@ -3,6 +3,7 @@ package auth
 import "testing"
 
 func TestGenerateAndVerifyToken(t *testing.T) {
+	InitJWT("test-secret-key")
 	// 生成Token
 	token, err := GenerateToken("1234567890", 1, 12345)
 	if err != nil {
