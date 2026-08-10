@@ -11,6 +11,7 @@ import (
 	"blog/internal/service"
 	"blog/pkg/database"
 	"blog/pkg/kafka"
+	"blog/pkg/oss"
 	iputil "blog/pkg/util/ip"
 	"context"
 	"fmt"
@@ -38,8 +39,6 @@ var serverCmd = &cobra.Command{
 		}
 		// 1.1 初始化自定义验证器
 		common.InitValidator()
-		// 1.1.1 注入JWT签名密钥
-		auth.InitJWT(config.JWT.Secret)
 		// 1.2 初始化ip工具类
 		dir, _ := os.Getwd() // 获取当前程序运行的绝对路径
 		dbPath := filepath.Join(dir, "pkg/resource/ip2region.xdb")
@@ -93,12 +92,27 @@ var serverCmd = &cobra.Command{
 		commentLikeRepo := repository.NewCommentLikeRepository(db)
 		ntfRepo := repository.NewNotificationRepository(mongodb)
 
+		// 4.1.1 初始化 MinIO 客户端
+		ossClient, err := oss.NewMinioClient(
+			config.OSS.Endpoint,
+			config.OSS.AccessKeyID,
+			config.OSS.SecretAccessKey,
+			config.OSS.Bucket,
+			config.OSS.UseSSL,
+		)
+		if err != nil {
+			fmt.Printf("[error]:MinIO客户端初始化失败:%v\n", err)
+			return
+		}
+
 		// 4.2 初始化service
 		ntfService := service.NewNotificationService(ntfRepo)
 		artLikeService := service.NewArticleLikeService(artLikeRepo, artRepo, rdb, ntfService, userRepo, kafkaClient)
 		comLikeService := service.NewCommentLikeService(commentLikeRepo, commentRepo, rdb)
-		userAuthService := service.NewUserAuthService(userRepo)
-		userService := service.NewUserService(userRepo)
+		tokenAuth := auth.NewTokenAuth(rdb)
+		userAuthService := service.NewUserAuthService(userRepo, tokenAuth)
+		userService := service.NewUserService(userRepo, rdb)
+		userService.SetOSS(ossClient, config.OSS.PublicDomain)
 		historyService := service.NewArticleViewHistoryService(historyRepo, kafkaClient)
 		artService := service.NewArticleService(artRepo, artLikeService, rdb)
 		artRankService := service.NewArticleRankService(artRepo, rdb)
@@ -113,7 +127,7 @@ var serverCmd = &cobra.Command{
 
 		// 4.3 初始化handler
 		userAuthHandler := handler.NewUserAuthHandler(userAuthService)
-		userHandler := handler.NewUserHandler(userService)
+		userHandler := handler.NewUserHandler(userService, userAuthService)
 		articleHandler := handler.NewArticleHandler(artService, artRankService)
 		commentHandler := handler.NewCommentHandler(commentService)
 		likeHandler := handler.NewLikeHandler(artLikeService, comLikeService)
@@ -136,6 +150,7 @@ var serverCmd = &cobra.Command{
 			Like:        likeHandler,
 			Notify:      ntfHandler,
 			ViewHistory: historyService,
+			Redis:       rdb,
 		}
 
 		// 6. 创建路由引擎

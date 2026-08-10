@@ -15,6 +15,7 @@ type Config struct {
 	OpenJWT    OpenJWT   `yaml:"openjwt"`
 	GRPC       GRPC      `yaml:"grpc"`
 	ThirdParty []Partner `yaml:"thirdparty"`
+	OSS        OSS       `yaml:"oss"`
 }
 
 type JWT struct {
@@ -55,6 +56,15 @@ type Mongodb struct {
 	DBName   string `yaml:"dbname"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
+}
+
+type OSS struct {
+	Endpoint        string `yaml:"endpoint"`
+	AccessKeyID     string `yaml:"access_key_id"`
+	SecretAccessKey string `yaml:"secret_access_key"`
+	Bucket          string `yaml:"bucket"`
+	UseSSL          bool   `yaml:"use_ssl"`
+	PublicDomain    string `yaml:"public_domain"`
 }
 
 func LoadConfig(filePath string) (*Config, error) {
