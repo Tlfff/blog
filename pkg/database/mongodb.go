@@ -12,7 +12,9 @@ import (
 // 负责连接 MongoDB
 func NewMongoDBClient(username, password, host, dbname string, port int) (*mongo.Database, error) {
 	var dsn string
-	dsn = fmt.Sprintf("mongodb://%s:%s@%s:%d/%s", username, password, host, port, dbname)
+	// authSource=admin：官方镜像通过 MONGO_INITDB_ROOT_USERNAME 创建的用户存放在 admin 库，
+	// 不指定时驱动默认用路径中的库（blog）做认证，会报 AuthenticationFailed
+	dsn = fmt.Sprintf("mongodb://%s:%s@%s:%d/%s?authSource=admin", username, password, host, port, dbname)
 
 	// 1. 设置连接超时控制（防止数据库挂了导致程序永久死等）
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

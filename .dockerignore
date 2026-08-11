@@ -1,0 +1,21 @@
+.git
+.vscode
+
+# 构建产物和测试产物
+blog_api_linux
+cover.out
+coverage.out
+*.test
+
+# 本地环境文件
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# 文档和脚本（运行时用不到）
+readme.md
+LICENSE
+scripts/
+
+# 临时测试客户端
+cmd/grpc_client_test/

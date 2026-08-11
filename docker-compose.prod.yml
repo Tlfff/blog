@@ -1,0 +1,182 @@
+name: blog
+
+# 生产环境编排：镜像从腾讯云仓库拉取，不在服务器上构建
+services:
+  # MySQL 服务定义
+  mysql:
+    image: mysql:8.0
+    container_name: blog-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: "Tlf0614"            # root 超级管理员密码（生产环境请修改）
+      MYSQL_DATABASE: "blog"                    # 容器启动时自动创建的数据库名
+      MYSQL_USER: "bloguser"                    # 额外创建的应用专用用户
+      MYSQL_PASSWORD: "20040614"                # 应用用户的密码（生产环境请修改）
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./scripts/mysql:/docker-entrypoint-initdb.d:ro # 仅数据目录为空时执行一次，自动建库建表
+    command:
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - blog-net
+
+  # Redis 服务定义
+  redis:
+    image: redis:7-alpine
+    container_name: blog-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --aof-use-rdb-preamble yes # 开启混合持久化
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - blog-net
+
+  # MongoDB 服务定义
+  mongodb:
+    image: mongo:7
+    container_name: blog-mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: "bloguser" # 生产环境请修改
+      MONGO_INITDB_ROOT_PASSWORD: "20040614" # 生产环境请修改
+      MONGO_INITDB_DATABASE: "blog"
+      TZ: Asia/Shanghai
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./scripts/mongodb:/docker-entrypoint-initdb.d:ro # 仅数据目录为空时执行一次
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - blog-net
+
+  # Kafka 服务定义
+  kafka:
+    image: apache/kafka:4.0.0
+    container_name: blog-kafka
+    restart: always
+    environment:
+      # KRaft 模式：节点既是 broker 又是 controller
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,EXTERNAL://:29092,CONTROLLER://:9093"
+      # 注意：EXTERNAL 对外公布地址，若需从服务器外部用 Kafka 工具连接，把 localhost 改为服务器 IP/域名
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,EXTERNAL://muzimi.xyz:29092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      TZ: Asia/Shanghai
+    ports:
+      - "9092:9092"      # 容器间内部通信
+      - "29092:29092"    # 宿主机外部访问（Kafka 工具连接用）
+    volumes:
+      - kafka_data:/bitnami/kafka
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - blog-net
+
+  # 后端服务（HTTP）
+  blog-server:
+    image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0 # 锁定版本，不用 latest
+    container_name: blog-server
+    restart: always
+    command: ["server"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config/config.docker.yaml:/app/config/config.yaml:ro # 用 docker 专用配置覆盖容器内默认配置
+      - ./pkg/resource:/app/pkg/resource:ro # IP 地理位置数据库（只读挂载，方便更新）
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - blog-net
+
+  # 对外服务（gRPC，二方/三方）
+  blog-grpc:
+    image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0
+    container_name: blog-grpc
+    restart: always
+    command: ["grpc"]
+    ports:
+      - "9100:9100"
+    volumes:
+      - ./config/config.docker.yaml:/app/config/config.yaml:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - blog-net
+
+  # Kafka 消费者
+  blog-consumer:
+    image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0
+    container_name: blog-consumer
+    restart: always
+    command: ["kafka-consume"]
+    volumes:
+      - ./config/config.docker.yaml:/app/config/config.yaml:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - blog-net
+
+# 数据卷定义
+volumes:
+  mysql_data:
+  redis_data:
+  mongo_data:
+  kafka_data:
+
+# 网络定义
+networks:
+  blog-net:
+    driver: bridge

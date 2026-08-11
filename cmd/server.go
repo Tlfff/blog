@@ -112,7 +112,7 @@ var serverCmd = &cobra.Command{
 		tokenAuth := auth.NewTokenAuth(rdb)
 		userAuthService := service.NewUserAuthService(userRepo, tokenAuth)
 		userService := service.NewUserService(userRepo, rdb)
-		userService.SetOSS(ossClient, config.OSS.PublicDomain)
+		userService.SetOSS(ossClient, config.OSS.PublicDomain, config.OSS.AllowedExts)
 		historyService := service.NewArticleViewHistoryService(historyRepo, kafkaClient)
 		artService := service.NewArticleService(artRepo, artLikeService, rdb)
 		artRankService := service.NewArticleRankService(artRepo, rdb)

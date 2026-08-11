@@ -30,6 +30,7 @@ type UserService struct {
 	rdb             *redis.Client
 	oss             *oss.MinioClient
 	ossPublicDomain string
+	allowedExts     map[string]bool // 允许上传的头像扩展名
 }
 
 func NewUserService(repo *repository.UserRepository, rdbs ...*redis.Client) *UserService {
@@ -40,10 +41,14 @@ func NewUserService(repo *repository.UserRepository, rdbs ...*redis.Client) *Use
 	return &UserService{repo: repo, rdb: rdb}
 }
 
-// SetOSS 注入 MinIO 客户端和公开域名
-func (s *UserService) SetOSS(ossClient *oss.MinioClient, publicDomain string) {
+// SetOSS 注入 MinIO 客户端、公开域名和允许的扩展名
+func (s *UserService) SetOSS(ossClient *oss.MinioClient, publicDomain string, allowedExts []string) {
 	s.oss = ossClient
 	s.ossPublicDomain = publicDomain
+	s.allowedExts = make(map[string]bool, len(allowedExts))
+	for _, ext := range allowedExts {
+		s.allowedExts[strings.ToLower(ext)] = true
+	}
 }
 
 // 获取自己主页详情
@@ -247,12 +252,9 @@ func (s *UserService) GetAvatarUploadURL(ctx context.Context, userID uint64, fil
 		return "", "", common.ErrSystem
 	}
 
-	// 校验文件扩展名白名单
-	allowedExts := map[string]bool{
-		"jpg": true, "jpeg": true, "png": true, "webp": true,
-	}
+	// 校验文件扩展名白名单（来自配置）
 	ext := strings.ToLower(strings.TrimPrefix(fileExt, "."))
-	if !allowedExts[ext] {
+	if !s.allowedExts[ext] {
 		return "", "", common.ErrInvalidRequestBody
 	}
 

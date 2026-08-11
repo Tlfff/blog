@@ -59,12 +59,13 @@ type Mongodb struct {
 }
 
 type OSS struct {
-	Endpoint        string `yaml:"endpoint"`
-	AccessKeyID     string `yaml:"access_key_id"`
-	SecretAccessKey string `yaml:"secret_access_key"`
-	Bucket          string `yaml:"bucket"`
-	UseSSL          bool   `yaml:"use_ssl"`
-	PublicDomain    string `yaml:"public_domain"`
+	Endpoint        string   `yaml:"endpoint"`
+	AccessKeyID     string   `yaml:"access_key_id"`
+	SecretAccessKey string   `yaml:"secret_access_key"`
+	Bucket          string   `yaml:"bucket"`
+	UseSSL          bool     `yaml:"use_ssl"`
+	PublicDomain    string   `yaml:"public_domain"`
+	AllowedExts     []string `yaml:"allowed_exts"` // 允许上传的文件扩展名
 }
 
 func LoadConfig(filePath string) (*Config, error) {
