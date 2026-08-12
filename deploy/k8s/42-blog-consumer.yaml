@@ -1,0 +1,46 @@
+# Kafka 消费者：消费 notification 和 view_history 两个 topic，启动命令 kafka-consume
+# 纯后台任务，不需要对外暴露端口，所以没有 Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blog-consumer
+  namespace: lf-blog
+spec:
+  replicas: 1 # 一个消费者副本即可（多个副本会瓜分同一 topic 分区）
+  selector:
+    matchLabels:
+      app: blog-consumer
+  template:
+    metadata:
+      labels:
+        app: blog-consumer # Pod 标签
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: k8s-node1 # 只调度到 k8s-node1
+      imagePullSecrets:
+        - name: tencent-ccr # 私有仓库拉取凭据
+      containers:
+        - name: blog-consumer
+          image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - kafka-consume # 以消费者模式启动（长驻进程，不退出）
+          resources: # 资源配额
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /app/config/config.yaml
+              subPath: config.yaml # 只挂 Secret 里的 config.yaml
+              readOnly: true
+      volumes:
+        - name: config
+          secret:
+            secretName: blog-config # 配置来自 Secret（含 kafka 消费者组等配置）
+            items:
+              - key: config.yaml
+                path: config.yaml

@@ -1,0 +1,99 @@
+# blog-server 集群内 Service（ClusterIP）：Pod 之间通过 blog-server:8080 访问
+apiVersion: v1
+kind: Service
+metadata:
+  name: blog-server
+  namespace: lf-blog
+spec:
+  type: ClusterIP # 默认类型：只在集群内部可达
+  selector:
+    app: blog-server # 选中标签为 app=blog-server 的 Pod
+  ports:
+    - name: http
+      port: 8080 # Service 对外端口
+      targetPort: http # 转发到 Pod 上名为 http 的容器端口
+---
+# blog-server 对外 NodePort：把 8080 暴露到宿主机端口 30080
+# Mac 上通过 http://192.168.252.4:30080 访问（任意节点 IP + 30080 都行）
+apiVersion: v1
+kind: Service
+metadata:
+  name: blog-server-nodeport
+  namespace: lf-blog
+spec:
+  type: NodePort # 在每个节点上开一个固定端口转发进来
+  selector:
+    app: blog-server
+  ports:
+    - name: http
+      port: 8080 # 集群内访问端口
+      targetPort: http
+      nodePort: 30080 # 宿主机端口（30000-32767 范围内自定义）
+---
+# 博客 HTTP 服务（Gin）：启动命令 server，监听 8080
+# 配置通过 Secret 挂载到 /app/config/config.yaml（等价 compose 里覆盖配置文件）
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blog-server
+  namespace: lf-blog
+spec:
+  replicas: 1 # 副本数：无状态服务，正常可以多副本，本地 1 个即可
+  selector:
+    matchLabels:
+      app: blog-server
+  template:
+    metadata:
+      labels:
+        app: blog-server # Pod 标签，Service 通过它路由
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: k8s-node1 # 只调度到 k8s-node1
+      imagePullSecrets:
+        - name: tencent-ccr # 私有仓库拉取凭据
+      containers:
+        - name: blog-server
+          image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0 # 博客应用镜像（三个服务共用）
+          imagePullPolicy: IfNotPresent
+          args:
+            - server # 指定以 HTTP 服务模式启动（镜像 ENTRYPOINT 是 ./blog）
+          ports:
+            - name: http # 给容器端口起名，Service 的 targetPort 引用它
+              containerPort: 8080
+          startupProbe: # 启动探针：应用启动慢（要连 MySQL 等），给足 2 分钟宽限
+            tcpSocket:
+              port: http # 检查 8080 端口能否建立 TCP 连接
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 24 # 24 次 × 5 秒 = 约 2 分钟
+          readinessProbe: # 就绪探针：通过后 Service 才转发流量，避免访问到没起好的实例
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe: # 存活探针：端口不通说明进程挂了，K8s 自动重启
+            tcpSocket:
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources: # 资源配额
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /app/config/config.yaml # 应用固定从这个路径读配置
+              subPath: config.yaml # 只挂 Secret 里的 config.yaml 这一个 key（否则会覆盖整个目录）
+              readOnly: true
+      volumes:
+        - name: config
+          secret:
+            secretName: blog-config # 配置来自 Secret
+            items:
+              - key: config.yaml
+                path: config.yaml
