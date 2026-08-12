@@ -1,34 +1,34 @@
 name: blog
 
-# 生产环境编排：镜像从腾讯云仓库拉取，不在服务器上构建
+# 服务定义
 services:
   # MySQL 服务定义
   mysql:
-    image: mysql:8.0
-    container_name: blog-mysql
-    restart: always
+    image: mysql:8.0    # MySQL 镜像版本，8.0 版本
+    container_name: blog-mysql # 容器名字
+    restart: always # 重启策略，容器异常退出时总是自动重启
     environment:
-      MYSQL_ROOT_PASSWORD: "Tlf0614"            # root 超级管理员密码（生产环境请修改）
+      MYSQL_ROOT_PASSWORD: "Tlf0614"            # root 超级管理员密码
       MYSQL_DATABASE: "blog"                    # 容器启动时自动创建的数据库名
       MYSQL_USER: "bloguser"                    # 额外创建的应用专用用户
-      MYSQL_PASSWORD: "20040614"                # 应用用户的密码（生产环境请修改）
-      TZ: Asia/Shanghai
+      MYSQL_PASSWORD: "20040614"                # 应用用户的密码
+      TZ: Asia/Shanghai                         # 容器时区设置，影响时间函数
     ports:
-      - "3306:3306"
+      - "3306:3306" # 映射端口，外部访问端口：容器端口
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./scripts/mysql:/docker-entrypoint-initdb.d:ro # 仅数据目录为空时执行一次，自动建库建表
+      - mysql_data:/var/lib/mysql # 映射数据卷，将容器内的数据持久化到主机
+      - ./scripts/mysql:/docker-entrypoint-initdb.d:ro # 映射初始化脚本，仅数据目录为空时执行一次，自动建库建表
     command:
-      - "--character-set-server=utf8mb4"
-      - "--collation-server=utf8mb4_unicode_ci"
+      - "--character-set-server=utf8mb4"  # 设置字符集为 utf8mb4
+      - "--collation-server=utf8mb4_unicode_ci"  # 设置排序规则为 utf8mb4_unicode_ci
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
-      interval: 10s
-      timeout: 10s
-      retries: 10
-      start_period: 60s
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"] # 健康检查
+      interval: 10s # 检查间隔，10 秒
+      timeout: 10s   # 检查超时时间，10 秒
+      retries: 10      # 最大重试次数，10 次
+      start_period: 60s # 等待 60 秒，确保mysql初始化完成
     networks:
-      - blog-net
+      - blog-net # 加入自定义网络 blog-net
 
   # Redis 服务定义
   redis:
@@ -38,14 +38,14 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_data:/data  # 映射数据卷，将容器内的数据持久化到主机
     command: redis-server --appendonly yes --aof-use-rdb-preamble yes # 开启混合持久化
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      test: ["CMD", "redis-cli", "ping"] # 检查 Redis 服务是否正常
+      interval: 10s # 检查间隔，10 秒
+      timeout: 10s   # 检查超时时间，10 秒
+      retries: 5       # 最大重试次数，5 次
+      start_period: 30s # 容器启动后等待 30 秒，确保redis初始化完成
     networks:
       - blog-net
 
@@ -54,22 +54,22 @@ services:
     image: mongo:7
     container_name: blog-mongodb
     restart: always
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: "bloguser" # 生产环境请修改
-      MONGO_INITDB_ROOT_PASSWORD: "20040614" # 生产环境请修改
-      MONGO_INITDB_DATABASE: "blog"
-      TZ: Asia/Shanghai
+    environment:  # 环境变量配置
+      MONGO_INITDB_ROOT_USERNAME: "bloguser" # 初始化 MongoDB 的 root 用户名
+      MONGO_INITDB_ROOT_PASSWORD: "20040614" # 初始化 MongoDB 的 root 密码
+      MONGO_INITDB_DATABASE: "blog" # 初始化 MongoDB 的数据库名
+      TZ: Asia/Shanghai # 容器时区设置，影响时间函数
     ports:
       - "27017:27017"
     volumes:
-      - mongo_data:/data/db
-      - ./scripts/mongodb:/docker-entrypoint-initdb.d:ro # 仅数据目录为空时执行一次
+      - mongo_data:/data/db # 映射数据卷，将容器内的数据持久化到主机
+      - ./scripts/mongodb:/docker-entrypoint-initdb.d:ro # 映射初始化脚本，仅数据目录为空时执行一次
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"] # 检查 MongoDB 服务是否正常
+      interval: 10s # 检查间隔，10 秒
+      timeout: 10s   # 检查超时时间，10 秒
+      retries: 5       # 最大重试次数，5 次
+      start_period: 30s # 容器启动后等待 30 秒，确保mongodb初始化完成
     networks:
       - blog-net
 
@@ -80,54 +80,53 @@ services:
     restart: always
     environment:
       # KRaft 模式：节点既是 broker 又是 controller
-      KAFKA_NODE_ID: "1"
-      KAFKA_PROCESS_ROLES: "broker,controller"
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
-      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
-      KAFKA_LISTENERS: "PLAINTEXT://:9092,EXTERNAL://:29092,CONTROLLER://:9093"
-      # 注意：EXTERNAL 对外公布地址，若需从服务器外部用 Kafka 工具连接，把 localhost 改为服务器 IP/域名
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,EXTERNAL://muzimi.xyz:29092"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_NODE_ID: "1"  # 节点 ID，用于 KRaft 协议
+      KAFKA_PROCESS_ROLES: "broker,controller"  # 节点角色，broker 或 controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"  # 控制器选举投票者列表
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"   # controller 监听器名称
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,EXTERNAL://:29092,CONTROLLER://:9093"   # 监听器配置，容器间通信 / 宿主机访问 / controller 内部选举
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,EXTERNAL://43.155.168.116:29092"   # 对外公布的地址，容器间通信 / 宿主机访问
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"  # 监听器安全协议映射，容器间通信 / 宿主机访问 / controller 内部选举，PLAINTEXT 明文
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"  # 自动创建主题，当消费者订阅不存在的主题时，会自动创建该主题
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"  # 消费者进度记录保存几份副本
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"  # 事务状态日志保存几份副本
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"  # 事务状态日志最小 ISR，默认值为 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"  # 消费者启动时，等待多久开始分配任务
       TZ: Asia/Shanghai
     ports:
       - "9092:9092"      # 容器间内部通信
       - "29092:29092"    # 宿主机外部访问（Kafka 工具连接用）
     volumes:
-      - kafka_data:/bitnami/kafka
+      - kafka_data:/bitnami/kafka   # 映射数据卷，将容器内的数据持久化到主机
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      interval: 10s # 检查间隔，10 秒
+      timeout: 10s   # 检查超时时间，10 秒
+      retries: 5       # 最大重试次数，5 次
+      start_period: 30s    # 容器启动后等待 30 秒，确保Kafka初始化完成
     networks:
       - blog-net
 
   # 后端服务（HTTP）
   blog-server:
-    image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0 # 锁定版本，不用 latest
+    image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0 # 用腾讯云仓库的镜像
     container_name: blog-server
     restart: always
-    command: ["server"]
+    command: ["server"] # 启动容器内的命令
     ports:
       - "8080:8080"
     volumes:
-      - ./config/config.docker.yaml:/app/config/config.yaml:ro # 用 docker 专用配置覆盖容器内默认配置
-      - ./pkg/resource:/app/pkg/resource:ro # IP 地理位置数据库（只读挂载，方便更新）
-    depends_on:
+      - ./config/config.docker.yaml:/app/config/config.yaml:ro  # 用 docker 专用配置覆盖容器内默认的 config.yaml
+      - ./pkg/resource:/app/pkg/resource:ro  # IP 地理位置数据库（只读挂载，方便更新）
+    depends_on:   # 依赖的其他服务
       mysql:
-        condition: service_healthy
+        condition: service_healthy    # 等待 MySQL 服务健康
       redis:
-        condition: service_healthy
+        condition: service_healthy    # 等待 Redis 服务健康
       mongodb:
-        condition: service_healthy
+        condition: service_healthy    # 等待 MongoDB 服务健康
       kafka:
-        condition: service_healthy
+        condition: service_healthy    # 等待 Kafka 服务健康
     networks:
       - blog-net
 
@@ -136,16 +135,16 @@ services:
     image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0
     container_name: blog-grpc
     restart: always
-    command: ["grpc"]
+    command: ["grpc"] # 启动容器内的命令
     ports:
       - "9100:9100"
     volumes:
-      - ./config/config.docker.yaml:/app/config/config.yaml:ro
-    depends_on:
+      - ./config/config.docker.yaml:/app/config/config.yaml:ro  # 用 docker 专用配置覆盖容器内默认的 config.yaml
+    depends_on:   # 依赖的其他服务
       mysql:
-        condition: service_healthy
+        condition: service_healthy    # 等待 MySQL 服务健康
       redis:
-        condition: service_healthy
+        condition: service_healthy    # 等待 Redis 服务健康
     networks:
       - blog-net
 
@@ -154,24 +153,24 @@ services:
     image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0
     container_name: blog-consumer
     restart: always
-    command: ["kafka-consume"]
+    command: ["kafka-consume"] # 启动容器内的命令
     volumes:
-      - ./config/config.docker.yaml:/app/config/config.yaml:ro
-    depends_on:
+      - ./config/config.docker.yaml:/app/config/config.yaml:ro  # 用 docker 专用配置覆盖容器内默认的 config.yaml
+    depends_on:   # 依赖的其他服务
       mysql:
-        condition: service_healthy
+        condition: service_healthy    # 等待 MySQL 服务健康
       redis:
-        condition: service_healthy
+        condition: service_healthy    # 等待 Redis 服务健康
       mongodb:
-        condition: service_healthy
+        condition: service_healthy    # 等待 MongoDB 服务健康
       kafka:
-        condition: service_healthy
+        condition: service_healthy    # 等待 Kafka 服务健康
     networks:
       - blog-net
 
-# 数据卷定义
+# 数据卷定义，把容器内部的数据目录，挂载到 Docker 管理的外部存储空间，这样数据就和容器本身分离了
 volumes:
-  mysql_data:
+  mysql_data:   # 创建一个名为 "mysql_data" 的数据卷
   redis_data:
   mongo_data:
   kafka_data:
@@ -179,4 +178,4 @@ volumes:
 # 网络定义
 networks:
   blog-net:
-    driver: bridge
+    driver: bridge  # 桥接网络，容器间通信
