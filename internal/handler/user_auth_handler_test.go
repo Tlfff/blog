@@ -27,7 +27,7 @@ func TestUserAuthHandler_AllRoutes(t *testing.T) {
 
 	// 3.  完美对齐升级后的构造函数
 	userRepo := repository.NewUserRepository(db)
-	userAuthService := service.NewUserAuthService(userRepo)
+	userAuthService := service.NewUserAuthService(userRepo, nil)
 	h := NewUserAuthHandler(userAuthService)
 
 	// 4. 大表格：按“时光流逝”的顺序，先测异常，再测成功注册，最后测登录

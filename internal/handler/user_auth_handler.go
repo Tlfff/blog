@@ -16,7 +16,7 @@ func NewUserAuthHandler(userAuth *service.UserAuthService) *UserAuthHandler {
 	return &UserAuthHandler{userAuth: userAuth}
 }
 
-// Register 处理用户注册请求
+// 处理用户注册请求
 func (h *UserAuthHandler) Register(c *gin.Context) {
 	var req user.RegisterRequest
 	// 1. 解析前端传来的 JSON 请求体
@@ -42,7 +42,7 @@ func (h *UserAuthHandler) Register(c *gin.Context) {
 	common.OK(c, "注册成功", nil)
 }
 
-// Login 处理用户登录请求
+// 处理用户登录请求
 func (h *UserAuthHandler) Login(c *gin.Context) {
 	var req user.LoginRequest
 
@@ -58,7 +58,7 @@ func (h *UserAuthHandler) Login(c *gin.Context) {
 	}
 
 	// 2. 调用登录
-	res, err := h.userAuth.Login(c, req.Phone, req.Nickname, req.Password, c.ClientIP())
+	res, err := h.userAuth.Login(c, req.Phone, req.Nickname, req.Password, c.ClientIP(), req.Device, req.RememberMe)
 	if err != nil {
 		c.Error(err)
 		return

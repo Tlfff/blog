@@ -59,11 +59,11 @@ func TestUserHandler_AllRoutes(t *testing.T) {
 	// 3.  完美对齐升级后的构造函数
 	// 这一步和你的 main.go 逻辑完全一致，利用内存模式原地起飞
 	userRepo := repository.NewUserRepository(db)
-	userService := service.NewUserService(userRepo) // 如果你写的是 NewUserService(userRepo) 就用那个
-	userAuthService := service.NewUserAuthService(userRepo)
+	userService := service.NewUserService(userRepo)
+	userAuthService := service.NewUserAuthService(userRepo, nil)
 
 	// 把真实组装好的服务喂给 Handler
-	h := NewUserHandler(userService)
+	h := NewUserHandler(userService, userAuthService)
 
 	_ = userAuthService.Register(t.Context(), "13800000000", "123456", "测试用户", "120.0.0.1")
 	// 2.  定义大表格

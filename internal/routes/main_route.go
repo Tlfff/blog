@@ -6,6 +6,7 @@ import (
 	"blog/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 // 未来增加新模块，只需在这里加一行，不需要改 InitRoute 的签名
@@ -18,6 +19,7 @@ type AppHandler struct {
 	Notify   *handler.NotificationHandler
 	// 浏览历史服务，路由级中间件使用（不经过 handler）
 	ViewHistory *service.ArticleViewHistoryService
+	Redis       *redis.Client
 }
 
 func InitRoute(r *gin.Engine, appHandler *AppHandler) {
@@ -34,7 +36,7 @@ func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 
 	// 3.需要登录的接口
 	privateGroup := r.Group("/auth")
-	privateGroup.Use(middleware.MustAuth())
+	privateGroup.Use(middleware.MustAuth(appHandler.Redis))
 	{
 		InitUserPrivateRoutes(privateGroup, appHandler.User)
 		InitCommentPrivateRoutes(privateGroup, appHandler.Comment)
@@ -47,7 +49,7 @@ func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 	}
 	// 4.管理员管理的接口
 	authGroup := r.Group("/admin")
-	authGroup.Use(middleware.MustAuth(), middleware.AdminCheckMiddleware())
+	authGroup.Use(middleware.MustAuth(appHandler.Redis), middleware.AdminCheckMiddleware())
 	{
 		InitArticlePrivateRoutes(authGroup, appHandler.Article)
 		InitCommentAdminRoutes(authGroup, appHandler.Comment)
@@ -55,7 +57,7 @@ func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 
 	// 5.登录和不登录功能有区别的接口
 	optionalGroup := r.Group("/optional")
-	optionalGroup.Use(middleware.OptionalAuth())
+	optionalGroup.Use(middleware.OptionalAuth(appHandler.Redis))
 	{
 		InitArticleOptionalRoutes(optionalGroup, appHandler.Article, appHandler.ViewHistory)
 	}

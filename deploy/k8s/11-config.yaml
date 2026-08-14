@@ -1,0 +1,157 @@
+# 数据库初始化脚本：MySQL 建库建表 + MongoDB 建集合
+# ConfigMap 与 Secret 区别：ConfigMap 存非机密配置（这里是 SQL/JS 脚本），挂载为只读文件
+# MySQL 镜像首次启动（数据目录为空）会按文件名顺序执行 /docker-entrypoint-initdb.d 下所有 .sql
+# 所以这里用数字前缀 00/10/20... 控制执行顺序（有依赖的表必须排后面）
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: database-init
+  namespace: lf-blog
+data:
+  # ---- 以下 MySQL 脚本挂载进 mysql-0 的 /docker-entrypoint-initdb.d ----
+  00-database_blog.sql: | # 先建库（不建库后面 USE blog 会失败）
+    CREATE DATABASE IF NOT EXISTS blog
+    DEFAULT CHARACTER SET utf8mb4
+    DEFAULT COLLATE utf8mb4_general_ci
+  10-users.sql: | # 用户表
+    USE blog;
+
+    CREATE TABLE IF NOT EXISTS users(
+        id              BIGINT UNSIGNED     NOT NULL    AUTO_INCREMENT              COMMENT '用户ID',
+        nickname        VARCHAR(50)         NOT NULL                                COMMENT '用户名',
+        phone           VARCHAR(50)         NOT NULL                                COMMENT '手机号',
+        password        VARCHAR(255)        NOT NULL                                COMMENT '加密后密码:算法$迭代次数$Salt$Hash',
+        avatar          VARCHAR(255)                                                COMMENT '头像URL地址',
+        role            TINYINT             NOT NULL    DEFAULT 1                   COMMENT '用户角色:1-普通用户,2-管理员',
+        created_time    DATETIME            NOT NULL    DEFAULT CURRENT_TIMESTAMP   COMMENT '创建时间',
+        updated_time    DATETIME            NOT NULL    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+        status          TINYINT             NOT NULL                                COMMENT '用户状态:0-删除,1-正常',
+        last_login_ip   VARCHAR(50)         NOT NULL    DEFAULT ''                  COMMENT '最后登录IP',
+        last_login_time DATETIME            NOT NULL    DEFAULT CURRENT_TIMESTAMP   COMMENT '最后登录时间',
+        PRIMARY KEY (id),
+        -- 唯一索引：电话号码
+        UNIQUE KEY uni_phone (phone),
+        -- 唯一索引：昵称
+        UNIQUE KEY uni_nickname (nickname),
+        KEY idx_created_time (created_time),
+        KEY idx_updated_time (updated_time)
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '用户表'
+  20-articles.sql: | # 文章表
+    USE blog;
+
+    CREATE TABLE IF NOT EXISTS articles(
+        id                 BIGINT UNSIGNED          NOT NULL    AUTO_INCREMENT              COMMENT '文章ID',
+        author_id          BIGINT UNSIGNED          NOT NULL                                COMMENT '作者ID',
+        title              VARCHAR(255)             NOT NULL                                COMMENT '文章标题',
+        content            TEXT                     NOT NULL                                COMMENT '文章正文(支持Markdown)',
+        tags               VARCHAR(255)             NOT NULL                                COMMENT '文章标签',
+        view_count         INT UNSIGNED             NOT NULL    DEFAULT 0                   COMMENT '浏览量',
+        like_count         INT UNSIGNED             NOT NULL    DEFAULT 0                   COMMENT '点赞数',
+        comment_count      INT UNSIGNED             NOT NULL    DEFAULT 0                   COMMENT '评论数',
+        status             TINYINT                  NOT NULL    DEFAULT 2                   COMMENT '文章状态:0-已删除,1-草稿,2-已发表',
+        created_time       DATETIME                 NOT NULL    DEFAULT CURRENT_TIMESTAMP   COMMENT '创建时间',
+        updated_time       DATETIME                 NOT NULL    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+        PRIMARY KEY (id),
+        KEY idx_created_time (created_time),
+        KEY idx_updated_time (updated_time)
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '文章表'
+  30-comments.sql: | # 评论表
+    USE blog;
+
+    CREATE TABLE IF NOT EXISTS `comments` (
+        id                      BIGINT UNSIGNED     NOT NULL    AUTO_INCREMENT              COMMENT '评论ID',
+        article_id              BIGINT UNSIGNED     NOT NULL                                COMMENT '对应的文章ID',
+        user_id                 BIGINT UNSIGNED     NOT NULL                                COMMENT '用户ID',
+        reply_to_user_id        BIGINT UNSIGNED     NOT NULL    DEFAULT   0                 COMMENT '回复的用户ID',
+        content                 TEXT                NOT NULL                                COMMENT '评论内容',
+        root_id                 BIGINT UNSIGNED     NOT NULL    DEFAULT   0                 COMMENT '对应的主评论ID',
+        ip                      VARCHAR(50)         NOT NULL    DEFAULT ''                  COMMENT '评论IP地址',
+        like_count              BIGINT              NOT NULL    DEFAULT   0                 COMMENT '点赞数量',
+        comment_count           BIGINT              NOT NULL    DEFAULT   0                 COMMENT '子评论数量',
+        created_time            DATETIME            NOT NULL    DEFAULT CURRENT_TIMESTAMP   COMMENT '创建时间',
+        updated_time            DATETIME            NOT NULL    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+        status                  TINYINT             NOT NULL    DEFAULT   1                 COMMENT '评论状态:0-删除,1-正常',
+        PRIMARY KEY (id),
+        KEY `idx_articleid_rootid_status` (`article_id`,`root_id`,`status`),
+        KEY `idx_rootid_status`(`root_id`,`status`),
+        KEY idx_created_time (created_time),
+        KEY idx_updated_time (updated_time)
+        
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '评论表'
+  40-article_likes.sql: | # 文章点赞表
+    USE blog;
+
+    CREATE TABLE IF NOT EXISTS article_likes(
+        id                 BIGINT UNSIGNED          NOT NULL    AUTO_INCREMENT              COMMENT 'ID',
+        user_id            BIGINT UNSIGNED          NOT NULL                                COMMENT '用户ID',
+        article_id         BIGINT UNSIGNED          NOT NULL                                COMMENT '文章ID',
+        status             TINYINT                  NOT NULL    DEFAULT 1                   COMMENT '状态:2-未点赞,1-点赞',
+        created_time       DATETIME                 NOT NULL    DEFAULT CURRENT_TIMESTAMP   COMMENT '创建时间',
+        updated_time       DATETIME                 NOT NULL    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+        PRIMARY KEY (id),
+        UNIQUE KEY uni_userid_articleid (user_id, article_id),
+        
+        KEY idx_created_time (created_time),
+        KEY idx_updated_time (updated_time)
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '文章点赞表'
+  50-comment_likes.sql: | # 评论点赞表
+    USE blog;
+
+    CREATE TABLE IF NOT EXISTS comment_likes(
+        id                 BIGINT UNSIGNED          NOT NULL    AUTO_INCREMENT              COMMENT 'ID',
+        user_id            BIGINT UNSIGNED          NOT NULL                                COMMENT '用户ID',
+        comment_id         BIGINT UNSIGNED          NOT NULL                                COMMENT '评论ID',
+        status             TINYINT                  NOT NULL    DEFAULT 1                   COMMENT '状态:2-未点赞,1-点赞',
+        created_time       DATETIME                 NOT NULL    DEFAULT CURRENT_TIMESTAMP   COMMENT '创建时间',
+        updated_time       DATETIME                 NOT NULL    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+        PRIMARY KEY (id),
+        UNIQUE KEY uni_userid_articleid (user_id, comment_id),
+
+        KEY idx_created_time (created_time),
+        KEY idx_updated_time (updated_time)
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '评论点赞表'
+  60-article_view_histories.sql: | # 浏览历史表
+    USE blog;
+
+    CREATE TABLE IF NOT EXISTS article_view_histories(
+        id                 BIGINT UNSIGNED          NOT NULL    AUTO_INCREMENT              COMMENT '浏览历史ID',
+        user_id            BIGINT UNSIGNED          NOT NULL                                COMMENT '用户ID',
+        article_id         BIGINT UNSIGNED          NOT NULL                                COMMENT '文章ID',
+        created_time       DATETIME                 NOT NULL    DEFAULT CURRENT_TIMESTAMP   COMMENT '创建时间',
+        updated_time       DATETIME                 NOT NULL    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+        PRIMARY KEY (id),
+        KEY idx_userid_createdtime (user_id,created_time)
+        -- KEY idx_updated_time (updated_time)
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '浏览历史表'
+  # ---- 以下 MongoDB 脚本挂载进 mongodb-0 的 /docker-entrypoint-initdb.d ----
+  notification.js: | # 创建 notifications 集合和索引（MongoDB 初始化脚本用 .js 文件）
+    // 1. 切换到指定的数据库
+    db = db.getSiblingDB('blog');
+
+    // 2. 显式创建通知集合（类似于 CREATE TABLE）
+    db.createCollection('notifications');
+
+    // 3. 创建索引
+
+    // 3.1 加速通知列表查询
+    db.notifications.createIndex(
+        { "receiver_id": 1,  "created_time": -1 },//1 表示正序排序，-1表示倒序排序
+        { name: "idx_receiverid_createdtime" }
+    );
+    // 3.1 加速未读信息修改
+    db.notifications.createIndex(
+        { "receiver_id": 1,  "is_read": 1 },// 排列顺序为 false -> true，因为权重false < true
+        { name: "idx_receiverid_isread" }
+    );
+
+
+    // // 4. 为通知集合创建 TTL（自动过期）索引：30天（2592000秒）后文档自动删除
+    // db.notifications.createIndex(
+    //     { "created_time": 1 },
+    //     { 
+    //         name: "idx_notification_ttl",
+    //         expireAfterSeconds: 2592000 
+    //     }
+    // );
+
+    print(" MongoDB notifications 集合和索引初始化成功 !");

@@ -1,0 +1,135 @@
+# MySQL：headless Service（clusterIP: None），只负责给应用提供稳定的 DNS 名字 mysql:3306
+# headless 意为不分配 ClusterIP，直接解析到 Pod IP；单副本下 DNS 就是 mysql.namespace.svc
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: lf-blog
+spec:
+  clusterIP: None # headless 模式，应用通过名字 mysql 访问
+  selector:
+    app: mysql # 选中标签为 app=mysql 的 Pod
+  ports:
+    - name: mysql
+      port: 3306 # Service 对外端口，应用连接的就是这个
+      targetPort: mysql # 转发到 Pod 上名为 mysql 的容器端口（即 3306）
+---
+# MySQL 单副本 StatefulSet：有状态服务用 StatefulSet，Pod 名固定为 mysql-0，数据用 PVC 持久化
+# 镜像启动时会自动执行 /docker-entrypoint-initdb.d 下的 SQL（仅数据目录为空时执行一次）
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: lf-blog
+spec:
+  serviceName: mysql # 关联上面 headless Service，StatefulSet 的稳定网络标识
+  replicas: 1 # 单副本，本地学习环境不搞主从
+  selector:
+    matchLabels:
+      app: mysql # 管理哪些 Pod（必须与 template 的 labels 一致）
+  template:
+    metadata:
+      labels:
+        app: mysql # Pod 标签，Service 通过它找到本 Pod
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: k8s-node1 # 只调度到 k8s-node1（hostPath 数据卷只在该节点）
+      imagePullSecrets:
+        - name: tencent-ccr # 私有仓库拉取凭据（腾讯云 CCR 登录信息）
+      containers:
+        - name: mysql
+          image: ccr.ccs.tencentyun.com/lf-blog/mysql:8.0 # 镜像地址：同步到腾讯云仓库的 MySQL 8.0
+          imagePullPolicy: IfNotPresent # 本地已存在该镜像就不重复拉取
+          args: # 等价于 docker-compose 里的 command，MySQL 服务端启动参数
+            - --character-set-server=utf8mb4 # 设置字符集为 utf8mb4
+            - --collation-server=utf8mb4_unicode_ci # 设置排序规则为 utf8mb4_unicode_ci
+          env:
+            # 密码等敏感信息不写死在 YAML，从 Secret 读取（kubectl 创建 Secret 时注入）
+            - name: MYSQL_ROOT_PASSWORD # root 超级管理员密码
+              valueFrom:
+                secretKeyRef:
+                  name: infra-secrets # 引用的 Secret 名称
+                  key: mysql-root-password # 读取其中的 mysql-root-password 字段
+            - name: MYSQL_DATABASE # 容器启动时自动创建的数据库名
+              valueFrom:
+                secretKeyRef:
+                  name: infra-secrets
+                  key: mysql-database
+            - name: MYSQL_USER # 额外创建的应用专用用户（不用 root 连库）
+              valueFrom:
+                secretKeyRef:
+                  name: infra-secrets
+                  key: mysql-username
+            - name: MYSQL_PASSWORD # 应用用户的密码
+              valueFrom:
+                secretKeyRef:
+                  name: infra-secrets
+                  key: mysql-password
+            - name: TZ # 容器时区，影响时间函数
+              value: Asia/Shanghai
+          ports:
+            - name: mysql # 给容器端口起名，Service 的 targetPort 引用它
+              containerPort: 3306
+          startupProbe: # 启动探针：MySQL 首次启动较慢（要初始化数据），探针先等它就绪再执行其他检查
+            exec:
+              command:
+                - sh
+                - -ec
+                - mysqladmin ping -h 127.0.0.1 -u root -p"$MYSQL_ROOT_PASSWORD" --silent # 用 root 密码 ping，能通说明可接受连接
+            periodSeconds: 10 # 每 10 秒检查一次
+            timeoutSeconds: 5 # 单次检查超时 5 秒
+            failureThreshold: 18 # 连续失败 18 次（约 3 分钟）才判定启动失败
+          readinessProbe: # 就绪探针：通过后流量才会转发到本 Pod
+            exec:
+              command:
+                - sh
+                - -ec
+                - mysqladmin ping -h 127.0.0.1 -u root -p"$MYSQL_ROOT_PASSWORD" --silent
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe: # 存活探针：连续失败会把容器杀掉重启
+            exec:
+              command:
+                - sh
+                - -ec
+                - mysqladmin ping -h 127.0.0.1 -u root -p"$MYSQL_ROOT_PASSWORD" --silent
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources: # 资源配额，防止单个容器挤占整台 node 的内存
+            requests: # 请求值：调度时保证至少给这么多
+              cpu: 250m # 0.25 核
+              memory: 512Mi
+            limits: # 上限：最多用这么多，超过会被杀掉
+              cpu: "1"
+              memory: 1536Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql # MySQL 数据目录，挂到 PVC 实现持久化
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d # 初始化脚本目录，等价于 compose 的挂载
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mysql-data # 绑定下面 20-storage.yaml 定义的 PVC
+        - name: init
+          configMap:
+            name: database-init # 初始化 SQL 来自 ConfigMap
+            items:
+              # 只取其中这 7 个 key，并以相同名字落盘，保证 MySQL 按文件名顺序执行
+              - key: 00-database_blog.sql
+                path: 00-database_blog.sql
+              - key: 10-users.sql
+                path: 10-users.sql
+              - key: 20-articles.sql
+                path: 20-articles.sql
+              - key: 30-comments.sql
+                path: 30-comments.sql
+              - key: 40-article_likes.sql
+                path: 40-article_likes.sql
+              - key: 50-comment_likes.sql
+                path: 50-comment_likes.sql
+              - key: 60-article_view_histories.sql
+                path: 60-article_view_histories.sql
