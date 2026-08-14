@@ -50,6 +50,7 @@ var grpcCmd = &cobra.Command{
 		commentRepo := repository.NewCommentRepository(db)
 
 		// 6. 初始化service
+		// gRPC 二方服务用不到 OSS 功能，不注入 OSS
 		userService := service.NewUserService(userRepo)
 		commentService := service.NewCommentService(commentRepo, artRepo, rdb)
 		// 二方服务用不到文章点赞逻辑，artLikeService 传 nil

@@ -53,3 +53,8 @@ type GetAdminListRequest struct {
 type RecoverArticleRequest struct {
 	ID uint64 `json:"id" binding:"required,min=0"`
 }
+
+// 获取文章图片上传凭证
+type GetImageUploadURLRequest struct {
+	FileExt string `json:"file_ext" binding:"required"`
+}

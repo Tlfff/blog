@@ -33,6 +33,8 @@ type UserService struct {
 	allowedExts     map[string]bool // 允许上传的头像扩展名
 }
 
+// NewUserService 构造函数；rdb 为可选依赖（可变参数），
+// 某些调用场景（gRPC 服务、单元测试）用不到密码修改凭证等 Redis 功能，可不传
 func NewUserService(repo *repository.UserRepository, rdbs ...*redis.Client) *UserService {
 	var rdb *redis.Client
 	if len(rdbs) > 0 {
@@ -42,6 +44,7 @@ func NewUserService(repo *repository.UserRepository, rdbs ...*redis.Client) *Use
 }
 
 // SetOSS 注入 MinIO 客户端、公开域名和允许的扩展名
+// OSS 为可选依赖：gRPC 等二方服务用不到 OSS 功能，无需注入（相关接口会返回系统异常）
 func (s *UserService) SetOSS(ossClient *oss.MinioClient, publicDomain string, allowedExts []string) {
 	s.oss = ossClient
 	s.ossPublicDomain = publicDomain

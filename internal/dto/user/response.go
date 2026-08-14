@@ -15,6 +15,7 @@ type MyProfileResponse struct {
 	ID            uint64 `json:"id"`
 	Nickname      string `json:"nickname"`        //昵称
 	Avatar        string `json:"avatar"`          //头像
+	Role          int8   `json:"role"`            //角色
 	LastLoginTime int64  `json:"last_login_time"` //最后登录时间
 	LastLoginIp   string `json:"last_login_ip"`   //最后登录ip
 }
@@ -25,6 +26,7 @@ func NewMyProfileResponse(user *model.User) *MyProfileResponse {
 		ID:            user.ID,
 		Nickname:      user.Nickname,
 		Avatar:        user.Avatar,
+		Role:          user.Role,
 		LastLoginTime: user.LastLoginTime.Unix(),
 		LastLoginIp:   ip.ConvertIPToRegion(user.LastLoginIp),
 	}

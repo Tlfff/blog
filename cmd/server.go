@@ -115,8 +115,10 @@ var serverCmd = &cobra.Command{
 		userService.SetOSS(ossClient, config.OSS.PublicDomain, config.OSS.AllowedExts)
 		historyService := service.NewArticleViewHistoryService(historyRepo, kafkaClient)
 		artService := service.NewArticleService(artRepo, artLikeService, rdb)
+		artService.SetOSS(ossClient, config.OSS.PublicDomain)
 		artRankService := service.NewArticleRankService(artRepo, rdb)
 		commentService := service.NewCommentService(commentRepo, artRepo, rdb)
+		articleImageService := service.NewArticleImageService(ossClient, config.OSS.PublicDomain, config.OSS.AllowedExts)
 
 		// 初始化排行榜
 		initCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -128,7 +130,7 @@ var serverCmd = &cobra.Command{
 		// 4.3 初始化handler
 		userAuthHandler := handler.NewUserAuthHandler(userAuthService)
 		userHandler := handler.NewUserHandler(userService, userAuthService)
-		articleHandler := handler.NewArticleHandler(artService, artRankService)
+		articleHandler := handler.NewArticleHandler(artService, artRankService, articleImageService)
 		commentHandler := handler.NewCommentHandler(commentService)
 		likeHandler := handler.NewLikeHandler(artLikeService, comLikeService)
 		ntfHandler := handler.NewNotificationHandler(ntfService)

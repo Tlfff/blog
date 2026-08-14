@@ -14,13 +14,37 @@ import (
 type ArticleHandler struct {
 	article     *service.ArticleService
 	articleRank *service.ArticleRankService
+	image       *service.ArticleImageService
 }
 
-func NewArticleHandler(article *service.ArticleService, articleRank *service.ArticleRankService) *ArticleHandler {
+func NewArticleHandler(article *service.ArticleService, articleRank *service.ArticleRankService, image *service.ArticleImageService) *ArticleHandler {
 	return &ArticleHandler{
 		article:     article,
 		articleRank: articleRank,
+		image:       image,
 	}
+}
+
+// 获取文章图片上传凭证
+func (h *ArticleHandler) GetImageUploadURL(c *gin.Context) {
+	// 1. 解析请求体并放进req
+	var req arcticleDto.GetImageUploadURLRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(common.ErrInvalidRequestBody)
+		return
+	}
+	// 2. 获取凭证
+	uploadURL, objectKey, url, err := h.image.GetUploadURL(c, req.FileExt)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	// 3. 返回凭证
+	common.OK(c, "获取成功", gin.H{
+		"upload_url": uploadURL,
+		"object_key": objectKey,
+		"url":        url,
+	})
 }
 
 // 创建文章

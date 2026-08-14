@@ -45,4 +45,6 @@ func InitArticlePrivateRoutes(r *gin.RouterGroup, articleHandler *handler.Articl
 	r.POST("/article/trash/recover", articleHandler.RecoverArticle)
 	// 硬删除文章
 	r.POST("/article/trash/clear", articleHandler.ClearArticle)
+	// 获取文章图片上传凭证
+	r.POST("/article/image/upload-url", articleHandler.GetImageUploadURL)
 }

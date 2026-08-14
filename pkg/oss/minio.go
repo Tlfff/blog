@@ -39,6 +39,21 @@ func (m *MinioClient) DeleteObject(ctx context.Context, objectKey string) error 
 	return m.client.RemoveObject(ctx, m.bucket, objectKey, minio.RemoveObjectOptions{})
 }
 
+// 移动对象（同一 bucket 内）：先 Copy 到目标，成功后再删除源，避免拷贝失败丢数据
+func (m *MinioClient) MoveObject(ctx context.Context, srcKey, dstKey string) error {
+	_, err := m.client.CopyObject(ctx, minio.CopyDestOptions{
+		Bucket: m.bucket,
+		Object: dstKey,
+	}, minio.CopySrcOptions{
+		Bucket: m.bucket,
+		Object: srcKey,
+	})
+	if err != nil {
+		return fmt.Errorf("图片移动失败(%s -> %s): %w", srcKey, dstKey, err)
+	}
+	return m.client.RemoveObject(ctx, m.bucket, srcKey, minio.RemoveObjectOptions{})
+}
+
 // 获取对象完整 URL
 func (m *MinioClient) GetObjectURL(publicDomain, objectKey string) string {
 	return publicDomain + "/" + objectKey
