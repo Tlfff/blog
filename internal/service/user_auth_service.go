@@ -15,11 +15,12 @@ import (
 )
 
 type UserAuthService struct {
-	repo *repository.UserRepository
+	repo      *repository.UserRepository
+	tokenAuth *auth.TokenAuth
 }
 
-func NewUserAuthService(repo *repository.UserRepository) *UserAuthService {
-	return &UserAuthService{repo: repo}
+func NewUserAuthService(repo *repository.UserRepository, tokenAuth *auth.TokenAuth) *UserAuthService {
+	return &UserAuthService{repo: repo, tokenAuth: tokenAuth}
 }
 
 // 注册新用户
@@ -56,7 +57,7 @@ func (s *UserAuthService) Register(ctx context.Context, phone, password, nicknam
 }
 
 // 登录验证
-func (s *UserAuthService) Login(ctx context.Context, phone, nickname, password, clientIP string) (*user.LoginResponse, error) {
+func (s *UserAuthService) Login(ctx context.Context, phone, nickname, password, clientIP, device string, rememberMe bool) (*user.LoginResponse, error) {
 
 	// 1. 查找用户
 	dbUser, err := s.repo.GetUserByAccount(ctx, phone, nickname)
@@ -83,14 +84,13 @@ func (s *UserAuthService) Login(ctx context.Context, phone, nickname, password, 
 	dbUser.LastLoginTime = time.Now()
 	dbUser.UpdatedTime = time.Now()
 	if err := s.repo.UpdateUser(ctx, dbUser); err != nil {
-		// 登录中，更新 IP 失败通常不阻断登录，这里选择仅记录日志或非核心报错处理
 		log.Printf("更新用户登录信息失败: %v", err)
 	}
 
-	// 4. 生成 JWT 令牌
-	token, err := auth.GenerateToken(dbUser.Phone, dbUser.Role, dbUser.ID)
+	// 4. 创建 Redis token 会话
+	token, err := s.tokenAuth.CreateSession(ctx, dbUser.ID, dbUser.Role, clientIP, device, rememberMe)
 	if err != nil {
-		log.Printf("生成 Token 失败: %v", err)
+		log.Printf("创建登录会话失败: %v", err)
 		return nil, common.ErrSystem
 	}
 
@@ -98,4 +98,9 @@ func (s *UserAuthService) Login(ctx context.Context, phone, nickname, password, 
 	return &user.LoginResponse{
 		AccessToken: token,
 	}, nil
+}
+
+// 登出
+func (s *UserAuthService) Logout(ctx context.Context, token string) error {
+	return s.tokenAuth.DeleteSession(ctx, token)
 }

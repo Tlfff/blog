@@ -1,0 +1,98 @@
+# blog-grpc 集群内 Service（ClusterIP）：集群内部通过 blog-grpc:9100 访问
+apiVersion: v1
+kind: Service
+metadata:
+  name: blog-grpc
+  namespace: lf-blog
+spec:
+  type: ClusterIP # 只在集群内部可达
+  selector:
+    app: blog-grpc # 选中标签为 app=blog-grpc 的 Pod
+  ports:
+    - name: grpc
+      port: 9100 # Service 对外端口
+      targetPort: grpc # 转发到 Pod 上名为 grpc 的容器端口
+---
+# blog-grpc 对外 NodePort：把 gRPC 9100 暴露到宿主机端口 30100
+# 外部工具通过 192.168.252.4:30100 连接
+apiVersion: v1
+kind: Service
+metadata:
+  name: blog-grpc-nodeport
+  namespace: lf-blog
+spec:
+  type: NodePort
+  selector:
+    app: blog-grpc
+  ports:
+    - name: grpc
+      port: 9100
+      targetPort: grpc
+      nodePort: 30100 # 宿主机端口
+---
+# 博客 gRPC 服务（二方/三方对外）：启动命令 grpc，监听 9100
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blog-grpc
+  namespace: lf-blog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blog-grpc
+  template:
+    metadata:
+      labels:
+        app: blog-grpc # Pod 标签
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: k8s-node1 # 只调度到 k8s-node1
+      imagePullSecrets:
+        - name: tencent-ccr # 私有仓库拉取凭据
+      containers:
+        - name: blog-grpc
+          image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - grpc # 以 gRPC 服务模式启动
+          ports:
+            - name: grpc
+              containerPort: 9100
+          startupProbe: # 启动探针
+            tcpSocket:
+              port: grpc
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 24
+          readinessProbe: # 就绪探针
+            tcpSocket:
+              port: grpc
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe: # 存活探针
+            tcpSocket:
+              port: grpc
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources: # 资源配额
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /app/config/config.yaml
+              subPath: config.yaml # 只挂 Secret 里的 config.yaml
+              readOnly: true
+      volumes:
+        - name: config
+          secret:
+            secretName: blog-config # 配置来自 Secret
+            items:
+              - key: config.yaml
+                path: config.yaml

@@ -1,0 +1,5 @@
+# 博客系统专属命名空间：所有博客相关资源都放在这里，与 kube-system 等系统命名空间隔离
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lf-blog # 命名空间名称，后续 kubectl 命令都要带 -n lf-blog

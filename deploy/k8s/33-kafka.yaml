@@ -1,0 +1,142 @@
+# Kafka：headless Service，提供两个内部端口：9092 broker 通信、9093 controller 选举
+# publishNotReadyAddresses: Pod 还没就绪也先把地址发布出去——KRaft 单节点要自己能解析自己才能起来
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: lf-blog
+spec:
+  clusterIP: None # headless 模式，应用通过名字 kafka:9092 访问
+  publishNotReadyAddresses: true # 未 Ready 的 Pod 也参与 DNS 解析（自举需要）
+  selector:
+    app: kafka # 选中标签为 app=kafka 的 Pod
+  ports:
+    - name: broker # broker 端口：客户端（应用）和生产消费流量
+      port: 9092
+      targetPort: broker
+    - name: controller # controller 端口：KRaft 内部选举/元数据（集群内，不对外）
+      port: 9093
+      targetPort: controller
+---
+# Kafka 单副本 StatefulSet：KRaft 模式，单节点同时扮演 broker + controller
+# 关键：官方镜像以 UID 1000 运行，但 hostPath 数据目录属 root，所以加 initContainer 先改所有权
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: lf-blog
+spec:
+  serviceName: kafka # 关联上面的 headless Service，Pod 完整域名是 kafka-0.kafka.namespace.svc
+  replicas: 1 # 单副本（KRaft 单节点，副本因子全为 1）
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka # Pod 标签
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: k8s-node1 # 只调度到 k8s-node1
+      imagePullSecrets:
+        - name: tencent-ccr # 私有仓库拉取凭据
+      initContainers:
+        # 修复 hostPath 目录权限：官方 kafka 镜像用 UID 1000 跑，目录属 root 会 AccessDenied
+        # 这个容器只在主容器启动前执行一次，改完数据目录所有权后退出
+        - name: init-kafka-data
+          image: ccr.ccs.tencentyun.com/lf-blog/kafka:4.0.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -ec
+            - chown -R 1000:1000 /var/lib/kafka/data # 把数据目录交给 UID 1000（appuser）
+          securityContext:
+            runAsUser: 0 # 以 root 身份执行 chown（普通用户没权限改别人目录）
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+      containers:
+        - name: kafka
+          image: ccr.ccs.tencentyun.com/lf-blog/kafka:4.0.0 # 同步到腾讯云仓库的 Apache Kafka 镜像
+          imagePullPolicy: IfNotPresent
+          env:
+            # ---- KRaft 模式配置：节点既是 broker 又是 controller ----
+            - name: CLUSTER_ID
+              value: MkU3OEVBNTcwNTJENDM2Qk # 固定集群 ID，相当于集群身份证，重建必须一致
+            - name: KAFKA_NODE_ID
+              value: "1" # 节点 ID，用于 KRaft 协议
+            - name: KAFKA_PROCESS_ROLES
+              value: broker,controller # 节点角色：同时承担 broker 和 controller
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: 1@kafka-0.kafka:9093 # 控制器选举投票者列表（节点ID@域名:端口）
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: CONTROLLER # controller 监听器名称
+            - name: KAFKA_LISTENERS
+              value: PLAINTEXT://:9092,CONTROLLER://:9093 # 监听器配置：broker 9092 / controller 9093
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: PLAINTEXT://kafka:9092 # 对外公布的地址：集群内统一用 Service 名 kafka
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT # 监听器安全协议映射，全部明文
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: PLAINTEXT # broker 间通信用 PLAINTEXT 监听器
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "true" # 自动创建主题：消费者订阅不存在的主题时自动创建
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1" # 消费者进度记录保存几份副本
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "1" # 事务状态日志保存几份副本
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "1" # 事务状态日志最小 ISR
+            - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+              value: "0" # 消费者启动时等待多久开始分配任务
+            - name: KAFKA_LOG_DIRS
+              value: /var/lib/kafka/data # 数据目录：必须指向 PVC 挂载点，否则数据不持久
+            - name: TZ
+              value: Asia/Shanghai
+          ports:
+            - name: broker
+              containerPort: 9092
+            - name: controller
+              containerPort: 9093
+          startupProbe: # 启动探针：等 broker 能接受请求
+            exec:
+              command:
+                # 用 Kafka 自带工具查 broker 版本列表，能连上 localhost:9092 说明 broker 已起
+                - /opt/kafka/bin/kafka-broker-api-versions.sh
+                - --bootstrap-server
+                - localhost:9092
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 18 # 首次启动初始化较慢，给足 3 分钟
+          readinessProbe: # 就绪探针
+            exec:
+              command:
+                - /opt/kafka/bin/kafka-broker-api-versions.sh
+                - --bootstrap-server
+                - localhost:9092
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 3
+          livenessProbe: # 存活探针
+            exec:
+              command:
+                - /opt/kafka/bin/kafka-broker-api-versions.sh
+                - --bootstrap-server
+                - localhost:9092
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources: # 资源配额（JVM 应用，内存上限给足 2Gi）
+            requests:
+              cpu: 500m
+              memory: 768Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data # Kafka 数据目录，挂到 PVC 持久化
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: kafka-data # 绑定 20-storage.yaml 定义的 PVC

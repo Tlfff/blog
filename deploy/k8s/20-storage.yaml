@@ -1,0 +1,163 @@
+# ============================================================
+# 静态存储：PV + PVC 成对定义（裸 kubeadm 没有默认 StorageClass，所以手动绑定）
+# PV 是集群级资源（不属于任何 namespace），PVC 在 lf-blog 命名空间里请求容量
+# 这里用 hostPath 直接落在 k8s-node1 磁盘上，仅适合单节点学习环境
+# ============================================================
+
+# ---- MySQL 数据卷 ----
+# PV：真正提供存储的一方。hostPath 指向宿主机 /var/lib/lf-blog/mysql
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: lf-blog-mysql-pv
+spec:
+  capacity:
+    storage: 5Gi # 声明容量
+  accessModes:
+    - ReadWriteOnce # 单节点读写（hostPath 只能单节点挂载）
+  persistentVolumeReclaimPolicy: Retain # 删除 PVC 后 PV 数据保留，防止误删数据
+  storageClassName: manual # 手动管理存储类，PVC 要写相同名字才能匹配
+  volumeMode: Filesystem # 以文件系统方式使用
+  hostPath: # 直接使用宿主机目录
+    path: /var/lib/lf-blog/mysql # 数据实际存放位置
+    type: DirectoryOrCreate # 目录不存在就自动创建
+  nodeAffinity: # 节点亲和：只能被 k8s-node1 使用（hostPath 数据只存在这一台机器上）
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - k8s-node1
+---
+# PVC：Pod 向集群申请存储的凭证。指定 volumeName 直接绑定上面的 PV
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-data
+  namespace: lf-blog
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual # 与 PV 的 storageClassName 一致才能匹配
+  volumeName: lf-blog-mysql-pv # 直接指定绑定的 PV 名字
+  resources:
+    requests:
+      storage: 5Gi
+---
+# ---- Redis 数据卷 ----
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: lf-blog-redis-pv
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  volumeMode: Filesystem
+  hostPath:
+    path: /var/lib/lf-blog/redis
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - k8s-node1
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data
+  namespace: lf-blog
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  volumeName: lf-blog-redis-pv
+  resources:
+    requests:
+      storage: 2Gi
+---
+# ---- MongoDB 数据卷 ----
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: lf-blog-mongodb-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  volumeMode: Filesystem
+  hostPath:
+    path: /var/lib/lf-blog/mongodb
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - k8s-node1
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-data
+  namespace: lf-blog
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  volumeName: lf-blog-mongodb-pv
+  resources:
+    requests:
+      storage: 5Gi
+---
+# ---- Kafka 数据卷 ----
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: lf-blog-kafka-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  volumeMode: Filesystem
+  hostPath:
+    path: /var/lib/lf-blog/kafka
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - k8s-node1
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kafka-data
+  namespace: lf-blog
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  volumeName: lf-blog-kafka-pv
+  resources:
+    requests:
+      storage: 5Gi
