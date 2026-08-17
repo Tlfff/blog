@@ -34,7 +34,7 @@ func (h *ArticleHandler) GetImageUploadURL(c *gin.Context) {
 		return
 	}
 	// 2. 获取凭证
-	uploadURL, objectKey, url, err := h.image.GetUploadURL(c, req.FileExt)
+	uploadURL, url, err := h.image.GetUploadURL(c, req.FileExt)
 	if err != nil {
 		c.Error(err)
 		return
@@ -42,7 +42,6 @@ func (h *ArticleHandler) GetImageUploadURL(c *gin.Context) {
 	// 3. 返回凭证
 	common.OK(c, "获取成功", gin.H{
 		"upload_url": uploadURL,
-		"object_key": objectKey,
 		"url":        url,
 	})
 }
