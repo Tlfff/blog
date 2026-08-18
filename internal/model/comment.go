@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+// Comment 是评论数据模型（GORM 映射 comments 表）。
 type Comment struct {
 	ID            uint64    `gorm:"column:id;primaryKey;autoIncrement"` //评论ID
 	ArticleID     uint64    `gorm:"column:article_id"`                  //文章ID
@@ -17,6 +18,7 @@ type Comment struct {
 	Status        int8      `gorm:"column:status"`                      //评论状态：2-已删除 1-正常
 }
 
+// 指定该模型对应的数据库表名
 func (Comment) TableName() string {
 	return "comments"
 }

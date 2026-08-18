@@ -1,22 +1,27 @@
-syntax = "proto3";
+// common.proto：内部 gRPC 契约的公共请求/响应类型，供 identity、content、community 三个服务复用。
+syntax = "proto3"; // 使用 proto3 语法
 
-package blog.internal.v1;
+package blog.internal.v1; // 内部服务间契约的包名，v1 为契约版本
 
-option go_package = "blog/shared/contracts/gen/internalv1;internalv1";
+option go_package = "blog/shared/contracts/gen/internalv1;internalv1"; // Go 导入路径与包名
 
+// 通用空消息：用于无入参或无返回值的 RPC
 message Empty {}
 
+// 通用请求：仅按用户ID定位资源
 message UserIDRequest {
-  uint64 user_id = 1;
+  uint64 user_id = 1; // 用户ID
 }
 
+// 通用请求：按文章ID + 操作者用户ID定位资源，用于需要校验归属或个性化状态的接口
 message ArticleUserRequest {
-  uint64 article_id = 1;
-  uint64 user_id = 2;
+  uint64 article_id = 1; // 文章ID
+  uint64 user_id = 2;    // 操作者用户ID，0 表示未登录访客
 }
 
+// 通用响应：对象存储直传凭证
 message UploadURLResponse {
-  string upload_url = 1;
-  string object_key = 2;
-  string url = 3;
+  string upload_url = 1; // 预签名上传地址，客户端直传使用，有时效
+  string object_key = 2; // 对象存储中的文件键，确认阶段回传使用
+  string url = 3;        // 上传完成后可公开访问的资源地址
 }

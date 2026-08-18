@@ -1,0 +1,38 @@
+{
+  "internal/infrastructure/community/view_history_repository.go": {
+    "before": {
+      "11": ["viewHistoryRepository 是浏览历史 Repository 的 GORM 实现。"],
+      "20": ["新增一条浏览历史流水记录"],
+      "29": ["原子自增文章浏览量，避免读改写导致的并发丢失"]
+    },
+    "eol": {"12": "GORM 数据库连接"}
+  },
+  "internal/infrastructure/community/event_publisher.go": {
+    "before": {
+      "12": ["eventPublisherAdapter 是 Community 事件发布 Port 的 Kafka 实现。"],
+      "21": ["异步发送点赞通知事件，Kafka 不可用时降级为静默丢弃（通知类消息允许丢失）"],
+      "38": ["同步发送浏览历史事件，Kafka 不可用时返回错误交由上层处理"],
+      "53": ["时间为零值时回退为当前时间，保证事件一定带有发生时间"]
+    },
+    "eol": {"13": "Kafka 客户端，为 nil 表示未启用消息队列"}
+  },
+  "internal/infrastructure/community/hot_rank_store.go": {
+    "before": {
+      "12": ["hotRankStoreAdapter 是热榜存储 Port 的 Redis ZSet 实现。"],
+      "21": ["按热度倒序取出前 limit 篇文章，跳过成员格式非法的脏数据"],
+      "49": ["用事务流水线重建热榜：先删除旧 ZSet 再整体写入，保证读到的榜单不会半新半旧"]
+    },
+    "eol": {"13": "Redis 客户端"}
+  },
+  "internal/infrastructure/community/article_user_queries.go": {
+    "before": {
+      "11": ["articleQueryAdapter 是 Community 文章只读查询 Port 的 GORM 实现。"],
+      "20": ["按文章ID查询作者与标题，用于通知等场景"],
+      "32": ["按ID批量查询文章统计数据，用于热榜回填标题与计数"],
+      "44": ["按浏览量、点赞数、评论数之和倒序取出已发表的热门文章"],
+      "58": ["把文章数据模型转换为 Community 只读查询模型"],
+      "69": ["批量把文章数据模型转换为 Community 只读查询模型"]
+    },
+    "eol": {"12": "GORM 数据库连接"}
+  }
+}

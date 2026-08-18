@@ -6,7 +6,7 @@ import (
 	"runtime/debug"
 )
 
-// Error 记录错误并附带调用栈开关。
+// 记录错误日志，可选附带调用栈，err 为 nil 时不输出
 func Error(prefix string, err error, withStack bool) {
 	if err == nil {
 		return

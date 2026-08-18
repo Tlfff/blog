@@ -1,3 +1,4 @@
+// Package kafka 封装 Kafka 生产者、消费者与死信队列能力。
 package kafka
 
 import (
@@ -5,10 +6,11 @@ import (
 	"sync"
 )
 
+// 全局 Kafka 客户端单例及其初始化状态
 var (
-	globalClient *Client
-	once         sync.Once
-	initErr      error
+	globalClient *Client   // 全局唯一的 Kafka 客户端实例
+	once         sync.Once // 保证初始化逻辑只执行一次
+	initErr      error     // 初始化过程中产生的错误
 )
 
 // 初始化全局 Kafka 客户端

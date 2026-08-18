@@ -17,36 +17,45 @@ import (
 	platformgrpc "blog/shared/platform/grpc"
 )
 
-// Run 启动 gRPC 服务并阻塞直到收到退出信号或服务异常退出。
+// 启动内部gRPC服务并阻塞，直到收到退出信号或服务异常退出
 func Run(addr, serviceName string, allowedIDs map[string]bool, register func(*grpc.Server)) error {
+	// 1. 监听指定的 TCP 地址
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
 
+	// 2. 创建 gRPC Server 并注册服务身份校验拦截器
 	s := grpc.NewServer(grpc.ChainUnaryInterceptor(platformgrpc.ServerAuthInterceptor(allowedIDs)))
+	// 2.1 由调用方注册具体的业务服务
 	register(s)
 
+	// 3. 注册健康检查服务并置为 SERVING
 	healthServer := health.NewServer()
 	healthpb.RegisterHealthServer(s, healthServer)
 	healthServer.SetServingStatus(serviceName, healthpb.HealthCheckResponse_SERVING)
 	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 
+	// 4. 后台协程启动服务，启动错误通过 channel 回传
 	serveErr := make(chan error, 1)
 	go func() {
 		log.Printf("%s gRPC 服务启动，监听 %s", serviceName, addr)
 		serveErr <- s.Serve(lis)
 	}()
 
+	// 5. 监听 SIGINT/SIGTERM 退出信号
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
+	// 6. 等待服务异常退出或收到退出信号
 	select {
 	case err := <-serveErr:
 		return err
 	case <-sig:
+		// 6.1 先摘除健康状态，让上游停止转发新流量
 		log.Printf("收到退出信号，正在优雅停止 %s", serviceName)
 		healthServer.Shutdown()
+		// 6.2 最多等待5秒完成优雅停止，超时则强制停止
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		stopped := make(chan struct{})

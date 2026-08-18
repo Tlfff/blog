@@ -1,138 +1,172 @@
-syntax = "proto3";
+// identity.proto：Identity（身份）服务的内部 gRPC 契约，覆盖注册登录、资料维护、密码与头像管理。
+syntax = "proto3"; // 使用 proto3 语法
 
-package blog.internal.v1;
+package blog.internal.v1; // 内部服务间契约的包名，v1 为契约版本
 
-option go_package = "blog/shared/contracts/gen/internalv1;internalv1";
+option go_package = "blog/shared/contracts/gen/internalv1;internalv1"; // Go 导入路径与包名
 
-import "internal/v1/common.proto";
+import "internal/v1/common.proto"; // 复用 Empty、UserIDRequest、UploadURLResponse
 
 // IdentityService 是 Identity Service 对统一入口和其他服务暴露的内部 gRPC 接口。
 service IdentityService {
+  // 注册新用户，手机号唯一
   rpc Register(RegisterRequest) returns (Empty);
+  // 用户登录，成功后返回访问令牌
   rpc Login(LoginRequest) returns (LoginResponse);
+  // 用户登出，使当前令牌失效
   rpc Logout(LogoutRequest) returns (Empty);
+  // 获取本人资料，包含角色与登录痕迹等私有字段
   rpc GetMyProfile(UserIDRequest) returns (MyProfile);
+  // 获取他人公开资料，仅暴露 ID、昵称、头像
   rpc GetPublicProfile(UserIDRequest) returns (PublicProfile);
+  // 更新昵称、头像等基础资料
   rpc UpdateProfile(UpdateProfileRequest) returns (Empty);
+  // 校验旧密码，通过后下发一次性改密令牌
   rpc VerifyOldPassword(VerifyOldPasswordRequest) returns (VerifyOldPasswordResponse);
+  // 凭改密令牌设置新密码（两步式改密的第二步）
   rpc ChangePassword(ChangePasswordRequest) returns (Empty);
+  // 用旧密码直接设置新密码（一步式改密）
   rpc UpdatePassword(UpdatePasswordRequest) returns (Empty);
+  // 更新账号绑定的手机号
   rpc UpdateAccount(UpdateAccountRequest) returns (Empty);
+  // 获取头像直传凭证
   rpc GetAvatarUploadURL(GetAvatarUploadURLRequest) returns (UploadURLResponse);
+  // 确认头像上传结果并落库
   rpc ConfirmAvatar(ConfirmAvatarRequest) returns (ConfirmAvatarResponse);
+  // 获取单个用户基本信息，供其他服务补全作者信息
   rpc GetUserBasicInfo(UserIDRequest) returns (UserBasicInfo);
+  // 批量分页获取用户基本信息
   rpc ListUserBasicInfo(ListUsersRequest) returns (ListUsersResponse);
 }
 
+// 请求：注册新用户
 message RegisterRequest {
-  string phone = 1;
-  string password = 2;
-  string nickname = 3;
-  string client_ip = 4;
+  string phone = 1;     // 手机号，账号唯一标识
+  string password = 2;  // 明文密码，服务端加密后存储
+  string nickname = 3;  // 用户昵称
+  string client_ip = 4; // 注册来源IP，用于风控与留痕
 }
 
+// 请求：用户登录，支持手机号或昵称两种账号形式
 message LoginRequest {
-  string phone = 1;
-  string nickname = 2;
-  string password = 3;
-  string client_ip = 4;
-  string device = 5;
-  bool remember_me = 6;
+  string phone = 1;     // 手机号，与 nickname 二选一
+  string nickname = 2;  // 昵称，与 phone 二选一
+  string password = 3;  // 明文密码
+  string client_ip = 4; // 登录来源IP
+  string device = 5;    // 登录设备标识
+  bool remember_me = 6; // 是否记住登录，影响令牌有效期
 }
 
+// 响应：登录结果
 message LoginResponse {
-  string access_token = 1;
+  string access_token = 1; // 访问令牌（JWT），后续请求放入 Authorization
 }
 
+// 请求：用户登出
 message LogoutRequest {
-  string token = 1;
+  string token = 1; // 待失效的访问令牌
 }
 
+// 响应：本人资料（含私有字段）
 message MyProfile {
-  uint64 id = 1;
-  string nickname = 2;
-  string avatar = 3;
-  int32 role = 4;
-  int64 last_login_time = 5;
-  string last_login_ip = 6;
+  uint64 id = 1;             // 用户ID
+  string nickname = 2;       // 昵称
+  string avatar = 3;         // 头像URL
+  int32 role = 4;            // 用户角色：1-普通用户 2-管理员
+  int64 last_login_time = 5; // 最后登录时间，Unix 秒
+  string last_login_ip = 6;  // 最后登录IP
 }
 
+// 响应：他人公开资料
 message PublicProfile {
-  uint64 id = 1;
-  string nickname = 2;
-  string avatar = 3;
+  uint64 id = 1;       // 用户ID
+  string nickname = 2; // 昵称
+  string avatar = 3;   // 头像URL
 }
 
+// 请求：更新基础资料
 message UpdateProfileRequest {
-  uint64 user_id = 1;
-  string nickname = 2;
-  string avatar = 3;
+  uint64 user_id = 1;  // 用户ID
+  string nickname = 2; // 新昵称，空表示不修改
+  string avatar = 3;   // 新头像URL，空表示不修改
 }
 
+// 请求：校验旧密码
 message VerifyOldPasswordRequest {
-  uint64 user_id = 1;
-  string old_password = 2;
+  uint64 user_id = 1;      // 用户ID
+  string old_password = 2; // 旧密码明文
 }
 
+// 响应：旧密码校验通过后下发的改密令牌
 message VerifyOldPasswordResponse {
-  string change_token = 1;
+  string change_token = 1; // 一次性改密令牌，短时效，仅用于紧随其后的改密
 }
 
+// 请求：凭改密令牌设置新密码
 message ChangePasswordRequest {
-  uint64 user_id = 1;
-  string change_token = 2;
-  string new_password = 3;
-  string current_token = 4;
+  uint64 user_id = 1;       // 用户ID
+  string change_token = 2;  // 一次性改密令牌
+  string new_password = 3;  // 新密码明文
+  string current_token = 4; // 当前访问令牌，改密后需要一并失效
 }
 
+// 请求：用旧密码直接设置新密码
 message UpdatePasswordRequest {
-  uint64 user_id = 1;
-  string old_password = 2;
-  string new_password = 3;
+  uint64 user_id = 1;      // 用户ID
+  string old_password = 2; // 旧密码明文
+  string new_password = 3; // 新密码明文
 }
 
+// 请求：更新账号手机号
 message UpdateAccountRequest {
-  uint64 user_id = 1;
-  string phone = 2;
+  uint64 user_id = 1; // 用户ID
+  string phone = 2;   // 新手机号
 }
 
+// 请求：获取头像直传凭证
 message GetAvatarUploadURLRequest {
-  uint64 user_id = 1;
-  string file_ext = 2;
+  uint64 user_id = 1;   // 用户ID
+  string file_ext = 2;  // 文件扩展名，如 jpg、png，用于校验类型并生成对象键
 }
 
+// 请求：确认头像上传结果
 message ConfirmAvatarRequest {
-  uint64 user_id = 1;
-  string object_key = 2;
+  uint64 user_id = 1;    // 用户ID
+  string object_key = 2; // 上传凭证阶段返回的对象键
 }
 
+// 响应：头像确认结果
 message ConfirmAvatarResponse {
-  string avatar_url = 1;
+  string avatar_url = 1; // 落库后的头像访问地址
 }
 
+// 响应：用户基本信息，供其他服务补全作者展示信息
 message UserBasicInfo {
-  uint64 id = 1;
-  string nickname = 2;
-  string avatar = 3;
-  int64 last_login_time = 4;
-  string last_login_ip = 5;
+  uint64 id = 1;             // 用户ID
+  string nickname = 2;       // 昵称
+  string avatar = 3;         // 头像URL
+  int64 last_login_time = 4; // 最后登录时间，Unix 秒
+  string last_login_ip = 5;  // 最后登录IP
 }
 
+// 请求：分页获取用户列表
 message ListUsersRequest {
-  uint64 page = 1;
-  uint64 page_size = 2;
-  bool is_desc = 3;
+  uint64 page = 1;      // 页码，从 1 开始
+  uint64 page_size = 2; // 每页数量
+  bool is_desc = 3;     // 是否按创建时间降序
 }
 
+// 响应：用户列表项（仅公开字段）
 message UserListItem {
-  uint64 id = 1;
-  string nickname = 2;
-  string avatar = 3;
+  uint64 id = 1;       // 用户ID
+  string nickname = 2; // 昵称
+  string avatar = 3;   // 头像URL
 }
 
+// 响应：用户列表
 message ListUsersResponse {
-  repeated UserListItem items = 1;
-  uint64 total = 2;
-  uint64 page = 3;
-  uint64 page_size = 4;
+  repeated UserListItem items = 1; // 用户列表
+  uint64 total = 2;                // 符合条件的总用户数
+  uint64 page = 3;                 // 当前页码
+  uint64 page_size = 4;            // 每页数量
 }

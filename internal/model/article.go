@@ -2,12 +2,13 @@ package model
 
 import "time"
 
+// Article 是文章数据模型（GORM 映射 articles 表）。
 type Article struct {
 	ID           uint64    `gorm:"column:id;primaryKey;autoIncrement" ` // 文章唯一标识
 	AuthorID     uint64    `gorm:"column:author_id" `                   // 作者用户ID
 	Title        string    `gorm:"column:title" `                       // 文章标题
 	Content      string    `gorm:"column:content" `                     // 文章正文内容（支持Markdown）
-	Tags         string    `gorm:"column:tags" `                        // 文章标签
+	Tags         string    `gorm:"column:tags" `                        // 文章标签，多个标签以英文逗号分隔
 	Status       int8      `gorm:"column:status" `                      // 文章状态：1-已删除 2-草稿 3-已发表
 	ViewCount    uint32    `gorm:"column:view_count" `                  // 浏览量
 	LikeCount    uint32    `gorm:"column:like_count"`                   // 点赞数

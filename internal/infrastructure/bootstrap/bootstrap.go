@@ -25,10 +25,12 @@ func InitValidator() {
 
 // InitIPSearcher 基于当前工作目录初始化 ip2region 离线库。
 func InitIPSearcher() error {
+	// 1. 取当前工作目录作为离线库的基准路径
 	dir, err := os.Getwd()
 	if err != nil {
 		return err
 	}
+	// 2. 拼出 ip2region.xdb 路径并加载
 	return iputil.InitIPSearcher(filepath.Join(dir, "pkg/resource/ip2region.xdb"))
 }
 

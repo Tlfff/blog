@@ -7,6 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// 通知类型取值
 const (
 	NotifyTypeLikeArticle    = 1 // 点赞文章通知
 	NotifyTypeLikeComment    = 2 // 点赞评论通知
@@ -29,11 +30,11 @@ type LikeArticleNotifyContent struct {
 
 // 消息主文档
 type Notification struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty" `
-	ReceiverID  uint64             `bson:"receiver_id" `  // 消息接收者（文章作者）
-	Sender      NotifySender       `bson:"sender" `       // 点赞的人
-	Type        int8               `bson:"type" `         // 类型：1-点赞文章，2-点赞评论，3-评论文章，4-回复评论
-	IsRead      bool               `bson:"is_read" `      // 是否已读
-	Content     any                `bson:"content" `      // 动态内容
-	CreatedTime time.Time          `bson:"created_time" ` // 创建时间
+	ID          primitive.ObjectID `bson:"_id,omitempty" ` // MongoDB 文档主键
+	ReceiverID  uint64             `bson:"receiver_id" `   // 消息接收者（文章作者）
+	Sender      NotifySender       `bson:"sender" `        // 点赞的人
+	Type        int8               `bson:"type" `          // 类型：1-点赞文章，2-点赞评论，3-评论文章，4-回复评论
+	IsRead      bool               `bson:"is_read" `       // 是否已读
+	Content     any                `bson:"content" `       // 动态内容
+	CreatedTime time.Time          `bson:"created_time" `  // 创建时间
 }

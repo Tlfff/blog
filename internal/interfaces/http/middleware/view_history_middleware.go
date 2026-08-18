@@ -12,6 +12,7 @@ import (
 
 // ViewHistorySender 是浏览历史事件发送接口。
 type ViewHistorySender interface {
+	// SendViewHistory 发送一条浏览历史事件，由 Application 层实现
 	SendViewHistory(ctx context.Context, userID, articleID uint64) error
 }
 
@@ -37,6 +38,7 @@ func ViewHistoryMiddleware(historyService ViewHistorySender) gin.HandlerFunc {
 			if err := historyService.SendViewHistory(ctx, userID, req.ID); err != nil {
 				log.Printf("[Kafka] 中间件发送浏览历史失败, user: %d, article: %d, err: %v", userID, req.ID, err)
 			}
+		// 4. 主流程继续执行，浏览历史失败不影响接口返回
 		}()
 
 		// 4. 执行主流程

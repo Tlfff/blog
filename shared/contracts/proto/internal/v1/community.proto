@@ -1,180 +1,219 @@
+// community.proto：Community 领域（评论、点赞、热榜、浏览历史、通知）的内部 gRPC 契约定义。
 syntax = "proto3";
 
 package blog.internal.v1;
 
-option go_package = "blog/shared/contracts/gen/internalv1;internalv1";
+option go_package = "blog/shared/contracts/gen/internalv1;internalv1"; // Go 导入路径为 blog/shared/contracts/gen/internalv1，Go 包名为 internalv1
 
-import "internal/v1/common.proto";
+import "internal/v1/common.proto"; // 复用 Empty、UserIDRequest、ArticleUserRequest 等公共消息
 
 // CommunityService 是 Community Service 对统一入口和其他服务暴露的内部 gRPC 接口。
 service CommunityService {
+  // 创建评论（根评论或回复）
   rpc CreateComment(CreateCommentRequest) returns (CreateCommentResponse);
+  // 分页获取文章的根评论列表
   rpc ListRootComments(ListRootCommentsRequest) returns (RootCommentList);
+  // 分页获取某条根评论下的回复列表
   rpc ListReplies(ListRepliesRequest) returns (ReplyList);
+  // 删除评论（作者本人或管理员）
   rpc DeleteComment(DeleteCommentRequest) returns (Empty);
+  // 获取单条评论的点赞数与热度值
   rpc GetCommentStats(CommentIDRequest) returns (CommentStats);
+  // 点赞文章
   rpc ArticleLike(ArticleUserRequest) returns (Empty);
+  // 取消文章点赞
   rpc ArticleCancelLike(ArticleUserRequest) returns (Empty);
+  // 点赞评论
   rpc CommentLike(CommentUserRequest) returns (Empty);
+  // 取消评论点赞
   rpc CommentCancelLike(CommentUserRequest) returns (Empty);
+  // 查询用户是否已点赞指定文章
   rpc IsUserLikedArticle(ArticleUserRequest) returns (LikeState);
+  // 获取文章热榜
   rpc GetHotRank(HotRankRequest) returns (HotRank);
+  // 重建文章热榜缓存（定时任务调用）
   rpc RebuildHotRank(Empty) returns (Empty);
+  // 上报文章浏览历史
   rpc SendViewHistory(ViewHistoryRequest) returns (Empty);
+  // 分页获取用户通知列表
   rpc GetNotifications(NotificationListRequest) returns (NotificationList);
+  // 获取用户未读通知数
   rpc GetUnreadCount(UserIDRequest) returns (UnreadCount);
+  // 清空用户未读通知数
   rpc ClearUnread(UserIDRequest) returns (Empty);
 }
 
+// 请求：创建评论
 message CreateCommentRequest {
-  uint64 article_id = 1;
-  uint64 root_id = 2;
-  uint64 user_id = 3;
-  uint64 reply_to_user_id = 4;
-  string content = 5;
-  string ip = 6;
+  uint64 article_id = 1;        // 所属文章ID
+  uint64 root_id = 2;           // 根评论ID：0-本条为根评论 非0-本条为该根评论下的回复
+  uint64 user_id = 3;           // 评论人用户ID
+  uint64 reply_to_user_id = 4;  // 被回复者用户ID：0-回复文章本身
+  string content = 5;           // 评论正文内容
+  string ip = 6;                // 评论时的客户端IP
 }
 
+// 响应：创建评论结果
 message CreateCommentResponse {
-  uint64 id = 1;
-  int64 created_time = 2;
+  uint64 id = 1;          // 新建评论ID
+  int64 created_time = 2; // 创建时间（Unix 秒）
 }
 
+// 评论中展示的用户公开信息
 message CommentUserInfo {
-  uint64 user_id = 1;
-  string username = 2;
-  string avatar = 3;
+  uint64 user_id = 1; // 用户ID
+  string username = 2; // 用户昵称
+  string avatar = 3;   // 用户头像URL
 }
 
+// 根评论条目
 message RootCommentItem {
-  uint64 id = 1;
-  uint64 article_id = 2;
-  CommentUserInfo user = 3;
-  string content = 4;
-  uint32 reply_count = 5;
-  string ip = 6;
-  int64 created_time = 7;
-  int32 status = 8;
-  uint64 like_count = 9;
+  uint64 id = 1;              // 评论ID
+  uint64 article_id = 2;      // 所属文章ID
+  CommentUserInfo user = 3;   // 评论人公开信息
+  string content = 4;         // 评论正文内容
+  uint32 reply_count = 5;     // 该根评论下的回复数
+  string ip = 6;              // 评论时的客户端IP
+  int64 created_time = 7;     // 创建时间（Unix 秒）
+  int32 status = 8;           // 评论状态：0-已删除 1-正常
+  uint64 like_count = 9;      // 点赞数
 }
 
+// 响应：根评论列表
 message RootCommentList {
-  repeated RootCommentItem items = 1;
-  int64 total = 2;
-  uint64 last_id = 3;
-  uint64 page = 4;
-  uint64 page_size = 5;
+  repeated RootCommentItem items = 1; // 根评论列表
+  int64 total = 2;                    // 根评论总数
+  uint64 last_id = 3;                 // 本页最后一条评论ID（游标分页用）
+  uint64 page = 4;                    // 当前页码
+  uint64 page_size = 5;               // 每页数量
 }
 
+// 请求：分页获取文章根评论列表
 message ListRootCommentsRequest {
-  uint64 article_id = 1;
-  uint64 last_id = 2;
-  uint64 page = 3;
-  uint64 page_size = 4;
-  bool is_desc = 5;
-  uint64 author_id = 6;
+  uint64 article_id = 1; // 目标文章ID
+  uint64 last_id = 2;    // 游标：上一页最后一条评论ID，0-从头开始
+  uint64 page = 3;       // 页码（页码分页时使用）
+  uint64 page_size = 4;  // 每页数量
+  bool is_desc = 5;      // 是否按创建时间降序
+  uint64 author_id = 6;  // 文章作者ID（用于标记楼主等展示逻辑）
 }
 
+// 回复评论条目
 message ReplyCommentItem {
-  uint64 id = 1;
-  uint64 article_id = 2;
-  uint64 root_id = 3;
-  CommentUserInfo user = 4;
-  CommentUserInfo reply_to_user = 5;
-  string content = 6;
-  int64 created_time = 7;
-  int32 status = 8;
-  string ip = 9;
-  uint64 like_count = 10;
+  uint64 id = 1;                        // 评论ID
+  uint64 article_id = 2;                // 所属文章ID
+  uint64 root_id = 3;                   // 所属根评论ID
+  CommentUserInfo user = 4;             // 评论人公开信息
+  CommentUserInfo reply_to_user = 5;    // 被回复者公开信息
+  string content = 6;                   // 评论正文内容
+  int64 created_time = 7;               // 创建时间（Unix 秒）
+  int32 status = 8;                     // 评论状态：0-已删除 1-正常
+  string ip = 9;                        // 评论时的客户端IP
+  uint64 like_count = 10;               // 点赞数
 }
 
+// 响应：回复列表
 message ReplyList {
-  repeated ReplyCommentItem items = 1;
-  int64 total = 2;
-  uint64 last_id = 3;
-  uint64 page = 4;
-  uint64 page_size = 5;
+  repeated ReplyCommentItem items = 1; // 回复列表
+  int64 total = 2;                     // 回复总数
+  uint64 last_id = 3;                  // 本页最后一条回复ID（游标分页用）
+  uint64 page = 4;                     // 当前页码
+  uint64 page_size = 5;                // 每页数量
 }
 
+// 请求：分页获取某条根评论下的回复
 message ListRepliesRequest {
-  uint64 root_id = 1;
-  uint64 last_id = 2;
-  uint64 page = 3;
-  uint64 page_size = 4;
+  uint64 root_id = 1;   // 根评论ID
+  uint64 last_id = 2;   // 游标：上一页最后一条回复ID，0-从头开始
+  uint64 page = 3;      // 页码（页码分页时使用）
+  uint64 page_size = 4; // 每页数量
 }
 
+// 请求：删除评论
 message DeleteCommentRequest {
-  uint64 comment_id = 1;
-  uint64 user_id = 2;
-  bool is_admin = 3;
+  uint64 comment_id = 1; // 待删除评论ID
+  uint64 user_id = 2;    // 操作人用户ID
+  bool is_admin = 3;     // 操作人是否为管理员（管理员可删除他人评论）
 }
 
+// 请求：按评论ID查询
 message CommentIDRequest {
-  uint64 comment_id = 1;
+  uint64 comment_id = 1; // 评论ID
 }
 
+// 响应：评论统计信息
 message CommentStats {
-  uint64 comment_id = 1;
-  uint64 hot_value = 2;
-  uint64 like_count = 3;
+  uint64 comment_id = 1; // 评论ID
+  uint64 hot_value = 2;  // 热度值（点赞数 + 评论数）
+  uint64 like_count = 3; // 点赞数
 }
 
+// 请求：评论点赞/取消点赞
 message CommentUserRequest {
-  uint64 comment_id = 1;
-  uint64 user_id = 2;
+  uint64 comment_id = 1; // 目标评论ID
+  uint64 user_id = 2;    // 操作人用户ID
 }
 
+// 响应：点赞状态
 message LikeState {
-  bool liked = 1;
+  bool liked = 1; // 是否已点赞
 }
 
+// 请求：获取热榜
 message HotRankRequest {
-  int32 limit = 1;
+  int32 limit = 1; // 返回条数上限
 }
 
+// 热榜条目
 message HotRankItem {
-  uint64 article_id = 1;
-  string title = 2;
-  double hot = 3;
-  uint32 view_count = 4;
-  uint32 comment_count = 5;
-  uint32 like_count = 6;
+  uint64 article_id = 1;    // 文章ID
+  string title = 2;         // 文章标题
+  double hot = 3;           // 热度分值
+  uint32 view_count = 4;    // 浏览量
+  uint32 comment_count = 5; // 评论数
+  uint32 like_count = 6;    // 点赞数
 }
 
+// 响应：文章热榜
 message HotRank {
-  repeated HotRankItem items = 1;
+  repeated HotRankItem items = 1; // 热榜列表（按热度降序）
 }
 
+// 请求：上报浏览历史
 message ViewHistoryRequest {
-  uint64 article_id = 1;
-  uint64 user_id = 2;
+  uint64 article_id = 1; // 被浏览的文章ID
+  uint64 user_id = 2;    // 浏览人用户ID
 }
 
+// 请求：分页获取通知列表
 message NotificationListRequest {
-  uint64 user_id = 1;
-  int64 page = 2;
-  int64 page_size = 3;
+  uint64 user_id = 1;  // 接收人用户ID
+  int64 page = 2;      // 页码
+  int64 page_size = 3; // 每页数量
 }
 
+// 通知条目
 message NotificationItem {
-  string id = 1;
-  int32 type = 2;
-  bool is_read = 3;
-  int64 created_time = 4;
-  uint64 sender_id = 5;
-  string sender_nickname = 6;
-  string sender_avatar = 7;
-  string action_text = 8;
-  uint64 article_id = 9;
-  string title = 10;
+  string id = 1;              // 通知ID（MongoDB ObjectID）
+  int32 type = 2;             // 通知类型：1-评论 2-点赞
+  bool is_read = 3;           // 是否已读
+  int64 created_time = 4;     // 创建时间（Unix 秒）
+  uint64 sender_id = 5;       // 触发通知的用户ID
+  string sender_nickname = 6; // 触发通知的用户昵称
+  string sender_avatar = 7;   // 触发通知的用户头像URL
+  string action_text = 8;     // 行为文案（如"评论了你的文章"）
+  uint64 article_id = 9;      // 关联文章ID
+  string title = 10;          // 关联文章标题
 }
 
+// 响应：通知列表
 message NotificationList {
-  repeated NotificationItem items = 1;
-  int64 page = 2;
-  int64 page_size = 3;
+  repeated NotificationItem items = 1; // 通知列表
+  int64 page = 2;                      // 当前页码
+  int64 page_size = 3;                 // 每页数量
 }
 
+// 响应：未读通知数
 message UnreadCount {
-  int64 count = 1;
+  int64 count = 1; // 未读通知数量
 }

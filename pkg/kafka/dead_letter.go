@@ -8,6 +8,7 @@ import (
 )
 
 // 死信队列消息结构
+// DeadLetterMessage 是死信队列消息载荷，记录原始消息与失败原因。
 type DeadLetterMessage struct {
 	// 原始消息信息
 	SourceTopic string `json:"source_topic"` // 原始 topic 名称（如 "notification"）
@@ -26,11 +27,13 @@ type DeadLetterMessage struct {
 }
 
 // 将死信消息序列化为 JSON 字节数组
+// 将死信消息序列化为 JSON 字节数组
 func (m *DeadLetterMessage) ToJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
 // 创建死信消息
+// 构造一条死信消息，汇总原始消息、错误信息与消费者组
 func NewDeadLetterMessage(sourceTopic string, consumerGroup string, msg kafka.Message, err error, retries int) *DeadLetterMessage {
 	return &DeadLetterMessage{
 		SourceTopic:   sourceTopic,

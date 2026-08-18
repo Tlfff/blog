@@ -1,5 +1,6 @@
 package consts
 
+// Redis Key 与 Hash Field 命名常量，统一前缀便于排查与清理
 const (
 	KeyArticleLikeStatePrefix = "like:article:status:" // 用户点赞文章操作hash
 	KeyCommentLikeStatePrefix = "like:comment:status:" // 用户点赞评论操作hash

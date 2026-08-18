@@ -286,6 +286,7 @@ func (c *Consumer) flushBatch(ctx context.Context, topicKey string, batch []kafk
 	}
 }
 
+// 处理单条消息并在失败时按退避间隔重试，返回最后一次错误
 func (c *Consumer) handleMessageWithRetry(ctx context.Context, topicKey string, msg kafka.Message, handler MessageHandler, maxRetries int, retryIntervalBase time.Duration) error {
 	var lastErr error
 

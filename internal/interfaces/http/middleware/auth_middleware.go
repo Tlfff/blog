@@ -9,6 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// 校验 Authorization 请求头并返回用户上下文与原始 Token
 func checkToken(c *gin.Context, rdb *redis.Client) (*auth.UserContext, string, error) {
 	// 1. 校验Authorization请求头
 	authHeader := c.GetHeader("Authorization")
@@ -45,6 +46,7 @@ func MustAuth(rdbs ...*redis.Client) gin.HandlerFunc {
 		rdb = rdbs[0]
 	}
 	return func(c *gin.Context) {
+		// 1. 校验 Token 并解析用户信息
 		userCtx, token, err := checkToken(c, rdb)
 		// 未登录直接拦截
 		if err != nil {
@@ -52,6 +54,7 @@ func MustAuth(rdbs ...*redis.Client) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		// 2. 校验通过，把用户信息与 Token 注入上下文供 Handler 使用
 		c.Set("currentUser", userCtx)
 		c.Set("currentToken", token)
 		c.Next()
@@ -65,8 +68,9 @@ func OptionalAuth(rdbs ...*redis.Client) gin.HandlerFunc {
 		rdb = rdbs[0]
 	}
 	return func(c *gin.Context) {
+		// 1. 尝试校验 Token，失败也不拦截请求
 		userCtx, token, err := checkToken(c, rdb)
-		// 如果登录了就记录用户信息
+		// 2. 已登录则注入用户信息，未登录按游客继续处理
 		if err == nil {
 			c.Set("currentUser", userCtx)
 			c.Set("currentToken", token)

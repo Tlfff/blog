@@ -1,0 +1,18 @@
+{
+  "internal/infrastructure/config/kafka.go": {
+    "before": {
+      "5": ["Kafka 是 Kafka 相关的全部配置项。"],
+      "13": ["TopicConfig 是单个 topic 的名称、消费组与批量/重试参数配置。"],
+      "25": ["KafkaProducer 是生产者的批量、重试与压缩配置。"],
+      "35": ["KafkaConsumer 是消费者的拉取、会话与提交偏移量配置。"],
+      "46": ["DeadLetterConfig 是死信队列的 topic、重试与消费组配置。"]
+    },
+    "eol": {"6": "kafka broker 地址，多个地址以英文逗号分隔"}
+  },
+  "internal/infrastructure/bootstrap/bootstrap.go": {
+    "inner": {
+      "28": ["1. 取当前工作目录作为离线库的基准路径"],
+      "32": ["2. 拼出 ip2region.xdb 路径并加载"]
+    }
+  }
+}

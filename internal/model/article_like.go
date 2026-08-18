@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+// ArticleLike 是文章点赞数据模型（GORM 映射 article_likes 表）。
 type ArticleLike struct {
 	ID          uint64    `gorm:"column:id;primaryKey;autoIncrement" ` // 唯一标识
 	UserID      uint64    `gorm:"column:user_id" `                     // 用户ID
@@ -11,10 +12,12 @@ type ArticleLike struct {
 	UpdatedTime time.Time `gorm:"column:updated_time;autoUpdateTime" ` // 最后更新时间
 }
 
+// 指定该模型对应的数据库表名
 func (ArticleLike) TableName() string {
 	return "article_likes"
 }
 
+// 文章点赞状态取值
 const (
 	ArticleLiked       = 1 // 点赞
 	ArticleCancelLiked = 2 // 取消点赞

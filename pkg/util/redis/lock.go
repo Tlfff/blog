@@ -1,3 +1,4 @@
+// Package redis 提供基于 Redis 的分布式锁实现。
 package redis
 
 import (
@@ -16,6 +17,7 @@ import (
 //go:embed lua
 var luaFS embed.FS
 
+// RedisLock 是基于 Redis SETNX 实现的分布式锁。
 type RedisLock struct {
 	rdb        *redis.Client // 客户端
 	key        string        // 锁Key
@@ -26,6 +28,7 @@ type RedisLock struct {
 	locked     bool          // 是否成功持有锁
 }
 
+// 创建一把 Redis 分布式锁，key 为锁标识，expireTime 为锁自动过期时间
 func NewRedisLock(rdb *redis.Client, key string, expireTime time.Duration) *RedisLock {
 	return &RedisLock{
 		rdb:        rdb,
@@ -48,6 +51,7 @@ func init() {
 	unlockScript = string(data)
 }
 
+// 带重试的加锁，重试次数与间隔由锁自身配置决定
 func (l *RedisLock) RetryLock(ctx context.Context) error {
 	for i := 0; i < l.retryCount; i++ {
 		// 检查上下文是否过期
@@ -72,6 +76,7 @@ func (l *RedisLock) RetryLock(ctx context.Context) error {
 	return common.ErrLockFailed
 }
 
+// 释放锁，通过 Lua 脚本保证只删除自己持有的那把锁
 func (l *RedisLock) UnLock(ctx context.Context) error {
 	// 1. 如果锁已经释放，则返回
 	if !l.locked {
@@ -90,15 +95,18 @@ func (l *RedisLock) UnLock(ctx context.Context) error {
 	return common.ErrUnLockFailed
 }
 
-// 加锁,value为锁唯一标识，防止误删
+// 尝试加锁一次且不重试，value 为锁唯一标识，防止误删他人持有的锁
 func (l *RedisLock) TryLock(ctx context.Context) (bool, error) {
+	// 1. 已经持有锁时直接返回成功
 	if l.locked == true {
 		return true, nil
 	}
+	// 2. 通过 SETNX 原子写入锁
 	ok, err := l.rdb.SetNX(ctx, l.key, l.value, l.expireTime).Result()
 	if err != nil {
 		return false, err
 	}
+	// 3. 记录持有状态并返回加锁结果
 	l.locked = ok
 	return ok, nil
 }

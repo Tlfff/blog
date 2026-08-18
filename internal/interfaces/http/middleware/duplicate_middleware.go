@@ -30,6 +30,8 @@ import (
 //			})
 //		}
 //	}
+
+// 拦截同一用户在 expire 时间内对同一路由的重复提交
 func DuplicateMitigation(expire time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 1. 从gin上下午中获取用户信息

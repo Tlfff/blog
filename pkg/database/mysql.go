@@ -1,3 +1,4 @@
+// Package database 提供 MySQL、MongoDB、Redis 客户端初始化与事务模板。
 package database
 
 import (
@@ -8,19 +9,22 @@ import (
 	"gorm.io/gorm"
 )
 
-// 负责连接mysql，返回一个原生的 *gorm.DB
+// 连接 MySQL 并返回原生的 *gorm.DB 连接实例
 func NewMySQLClient(username, password, host string, port int, dbname string) (*gorm.DB, error) {
+	// 1. 拼装 DSN：使用 utf8mb4 字符集、解析时间类型、采用本地时区
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		username, password, host, port, dbname)
 
+	// 2. 建立 GORM 连接，失败直接返回错误
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
+	// 3. 返回可用的连接实例
 	return db, nil
 }
 
-// RunTx:事务执行模板
+// 事务执行模板，用闭包包裹所有需要事务保护的增删改逻辑
 // ctx:请求上下文，用于传递超时、链路追踪信息
 // db:原始gorm.DB连接实例（来自各repository）
 // txLogic:闭包函数，需要事务包裹的所有增删改逻辑

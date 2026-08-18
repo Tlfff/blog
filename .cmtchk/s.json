@@ -1,0 +1,14 @@
+{
+ "main.go": {"before": {"7": "程序入口，交由 cobra 命令行执行具体子命令"}},
+ "internal/consts/lock_const.go": {"before": {"5": "分布式锁与缓存过期相关常量"}},
+ "internal/consts/redis_key.go": {"before": {"3": "Redis Key 与 Hash Field 命名常量，统一前缀便于排查与清理"}},
+ "internal/message/notification.go": {"before": {"5": "NotificationMsg 是通知 Kafka 消息体（DTO）。"}},
+ "internal/message/view_history.go": {"before": {"5": "ViewHistoryMsg 是浏览历史 Kafka 消息体（DTO）。"}},
+ "shared/contracts/events/notification.go": {
+   "eol": {"7": "通知类型：1-点赞文章 2-点赞评论 3-评论文章 4-回复评论", "8": "操作人（发送方）用户ID", "9": "目标ID（文章ID、评论ID等）", "10": "事件创建时间",
+           "15": "被浏览的文章ID", "16": "浏览者用户ID", "17": "事件创建时间"}},
+ "pkg/database/redis.go": {"before": {"10": "创建 Redis 客户端并做连通性探测"}},
+ "internal/dto/comment/request.go": {
+   "before": {"36": "AdminDeleteRequest 是管理员强制删除评论的请求 DTO。", "35": ""},
+   "eol": {"36": ""}}
+}

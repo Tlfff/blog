@@ -1,3 +1,4 @@
+// Package notification 定义通知相关的请求与响应 DTO。
 package notification
 
 import (
@@ -7,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+// NotifyListItem 是通知列表项响应 DTO。
 type NotifyListItem struct {
 	ID          string `json:"id"`           // 通知ID
 	Type        int8   `json:"type"`         // 1:点赞文章, 2:点赞评论, 3:回复文章, 4:回复评论
@@ -25,12 +27,15 @@ type NotifyListItem struct {
 	ArticleID uint64 `json:"article_id"` // 文章 ID
 	Title     string `json:"title"`      // 文章标题
 }
+
+// NotificationListResponse 是通知列表响应 DTO。
 type NotificationListResponse struct {
-	List     []*NotifyListItem `json:"list"`
+	List     []*NotifyListItem `json:"list"`      // 通知列表
 	Page     int64             `json:"page"`      // 当前页码
 	PageSize int64             `json:"page_size"` // 每页大小
 }
 
+// 构造通知列表响应，将 MongoDB 通知文档按类型映射为前端展示字段
 // 构造列表响应函数
 func NewNotificationListResponse(models []*model.Notification, page, pageSize int64) *NotificationListResponse {
 	resp := &NotificationListResponse{
@@ -40,7 +45,7 @@ func NewNotificationListResponse(models []*model.Notification, page, pageSize in
 	}
 
 	for _, m := range models {
-		// 构建通用的字段
+		// 1. 组装与通知类型无关的通用字段
 		item := &NotifyListItem{
 			ID:             m.ID.Hex(), // MongoDB 的 Primitive.ObjectID 转换为 Hex 字符串
 			Type:           m.Type,
@@ -51,9 +56,9 @@ func NewNotificationListResponse(models []*model.Notification, page, pageSize in
 			SenderAvatar:   m.Sender.Avatar,
 		}
 
-		// 根据不同的通知类型，映射具体的动作和文章内容
+		// 2. 按通知类型映射动作文案与关联文章信息
 		switch m.Type {
-		case model.NotifyTypeLikeArticle: // 点赞文章
+		case model.NotifyTypeLikeArticle: // 2.1 点赞文章：解析动态内容取出文章ID与标题
 			var content model.LikeArticleNotifyContent
 
 			// 将动态内容转码赋值给具体的结构体
@@ -63,11 +68,12 @@ func NewNotificationListResponse(models []*model.Notification, page, pageSize in
 			item.ActionText = "赞了你的文章"
 			item.ArticleID = content.ArticleID
 			item.Title = content.ArticleTitle
-		default: // 兜底，当收到一个未定义的消息
+		default: // 2.2 兜底分支：收到未定义的通知类型时记录告警
 			item.ActionText = "收到一条新消息"
 			log.Printf("[WARN] 未知的通知类型: type=%d, notify_id=%s", m.Type, m.ID.Hex())
 		}
 
+		// 3. 追加到列表
 		resp.List = append(resp.List, item)
 	}
 	return resp

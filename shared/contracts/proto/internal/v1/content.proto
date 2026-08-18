@@ -1,136 +1,164 @@
-syntax = "proto3";
+// content.proto：Content（内容）服务的内部 gRPC 契约，覆盖文章生命周期、查询与图片上传。
+syntax = "proto3"; // 使用 proto3 语法
 
-package blog.internal.v1;
+package blog.internal.v1; // 内部服务间契约的包名，v1 为契约版本
 
-option go_package = "blog/shared/contracts/gen/internalv1;internalv1";
+option go_package = "blog/shared/contracts/gen/internalv1;internalv1"; // Go 导入路径与包名
 
-import "internal/v1/common.proto";
+import "internal/v1/common.proto"; // 复用 Empty、ArticleUserRequest、UploadURLResponse
 
 // ContentService 是 Content Service 对统一入口和其他服务暴露的内部 gRPC 接口。
 service ContentService {
+  // 创建文章，可直接存为草稿或发表
   rpc CreateArticle(CreateArticleRequest) returns (Empty);
+  // 更新文章内容，仅作者本人可操作
   rpc UpdateArticle(UpdateArticleRequest) returns (Empty);
+  // 软删除文章，进入回收站可恢复
   rpc DeleteArticle(ArticleUserRequest) returns (Empty);
+  // 彻底清除文章，不可恢复
   rpc ClearArticle(ArticleUserRequest) returns (Empty);
+  // 发表文章，草稿转为已发表
   rpc PublishArticle(ArticleUserRequest) returns (Empty);
+  // 从回收站恢复文章为草稿
   rpc RecoverArticle(ArticleUserRequest) returns (Empty);
+  // 获取已发表文章详情，供公开访问
   rpc GetPublishedArticle(ArticleUserRequest) returns (ArticleDetail);
+  // 获取文章详情，作者可见自己的草稿与回收站文章
   rpc GetArticle(ArticleUserRequest) returns (ArticleDetail);
+  // 获取已发表文章列表，供首页与列表页
   rpc GetPublishedList(ListArticlesRequest) returns (ArticleList);
+  // 获取管理后台文章列表，可按状态过滤
   rpc GetAdminList(AdminListRequest) returns (AdminList);
+  // 获取全部可用文章列表（除已删除），供开放接口
   rpc GetAvailableList(ListArticlesRequest) returns (AvailableList);
+  // 获取文章图片直传凭证
   rpc GetImageUploadURL(ImageUploadRequest) returns (UploadURLResponse);
+  // 获取文章精简信息，供其他服务组装通知等场景
   rpc GetArticleInfo(ArticleIDRequest) returns (ArticleInfo);
 }
 
+// 请求：按文章ID查询
 message ArticleIDRequest {
-  uint64 article_id = 1;
+  uint64 article_id = 1; // 文章ID
 }
 
+// 响应：文章精简信息，供跨服务组装展示文案
 message ArticleInfo {
-  uint64 id = 1;
-  uint64 author_id = 2;
-  string title = 3;
+  uint64 id = 1;        // 文章ID
+  uint64 author_id = 2; // 作者用户ID
+  string title = 3;     // 文章标题
 }
 
+// 请求：创建文章
 message CreateArticleRequest {
-  uint64 author_id = 1;
-  string title = 2;
-  string content = 3;
-  repeated string tags = 4;
-  int32 status = 5;
+  uint64 author_id = 1;      // 作者用户ID
+  string title = 2;          // 文章标题
+  string content = 3;        // 文章正文内容（支持Markdown）
+  repeated string tags = 4;  // 文章标签
+  int32 status = 5;          // 文章状态：1-已删除 2-草稿 3-已发表
 }
 
+// 请求：更新文章
 message UpdateArticleRequest {
-  uint64 article_id = 1;
-  uint64 author_id = 2;
-  string title = 3;
-  string content = 4;
-  repeated string tags = 5;
-  int32 status = 6;
+  uint64 article_id = 1;     // 文章ID
+  uint64 author_id = 2;      // 作者用户ID，用于校验归属
+  string title = 3;          // 文章标题
+  string content = 4;        // 文章正文内容（支持Markdown）
+  repeated string tags = 5;  // 文章标签
+  int32 status = 6;          // 文章状态：1-已删除 2-草稿 3-已发表
 }
 
+// 响应：文章详情
 message ArticleDetail {
-  uint64 id = 1;
-  string title = 2;
-  string content = 3;
-  repeated string tags = 4;
-  int32 status = 5;
-  string author_nick = 6;
-  string author_avatar = 7;
-  string ip = 8;
-  int64 created_time = 9;
-  int64 updated_time = 10;
-  bool is_liked = 11;
-  uint64 like_count = 12;
+  uint64 id = 1;               // 文章ID
+  string title = 2;            // 文章标题
+  string content = 3;          // 文章正文内容（支持Markdown）
+  repeated string tags = 4;    // 文章标签
+  int32 status = 5;            // 文章状态：1-已删除 2-草稿 3-已发表
+  string author_nick = 6;      // 作者昵称
+  string author_avatar = 7;    // 作者头像URL
+  string ip = 8;               // 作者最后登录IP的归属地展示
+  int64 created_time = 9;      // 创建时间，Unix 秒
+  int64 updated_time = 10;     // 最后更新时间，Unix 秒
+  bool is_liked = 11;          // 当前请求用户是否已点赞
+  uint64 like_count = 12;      // 点赞数
 }
 
+// 请求：分页获取文章列表，支持游标与页码两种翻页
 message ListArticlesRequest {
-  uint64 page = 1;
-  uint64 page_size = 2;
-  uint64 last_id = 3;
-  bool is_desc = 4;
+  uint64 page = 1;      // 页码，从 1 开始
+  uint64 page_size = 2; // 每页数量
+  uint64 last_id = 3;   // 游标翻页的上一页末条文章ID，0 表示首页
+  bool is_desc = 4;     // 是否按创建时间降序
 }
 
+// 响应：文章列表项
 message ArticleListItem {
-  uint64 id = 1;
-  string title = 2;
-  string summary = 3;
-  uint64 author_id = 4;
-  int64 updated_time = 5;
-  uint32 view_count = 6;
-  uint32 like_count = 7;
-  uint32 comment_count = 8;
+  uint64 id = 1;             // 文章ID
+  string title = 2;          // 文章标题
+  string summary = 3;        // 正文摘要
+  uint64 author_id = 4;      // 作者用户ID
+  int64 updated_time = 5;    // 最后更新时间，Unix 秒
+  uint32 view_count = 6;     // 浏览量
+  uint32 like_count = 7;     // 点赞数
+  uint32 comment_count = 8;  // 评论数
 }
 
+// 响应：已发表文章列表
 message ArticleList {
-  repeated ArticleListItem items = 1;
-  uint64 last_id = 2;
-  uint64 total = 3;
-  uint64 page = 4;
-  uint64 page_size = 5;
+  repeated ArticleListItem items = 1; // 文章列表
+  uint64 last_id = 2;                 // 本页末条文章ID，供下一页游标使用
+  uint64 total = 3;                   // 符合条件的总文章数
+  uint64 page = 4;                    // 当前页码
+  uint64 page_size = 5;               // 每页数量
 }
 
+// 请求：管理后台分页获取文章列表
 message AdminListRequest {
-  uint64 page = 1;
-  uint64 page_size = 2;
-  uint64 last_id = 3;
-  bool is_desc = 4;
-  int32 status = 5;
+  uint64 page = 1;      // 页码，从 1 开始
+  uint64 page_size = 2; // 每页数量
+  uint64 last_id = 3;   // 游标翻页的上一页末条文章ID，0 表示首页
+  bool is_desc = 4;     // 是否按创建时间降序
+  int32 status = 5;     // 状态过滤：-2-全部 -1-全部除已删除 1-已删除 2-草稿 3-已发表
 }
 
+// 响应：管理后台文章列表项
 message AdminListItem {
-  uint64 id = 1;
-  string title = 2;
-  repeated string tags = 3;
-  int32 status = 4;
-  int64 created_time = 5;
-  int64 updated_time = 6;
+  uint64 id = 1;            // 文章ID
+  string title = 2;         // 文章标题
+  repeated string tags = 3; // 文章标签
+  int32 status = 4;         // 文章状态：1-已删除 2-草稿 3-已发表
+  int64 created_time = 5;   // 创建时间，Unix 秒
+  int64 updated_time = 6;   // 最后更新时间，Unix 秒
 }
 
+// 响应：管理后台文章列表
 message AdminList {
-  repeated AdminListItem items = 1;
-  uint64 last_id = 2;
-  uint64 total = 3;
-  uint64 page = 4;
-  uint64 page_size = 5;
+  repeated AdminListItem items = 1; // 文章列表
+  uint64 last_id = 2;               // 本页末条文章ID，供下一页游标使用
+  uint64 total = 3;                 // 符合条件的总文章数
+  uint64 page = 4;                  // 当前页码
+  uint64 page_size = 5;             // 每页数量
 }
 
+// 响应：开放接口可用文章列表项（仅暴露必要字段）
 message AvailableItem {
-  uint64 id = 1;
-  string title = 2;
-  repeated string tags = 3;
-  int64 created_time = 4;
-  int64 updated_time = 5;
+  uint64 id = 1;            // 文章ID
+  string title = 2;         // 文章标题
+  repeated string tags = 3; // 文章标签
+  int64 created_time = 4;   // 创建时间，Unix 秒
+  int64 updated_time = 5;   // 最后更新时间，Unix 秒
 }
 
+// 响应：开放接口可用文章列表
 message AvailableList {
-  repeated AvailableItem items = 1;
-  uint64 total = 2;
-  uint64 page = 3;
-  uint64 page_size = 4;
+  repeated AvailableItem items = 1; // 文章列表
+  uint64 total = 2;                 // 符合条件的总文章数
+  uint64 page = 3;                  // 当前页码
+  uint64 page_size = 4;             // 每页数量
 }
 
+// 请求：获取文章图片直传凭证
 message ImageUploadRequest {
-  string file_ext = 1;
+  string file_ext = 1; // 文件扩展名，如 jpg、png，用于校验类型并生成对象键
 }

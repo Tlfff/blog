@@ -1,7 +1,8 @@
 package common
 
+// 统一业务响应码：200 表示成功，其余按模块划分号段
 const (
-	CodeSuccess = 200
+	CodeSuccess = 200 // 请求成功
 	//------------------------- 请求 ---------------------------------
 	CodeBadRequestFormat    = 1000 //请求体JSON格式错误
 	CodeInvalidParameter    = 1001 // 参数校验失败

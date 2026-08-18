@@ -2,14 +2,16 @@ package config
 
 import "strings"
 
+// Kafka 是 Kafka 相关的全部配置项。
 type Kafka struct {
-	Brokers    string                 `yaml:"brokers"`     //kafka broker 地址
+	Brokers    string                 `yaml:"brokers"`     // kafka broker 地址，多个地址以英文逗号分隔
 	Topics     map[string]TopicConfig `yaml:"topics"`      // 所有 topic 配置
 	Producer   KafkaProducer          `yaml:"producer"`    // 生产者配置
 	Consumer   KafkaConsumer          `yaml:"consumer"`    // 消费者配置
 	DeadLetter DeadLetterConfig       `yaml:"dead_letter"` // 死信队列配置
 }
 
+// TopicConfig 是单个 topic 的名称、消费组与批量/重试参数配置。
 // kafka 主题名称配置
 type TopicConfig struct {
 	Name         string `yaml:"name"`             // topic 名称
@@ -22,6 +24,7 @@ type TopicConfig struct {
 	RetryWait    int    `yaml:"retry_wait_ms"`    // 重试间隔（毫秒），默认 100
 }
 
+// KafkaProducer 是生产者的批量、重试与压缩配置。
 // kafka 生产者配置
 type KafkaProducer struct {
 	Acks            string `yaml:"acks"`             // 确认数: none/one/all
@@ -32,6 +35,7 @@ type KafkaProducer struct {
 	CompressionType string `yaml:"compression_type"` // 压缩类型: none/gzip/snappy/lz4/zstd
 }
 
+// KafkaConsumer 是消费者的拉取、会话与提交偏移量配置。
 // kafka 消费者配置
 type KafkaConsumer struct {
 	MaxBytes       int    `yaml:"max_bytes"`          // 最大拉取字节数
@@ -43,6 +47,7 @@ type KafkaConsumer struct {
 	CommitWait     int    `yaml:"commit_wait_ms"`     // 提交偏移量间隔，默认 100 毫秒
 }
 
+// DeadLetterConfig 是死信队列的 topic、重试与消费组配置。
 // 死信队列配置
 type DeadLetterConfig struct {
 	Topic         string `yaml:"topic"`          // 死信队列 topic 名称

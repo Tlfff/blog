@@ -10,6 +10,7 @@ import (
 )
 
 // 管理生产者和消费者的生命周期
+// Client 是 Kafka 客户端，统一管理生产者与消费者的生命周期。
 type Client struct {
 	mu       sync.RWMutex // 保护生产者和消费者的访问
 	producer *Producer    // Kafka 生产者
@@ -20,6 +21,7 @@ type Client struct {
 
 // NewClient 创建 Kafka 客户端
 // 注意：只初始化 Producer，Consumer 需要单独调用 InitConsumer
+// 创建 Kafka 客户端，只初始化 Producer；Consumer 需另行调用 InitConsumer
 func NewClient(cfg config.Kafka) (*Client, error) {
 	// 1. 获取配置信息
 	if len(cfg.GetBrokerList()) == 0 {
@@ -47,6 +49,7 @@ func NewClient(cfg config.Kafka) (*Client, error) {
 //	获取生产者
 //
 // 如果客户端已关闭，返回 nil
+// 获取生产者，客户端已关闭时返回 nil
 func (c *Client) GetProducer() *Producer {
 	// 1. 检查客户端是否已关闭
 	c.mu.RLock()
@@ -59,6 +62,7 @@ func (c *Client) GetProducer() *Producer {
 }
 
 // 初始化消费者
+// 初始化消费者，重复调用不会重建已有消费者
 func (c *Client) InitConsumer(handlers map[string]MessageHandler) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -85,6 +89,7 @@ func (c *Client) InitConsumer(handlers map[string]MessageHandler) error {
 
 // 启动消费者
 // 需要先调用 InitConsumer
+// 启动消费者，需先调用 InitConsumer
 func (c *Client) StartConsumer(ctx context.Context) error {
 
 	c.mu.RLock()
@@ -104,6 +109,7 @@ func (c *Client) StartConsumer(ctx context.Context) error {
 }
 
 // 关闭消费者
+// 关闭消费者，未初始化时直接返回 nil
 func (c *Client) StopConsumer() error {
 	c.mu.RLock()
 	consumer := c.consumer
@@ -117,6 +123,7 @@ func (c *Client) StopConsumer() error {
 }
 
 // 检查消费者是否已初始化
+// 判断消费者是否已初始化且客户端未关闭
 func (c *Client) IsConsumerReady() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -124,6 +131,7 @@ func (c *Client) IsConsumerReady() bool {
 }
 
 // 检查消费者是否正在运行
+// 判断消费者是否正在运行
 func (c *Client) IsConsumerRunning() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -136,6 +144,7 @@ func (c *Client) IsConsumerRunning() bool {
 }
 
 // 关闭客户端，释放所有资源
+// 关闭客户端并释放生产者与消费者资源
 func (c *Client) Close() error {
 	// 1. 检查客户端是否已关闭
 	c.mu.Lock()

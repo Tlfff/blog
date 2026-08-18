@@ -6,7 +6,7 @@ import "github.com/google/uuid"
 // HeaderName 是 HTTP 与 gRPC metadata 中使用的 Trace ID 字段名。
 const HeaderName = "X-Trace-ID"
 
-// NewID 生成一条请求/消息的 Trace ID。
+// 生成一条请求或消息的 Trace ID
 func NewID() string {
 	return uuid.New().String()
 }

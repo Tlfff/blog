@@ -1,0 +1,90 @@
+{
+  "internal/infrastructure/config/config.go": {
+    "before": {
+      "1": ["Package config 负责加载并解析应用的 YAML 配置。"],
+      "9": ["Config 是应用的顶层配置聚合，对应配置文件的根节点。"],
+      "21": ["JWT 是 C 端用户登录令牌的签名配置。"],
+      "30": ["GRPC 是开放 gRPC 服务的监听配置。"],
+      "40": ["Database 是 MySQL 连接配置。"],
+      "48": ["Redis 是 Redis 连接配置。"],
+      "53": ["Mongodb 是 MongoDB 连接配置。"],
+      "61": ["OSS 是对象存储（MinIO）配置。"],
+      "71": ["从指定路径加载 YAML 配置并反序列化为 Config"]
+    },
+    "eol": {
+      "10": "MySQL 数据库配置",
+      "11": "Redis 缓存配置",
+      "12": "MongoDB 配置，用于存储通知",
+      "13": "Kafka 消息队列配置",
+      "14": "C端用户JWT配置",
+      "15": "二方服务JWT配置",
+      "16": "开放 gRPC 服务配置",
+      "17": "三方合作方密钥列表",
+      "18": "对象存储配置",
+      "27": "二方服务JWT签名密钥",
+      "31": "gRPC 服务监听端口",
+      "41": "数据库用户名",
+      "42": "数据库密码",
+      "43": "数据库主机地址",
+      "44": "数据库端口",
+      "45": "数据库名",
+      "49": "Redis 地址，格式为 host:port",
+      "50": "Redis 逻辑库编号",
+      "51": "Redis 密码，无密码时留空",
+      "54": "MongoDB 主机地址",
+      "55": "MongoDB 端口",
+      "56": "MongoDB 数据库名",
+      "57": "MongoDB 用户名",
+      "58": "MongoDB 密码",
+      "62": "对象存储服务地址",
+      "63": "访问密钥ID",
+      "64": "访问密钥Secret",
+      "65": "存储桶名称",
+      "66": "是否启用HTTPS",
+      "67": "对外访问的公开域名，用于拼接资源URL"
+    }
+  },
+  "internal/infrastructure/identity/avatar_storage.go": {
+    "before": {
+      "11": ["avatarStorageAdapter 是头像对象存储 Port 的 MinIO 适配器。"],
+      "20": ["生成头像上传的预签名 PUT 地址，客户端凭该地址直传对象存储"],
+      "27": ["拼接头像对象的公开访问 URL"],
+      "34": ["删除头像对象，用于替换头像后清理旧文件"]
+    },
+    "eol": {"12": "MinIO 客户端，为空表示未配置对象存储"}
+  },
+  "internal/infrastructure/identity/token_session.go": {
+    "before": {
+      "9": ["tokenSessionAdapter 是登录会话 Port 的 Redis Token 适配器。"],
+      "18": ["创建登录会话并返回 token"],
+      "22": ["根据 token 查询会话，并转换为领域会话对象"],
+      "36": ["删除指定 token 对应的会话，用于用户登出"],
+      "40": ["删除该用户的全部会话，用于强制全端下线"],
+      "44": ["删除该用户除当前 token 外的其他会话，用于改密后保留当前设备"],
+      "48": ["查询该用户当前全部有效 token，用于后台管理"]
+    },
+    "eol": {"10": "底层 Redis 会话实现"}
+  },
+  "internal/infrastructure/identity/password_change_token_store.go": {
+    "before": {
+      "16": ["一次性改密凭证的 Redis Key 前缀与有效期"],
+      "21": ["passwordChangeTokenStore 是改密凭证 Port 的 Redis 适配器。"],
+      "30": ["签发一次性改密凭证，校验旧密码通过后调用"],
+      "45": ["消费一次性改密凭证并返回其绑定的用户ID，凭证用后即失效"]
+    },
+    "eol": {
+      "17": "改密凭证Key前缀",
+      "18": "改密凭证有效期，10分钟",
+      "22": "Redis 客户端"
+    }
+  },
+  "internal/infrastructure/content/article_image_storage.go": {
+    "before": {
+      "10": ["articleImageStorageAdapter 是文章图片存储 Port 的 MinIO 适配器。"],
+      "19": ["生成文章图片上传的预签名 PUT 地址"],
+      "23": ["拼接图片对象的公开访问 URL"],
+      "27": ["移动图片对象，用于把临时目录的图片转正为正式路径"]
+    },
+    "eol": {"11": "MinIO 客户端"}
+  }
+}

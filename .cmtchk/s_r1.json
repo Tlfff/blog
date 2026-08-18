@@ -1,0 +1,42 @@
+{
+  "internal/interfaces/http/routes/article_route.go": {
+    "before": {
+      "1": ["Package routes 负责 HTTP 路由注册，按是否需要登录与角色划分路由组。"],
+      "11": ["注册文章公开路由（游客可访问，无需登录）"],
+      "16": ["注册文章可选登录路由，登录与未登录都能访问但返回内容有差异"],
+      "23": ["注册文章管理路由（需要登录且具备管理员权限）"]
+    },
+    "inner": {
+      "40": ["以下为垃圾箱相关路由：软删除后的文章管理"]
+    }
+  },
+  "internal/interfaces/http/routes/main_route.go": {
+    "before": {
+      "12": ["AppHandler 汇总所有 HTTP Handler 与路由级依赖，新增模块只需在此追加字段。"],
+      "24": ["注册全局中间件并按权限维度挂载全部路由组"]
+    },
+    "eol": {
+      "13": "用户注册登录 Handler",
+      "14": "文章 Handler",
+      "15": "用户资料 Handler",
+      "16": "评论 Handler",
+      "17": "点赞 Handler",
+      "18": "通知 Handler",
+      "21": "Redis 客户端，供鉴权中间件校验会话"
+    }
+  },
+  "internal/interfaces/http/routes/user_route.go": {
+    "inner": {
+      "11": ["用户注册"],
+      "12": ["用户登录"]
+    }
+  },
+  "internal/interfaces/http/routes/like_route.go": {
+    "inner": {
+      "11": ["点赞文章"],
+      "12": ["取消点赞文章"],
+      "14": ["点赞评论"],
+      "15": ["取消点赞评论"]
+    }
+  }
+}

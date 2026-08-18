@@ -14,9 +14,10 @@ import (
 	"github.com/segmentio/kafka-go/compress"
 )
 
+// Producer 是 Kafka 生产者，为每个 topic 维护独立的 writer。
 type Producer struct {
-	writers map[string]*kafka.Writer
-	config  config.Kafka
+	writers map[string]*kafka.Writer // 各 topic 对应的 writer，key 为 topic 配置名
+	config  config.Kafka // Kafka 配置
 }
 
 // 创建 Kafka 生产者。
@@ -69,6 +70,7 @@ func NewProducer(cfg config.Kafka) (*Producer, error) {
 		config:  cfg,
 	}, nil
 }
+// 按 topic 选择分区负载均衡策略
 func getBalancer(topicKey string) kafka.Balancer {
 	switch topicKey {
 	case "notification":
@@ -112,6 +114,7 @@ func (p *Producer) SendNotificationAsync(msg *message.NotificationMsg) {
 // key 为 nil 时，Kafka 使用轮询分区（Round-Robin）
 // key 不为 nil 时，Kafka 使用 Key Hash 分区（相同 Key 分配到同一分区）
 func (p *Producer) sendMessage(ctx context.Context, topicKey string, key []byte, value interface{}) error {
+	// 1. 按 topicKey 取出对应的 writer，未配置则报错
 	// 1. 获取 writer
 	writer, exists := p.writers[topicKey]
 	if !exists {
@@ -134,7 +137,8 @@ func (p *Producer) sendMessage(ctx context.Context, topicKey string, key []byte,
 
 // 关闭所有 writer
 func (p *Producer) Close() error {
-	var errs []error
+	// 1. 逐个关闭 writer，收集所有关闭错误
+	var errs []error // 收集关闭过程中的错误
 	// 1. 关闭所有 writer
 	for topicKey, writer := range p.writers {
 		if err := writer.Close(); err != nil {
@@ -150,6 +154,7 @@ func (p *Producer) Close() error {
 
 // 辅助函数：解析压缩类型
 func parseCompression(compressionType string) compress.Compression {
+	// 1. 按配置名匹配压缩算法，未匹配时兜底为 snappy
 	switch compressionType {
 	case "none":
 		return compress.None
@@ -168,6 +173,7 @@ func parseCompression(compressionType string) compress.Compression {
 
 // 辅助函数：解析确认级别
 func parseRequiredAcks(acks string) kafka.RequiredAcks {
+	// 1. 按配置名匹配确认级别，未匹配时兜底为 one
 	switch acks {
 	case "none":
 		return kafka.RequireNone

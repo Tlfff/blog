@@ -1,34 +1,36 @@
-syntax = "proto3";
+// article.proto：Content 领域文章服务的对外开放接口定义（供三方合作方调用）。
+syntax = "proto3"; // 使用 proto3 语法
 
-package blogopen.v1;
+package blogopen.v1; // 对外开放接口的包名，v1 为契约版本
 
-option go_package = "blog/gen/article;article";
+option go_package = "blog/gen/article;article"; // blog/gen/article 为 Go 导入路径，article 为 Go 包名
 
-// 文章服务定义
+// 文章服务定义：向三方合作方提供文章列表的只读查询能力。
 service ArticleService {
-  // 获取全部可用文章列表 (除已删除)
+  // 获取全部可用文章列表（不含已删除文章），按页返回
   rpc GetAvailableList (GetExternalListRequest) returns (ExternalListResponse);
 }
 
 // 请求：获取文章列表
 message GetExternalListRequest {
-  uint64 page = 1;
-  uint64 page_size = 2;
-  bool is_desc = 3; // 是否按创建时间降序
+  uint64 page = 1;      // 页码，从 1 开始
+  uint64 page_size = 2; // 每页数量
+  bool is_desc = 3;     // 是否按创建时间降序：true-降序 false-升序
 }
 
 // 响应：文章列表
 message ExternalListResponse {
-  repeated ArticleItem items = 1;
-  uint64 total = 2; // 总文章数
-  uint64 page = 3; // 当前页码
-  uint64 page_size = 4; // 每页数量
+  repeated ArticleItem items = 1; // 当前页的文章列表
+  uint64 total = 2;               // 符合条件的总文章数
+  uint64 page = 3;                // 当前页码
+  uint64 page_size = 4;           // 每页数量
 }
 
+// 响应项：对外暴露的单篇文章摘要信息（不含正文）
 message ArticleItem {
-  uint64 id = 1; // 文章ID
-  string title = 2; // 标题
-  repeated string tags = 3; // 标签
-  int64 created_time = 4; // 创建时间
-  int64 updated_time = 5; // 更新时间
+  uint64 id = 1;            // 文章ID
+  string title = 2;         // 文章标题
+  repeated string tags = 3; // 文章标签列表
+  int64 created_time = 4;   // 创建时间，Unix 时间戳（秒）
+  int64 updated_time = 5;   // 最后更新时间，Unix 时间戳（秒）
 }

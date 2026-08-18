@@ -10,8 +10,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// commentRepository 是基于 GORM 的评论 Repository 适配器。
 type commentRepository struct {
-	db *gorm.DB
+	db *gorm.DB // GORM 数据库连接
 }
 
 // NewCommentRepository 返回直接持有 GORM 的 Community 评论 Repository 实现。
@@ -19,9 +20,13 @@ func NewCommentRepository(db *gorm.DB) domaincommunity.CommentRepository {
 	return &commentRepository{db: db}
 }
 
+// 创建评论，并在同一事务内维护主楼回复数与文章评论数
 func (r *commentRepository) CreateWithCounts(ctx context.Context, comment *domaincommunity.Comment, incrementReply bool) error {
+	// 1. 领域对象转换为数据库模型
 	commentModel := toModelComment(comment)
+	// 2. 在事务中创建评论并维护相关计数
 	err := database.RunTx(ctx, r.db, func(tx *gorm.DB) error {
+		// 2.1 回复场景下先加锁校验主楼是否存在且未删除
 		if incrementReply {
 			rootComment, err := r.findByIDForUpdate(ctx, tx, comment.RootID)
 			if err != nil {
@@ -34,25 +39,30 @@ func (r *commentRepository) CreateWithCounts(ctx context.Context, comment *domai
 				return domaincommunity.ErrCommentRootDeleted
 			}
 		}
+		// 2.2 写入评论记录
 		if err := tx.WithContext(ctx).Create(commentModel).Error; err != nil {
 			return err
 		}
+		// 2.3 回复场景下累加主楼的回复数
 		if incrementReply {
 			if err := r.updateCommentCountDelta(ctx, tx, comment.RootID, 1); err != nil {
 				return err
 			}
 		}
+		// 2.4 累加文章的评论数
 		return r.updateArticleCommentCountDelta(ctx, tx, comment.ArticleID, 1)
 	})
 	if err != nil {
 		return err
 	}
+	// 3. 回填自增ID与时间，便于上层直接返回
 	comment.ID = commentModel.ID
 	comment.CreatedTime = commentModel.CreatedTime
 	comment.UpdatedTime = commentModel.UpdatedTime
 	return nil
 }
 
+// 按ID查询单条评论，未命中时返回领域错误
 func (r *commentRepository) FindByID(ctx context.Context, id uint64) (*domaincommunity.Comment, error) {
 	var m model.Comment
 	err := r.db.WithContext(ctx).
@@ -68,7 +78,9 @@ func (r *commentRepository) FindByID(ctx context.Context, id uint64) (*domaincom
 	return toDomainComment(&m), nil
 }
 
+// 分页查询文章的主楼评论列表，同时联表补齐作者与被回复者信息
 func (r *commentRepository) ListRootComments(ctx context.Context, articleID, lastID uint64, page, pageSize int, isDesc bool, authorID uint64) ([]*domaincommunity.CommentWithUser, error) {
+	// 1. 联表查询评论及作者、被回复者的公开信息
 	tx := r.db.WithContext(ctx).Table("comments c").
 		Select(`c.id, c.article_id, c.user_id, c.reply_to_user_id, c.content, c.root_id, c.like_count, c.comment_count, c.ip, c.created_time, c.updated_time, c.status,
 			u1.nickname AS nickname, u1.avatar AS avatar, u1.last_login_ip AS last_login_ip,
@@ -76,9 +88,11 @@ func (r *commentRepository) ListRootComments(ctx context.Context, articleID, las
 		Joins("LEFT JOIN users u1 ON c.user_id = u1.id").
 		Joins("LEFT JOIN users u2 ON c.reply_to_user_id = u2.id").
 		Where("c.article_id = ? AND c.root_id = 0 AND c.status = ?", articleID, model.CommentLiked)
+	// 2. 只看楼主时追加作者过滤
 	if authorID > 0 {
 		tx = tx.Where("c.user_id = ?", authorID)
 	}
+	// 3. 有游标走游标分页，否则走传统 Offset 分页
 	if lastID > 0 {
 		if isDesc {
 			tx = tx.Where("c.id < ?", lastID).Order("c.id DESC")
@@ -94,6 +108,7 @@ func (r *commentRepository) ListRootComments(ctx context.Context, articleID, las
 		}
 		tx = tx.Limit(pageSize).Offset((page - 1) * pageSize)
 	}
+	// 4. 扫描结果并转换为领域对象
 	var rows []*commentWithUserRow
 	if err := tx.Scan(&rows).Error; err != nil {
 		return nil, err
@@ -101,10 +116,13 @@ func (r *commentRepository) ListRootComments(ctx context.Context, articleID, las
 	return toDomainCommentWithUsers(rows), nil
 }
 
+// 统计文章的主楼评论总数，支持只看楼主
 func (r *commentRepository) CountRootComments(ctx context.Context, articleID, authorID uint64) (int64, error) {
 	var count int64
+	// 1. 统计条件：指定文章的正常状态主楼评论
 	tx := r.db.WithContext(ctx).Model(&model.Comment{}).
 		Where("article_id=? AND root_id=0 AND status=?", articleID, model.Published)
+	// 2. 只看楼主时追加作者过滤
 	if authorID > 0 {
 		tx = tx.Where("user_id=?", authorID)
 	}
@@ -114,7 +132,9 @@ func (r *commentRepository) CountRootComments(ctx context.Context, articleID, au
 	return count, nil
 }
 
+// 分页查询指定主楼下的回复列表（楼中楼）
 func (r *commentRepository) ListReplies(ctx context.Context, rootID, lastID uint64, page, pageSize int) ([]*domaincommunity.CommentWithUser, error) {
+	// 1. 联表查询回复及作者、被回复者的公开信息
 	tx := r.db.WithContext(ctx).Table("comments c").
 		Select(`c.id, c.article_id, c.user_id, c.reply_to_user_id, c.content, c.root_id, c.like_count, c.comment_count, c.ip, c.created_time, c.updated_time, c.status,
 			u1.nickname AS nickname, u1.avatar AS avatar, u1.last_login_ip AS last_login_ip,
@@ -122,11 +142,13 @@ func (r *commentRepository) ListReplies(ctx context.Context, rootID, lastID uint
 		Joins("LEFT JOIN users u1 ON c.user_id = u1.id").
 		Joins("LEFT JOIN users u2 ON c.reply_to_user_id = u2.id").
 		Where("c.root_id = ? AND c.status = ?", rootID, model.CommentLiked)
+	// 2. 有游标走游标分页，否则走传统 Offset 分页
 	if lastID > 0 {
 		tx = tx.Where("c.id > ?", lastID).Order("c.id ASC").Limit(pageSize)
 	} else {
 		tx = tx.Order("c.id ASC").Limit(pageSize).Offset((page - 1) * pageSize)
 	}
+	// 3. 扫描结果并转换为领域对象
 	var rows []*commentWithUserRow
 	if err := tx.Scan(&rows).Error; err != nil {
 		return nil, err
@@ -134,6 +156,7 @@ func (r *commentRepository) ListReplies(ctx context.Context, rootID, lastID uint
 	return toDomainCommentWithUsers(rows), nil
 }
 
+// 统计指定主楼下的回复总数
 func (r *commentRepository) CountReplies(ctx context.Context, rootID uint64) (int64, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Model(&model.Comment{}).
@@ -142,8 +165,11 @@ func (r *commentRepository) CountReplies(ctx context.Context, rootID uint64) (in
 	return count, err
 }
 
+// 删除评论，并在同一事务内维护主楼回复数与文章评论数
 func (r *commentRepository) DeleteWithCounts(ctx context.Context, comment *domaincommunity.Comment) error {
+	// 1. 领域对象转换为数据库模型
 	commentModel := toModelComment(comment)
+	// 2. 主楼评论：连带软删其下全部回复，并按实际条数扣减文章评论数
 	if commentModel.RootID == 0 {
 		return database.RunTx(ctx, r.db, func(tx *gorm.DB) error {
 			replyCount, err := r.batchUpdateChildCommentStatus(ctx, tx, commentModel.ID)
@@ -160,6 +186,7 @@ func (r *commentRepository) DeleteWithCounts(ctx context.Context, comment *domai
 			return r.updateArticleCommentCountDelta(ctx, tx, commentModel.ArticleID, -(1 + replyCount))
 		})
 	}
+	// 3. 回复评论：只软删自身，同时扣减主楼回复数与文章评论数
 	return database.RunTx(ctx, r.db, func(tx *gorm.DB) error {
 		affected, err := r.updateStatus(ctx, tx, commentModel.ID, uint8(domaincommunity.CommentStatusDeleted))
 		if err != nil {
@@ -175,7 +202,9 @@ func (r *commentRepository) DeleteWithCounts(ctx context.Context, comment *domai
 	})
 }
 
+// 在事务内加行锁查询评论，避免并发回复与删除产生计数错乱
 func (r *commentRepository) findByIDForUpdate(ctx context.Context, tx *gorm.DB, id uint64) (*model.Comment, error) {
+	// 1. 使用 FOR UPDATE 加行锁读取评论
 	var comment model.Comment
 	err := tx.WithContext(ctx).
 		Select("id", "article_id", "user_id", "reply_to_user_id", "content", "root_id", "like_count", "comment_count", "ip", "created_time", "updated_time", "status").
@@ -188,19 +217,23 @@ func (r *commentRepository) findByIDForUpdate(ctx context.Context, tx *gorm.DB, 
 	return &comment, nil
 }
 
+// 按增量更新主楼评论的回复数
 func (r *commentRepository) updateCommentCountDelta(ctx context.Context, tx *gorm.DB, id uint64, delta int64) error {
 	return tx.WithContext(ctx).Model(&model.Comment{}).
 		Where("id = ?", id).
 		UpdateColumn("comment_count", gorm.Expr("comment_count + ?", delta)).Error
 }
 
+// 按增量更新文章的评论数
 func (r *commentRepository) updateArticleCommentCountDelta(ctx context.Context, tx *gorm.DB, articleID uint64, delta int64) error {
 	return tx.WithContext(ctx).Model(&model.Article{}).
 		Where("id = ?", articleID).
 		UpdateColumn("comment_count", gorm.Expr("comment_count + ?", delta)).Error
 }
 
+// 批量把指定主楼下的正常回复标记为已删除，返回受影响行数
 func (r *commentRepository) batchUpdateChildCommentStatus(ctx context.Context, tx *gorm.DB, rootID uint64) (int64, error) {
+	// 1. 把该主楼下所有正常回复批量标记为已删除
 	res := tx.WithContext(ctx).
 		Model(&model.Comment{}).
 		Where("root_id = ? AND status = ?", rootID, model.CommentLiked).
@@ -208,22 +241,26 @@ func (r *commentRepository) batchUpdateChildCommentStatus(ctx context.Context, t
 	return res.RowsAffected, res.Error
 }
 
+// 把指定评论从正常状态更新为目标状态，返回受影响行数
 func (r *commentRepository) updateStatus(ctx context.Context, tx *gorm.DB, id uint64, status uint8) (int64, error) {
+	// 1. 仅当评论当前为正常状态时才更新，避免重复扣减计数
 	res := tx.WithContext(ctx).Model(&model.Comment{}).
 		Where("id=? AND status = ?", id, model.CommentLiked).
 		Update("status", status)
 	return res.RowsAffected, res.Error
 }
 
+// commentWithUserRow 是评论联表查询的行映射结构。
 type commentWithUserRow struct {
-	model.Comment
-	Nickname      string `gorm:"column:nickname"`
-	Avatar        string `gorm:"column:avatar"`
-	IP            string `gorm:"column:last_login_ip"`
-	ReplyNickname string `gorm:"column:reply_nickname"`
-	ReplyAvatar   string `gorm:"column:reply_avatar"`
+	model.Comment        // 内嵌评论表字段
+	Nickname      string `gorm:"column:nickname"`       // 评论发布者昵称
+	Avatar        string `gorm:"column:avatar"`         // 评论发布者头像URL
+	IP            string `gorm:"column:last_login_ip"`  // 评论发布者最后登录IP，用于展示归属地
+	ReplyNickname string `gorm:"column:reply_nickname"` // 被回复者昵称
+	ReplyAvatar   string `gorm:"column:reply_avatar"`   // 被回复者头像URL
 }
 
+// 把评论领域对象转换为数据库模型
 func toModelComment(c *domaincommunity.Comment) *model.Comment {
 	return &model.Comment{
 		ID:            c.ID,
@@ -241,6 +278,7 @@ func toModelComment(c *domaincommunity.Comment) *model.Comment {
 	}
 }
 
+// 把数据库模型转换为评论领域对象
 func toDomainComment(m *model.Comment) *domaincommunity.Comment {
 	return &domaincommunity.Comment{
 		ID:            m.ID,
@@ -258,7 +296,9 @@ func toDomainComment(m *model.Comment) *domaincommunity.Comment {
 	}
 }
 
+// 把联表查询结果批量转换为带用户信息的评论领域对象
 func toDomainCommentWithUsers(rows []*commentWithUserRow) []*domaincommunity.CommentWithUser {
+	// 1. 逐行转换评论主体并附加用户展示信息
 	result := make([]*domaincommunity.CommentWithUser, 0, len(rows))
 	for _, row := range rows {
 		comment := toDomainComment(&row.Comment)

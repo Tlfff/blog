@@ -1,3 +1,4 @@
+// Package auth 提供登录会话、JWT 与 HMAC 签名等认证能力。
 package auth
 
 import (

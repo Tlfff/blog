@@ -1,23 +1,24 @@
-syntax = "proto3";
+// comment.proto：Community 领域评论服务的对外开放接口定义（供三方合作方调用）。
+syntax = "proto3"; // 使用 proto3 语法
 
-package blogopen.v1;
+package blogopen.v1; // 对外开放接口的包名，v1 为契约版本
 
-option go_package = "blog/gen/comment;comment";
+option go_package = "blog/gen/comment;comment"; // blog/gen/comment 为 Go 导入路径，comment 为 Go 包名
 
-// 评论服务定义
+// 评论服务定义：向三方合作方提供评论互动数据的只读查询能力。
 service CommentService {
-  // 获取评论的点赞数和热度值
+  // 获取单条评论的点赞数与热度值
   rpc GetCommentStats (GetCommentStatsRequest) returns (GetCommentStatsResponse);
 }
 
 // 请求：获取评论统计
 message GetCommentStatsRequest {
-  uint64 comment_id = 1;
+  uint64 comment_id = 1; // 评论ID
 }
 
 // 响应：评论统计信息
 message GetCommentStatsResponse {
   uint64 comment_id = 1; // 评论ID
-  uint64 hot_value = 2;   // 热度值 (点赞数 + 评论数)
-  uint64 like_count = 3;  // 点赞数
+  uint64 hot_value = 2;  // 热度值（点赞数 + 子评论数）
+  uint64 like_count = 3; // 点赞数
 }

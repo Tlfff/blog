@@ -9,8 +9,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// hotRankStoreAdapter 是热榜存储 Port 的 Redis ZSet 实现。
 type hotRankStoreAdapter struct {
-	rdb *redis.Client
+	rdb *redis.Client // Redis 客户端
 }
 
 // NewHotRankStore 提供热榜 Redis ZSet 读写。
@@ -18,6 +19,7 @@ func NewHotRankStore(rdb *redis.Client) domaincommunity.HotRankStore {
 	return &hotRankStoreAdapter{rdb: rdb}
 }
 
+// 按热度倒序取出前 limit 篇文章，跳过成员格式非法的脏数据
 func (a *hotRankStoreAdapter) GetTop(ctx context.Context, limit int) ([]domaincommunity.HotRankItem, error) {
 	values, err := a.rdb.ZRangeArgsWithScores(ctx, redis.ZRangeArgs{
 		Key:   consts.KeyArticleHotRankZSet,
@@ -46,6 +48,7 @@ func (a *hotRankStoreAdapter) GetTop(ctx context.Context, limit int) ([]domainco
 	return items, nil
 }
 
+// 用事务流水线重建热榜：先删除旧 ZSet 再整体写入，保证读到的榜单不会半新半旧
 func (a *hotRankStoreAdapter) Rebuild(ctx context.Context, entries []domaincommunity.HotRankItem) error {
 	key := consts.KeyArticleHotRankZSet
 	if len(entries) == 0 {

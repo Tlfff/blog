@@ -1,0 +1,15 @@
+{
+  "internal/interfaces/http/middleware/view_history_middleware.go": {
+    "before": {
+      "15": ["SendViewHistory 发送一条浏览历史事件，由 Application 层实现"]
+    },
+    "inner": {
+      "40": ["4. 主流程继续执行，浏览历史失败不影响接口返回"]
+    }
+  },
+  "internal/interfaces/http/middleware/logger_middleware.go": {
+    "inner": {
+      "30": ["1.1 记录请求进入时间与基础请求信息，供结束日志计算耗时"]
+    }
+  }
+}

@@ -8,19 +8,20 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// 未来增加新模块，只需在这里加一行，不需要改 InitRoute 的签名
+// AppHandler 汇总所有 HTTP Handler 与路由级依赖，新增模块只需在此追加字段。
 type AppHandler struct {
-	UserAuth *handler.UserAuthHandler
-	Article  *handler.ArticleHandler
-	User     *handler.UserHandler
-	Comment  *handler.CommentHandler
-	Like     *handler.LikeHandler
-	Notify   *handler.NotificationHandler
+	UserAuth *handler.UserAuthHandler     // 用户注册登录 Handler
+	Article  *handler.ArticleHandler      // 文章 Handler
+	User     *handler.UserHandler         // 用户资料 Handler
+	Comment  *handler.CommentHandler      // 评论 Handler
+	Like     *handler.LikeHandler         // 点赞 Handler
+	Notify   *handler.NotificationHandler // 通知 Handler
 	// 浏览历史服务，路由级中间件使用（不经过 handler）
-	ViewHistory middleware.ViewHistorySender
-	Redis       *redis.Client
+	ViewHistory middleware.ViewHistorySender // 浏览历史发送器，供浏览历史中间件异步投递事件
+	Redis       *redis.Client                // Redis 客户端，供鉴权中间件校验会话
 }
 
+// 注册全局中间件并按权限维度挂载全部路由组
 func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 	// 1. 全局中间件
 	r.Use(middleware.LoggerMiddleware())

@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+// User 是用户数据模型（GORM 映射 users 表）。
 type User struct {
 	ID            uint64    `gorm:"column:id;primaryKey;autoIncrement" ` // 用户唯一标识
 	Nickname      string    `gorm:"column:nickname" `                    // 用户昵称

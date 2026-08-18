@@ -24,16 +24,20 @@ func InitOpenJWT(secret string) {
 // 二方服务token的Payload：
 // service_id 标识调用方服务（授权主体），team_id 标识所属团队（仅用于统计，不参与授权）
 type OpenClaims struct {
-	ServiceID string `json:"service_id"`
-	TeamID    string `json:"team_id"`
+	ServiceID string `json:"service_id"` // 调用方服务标识，作为授权主体
+	TeamID    string `json:"team_id"`    // 所属团队标识，仅用于统计，不参与授权
 	jwt.RegisteredClaims
 }
 
 // 给内部服务颁发token（平台组统一下发）
+// 给二方服务颁发 token，由平台组统一下发
+// serviceID 为授权主体，teamID 仅用于统计
 func OpenGenerateToken(serviceID, teamID string) (string, error) {
+	// 1. 校验密钥是否已注入
 	if len(openJWTSecret) == 0 {
 		return "", errors.New("二方jwt密钥未初始化")
 	}
+	// 2. 组装 Claims，设置签发者与有效期
 	now := time.Now()
 	claims := &OpenClaims{
 		ServiceID: serviceID,
@@ -44,11 +48,14 @@ func OpenGenerateToken(serviceID, teamID string) (string, error) {
 			ExpiresAt: jwt.NewNumericDate(now.Add(OpenJWTExpireTime)),
 		},
 	}
+	// 3. 使用 HS256 签名并返回 token 字符串
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(openJWTSecret)
 }
 
 // 解析并校验二方token（gRPC拦截器使用）
+// 解析并校验二方 token，供 gRPC 拦截器使用
 func OpenVerifyToken(tokenString string) (*OpenClaims, error) {
+	// 1. 解析 token 并校验签名、签发者与过期时间
 	claims := &OpenClaims{}
 	_, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (any, error) {
 		if len(openJWTSecret) == 0 {
@@ -60,6 +67,7 @@ func OpenVerifyToken(tokenString string) (*OpenClaims, error) {
 		jwt.WithIssuer(OpenJWTIssuer),                                // 校验签发者
 		jwt.WithExpirationRequired(),                                 // exp必须存在且未过期
 	)
+	// 2. 将 jwt 库错误映射为统一业务错误
 	if err != nil {
 		switch {
 		case errors.Is(err, jwt.ErrTokenExpired):
@@ -72,5 +80,6 @@ func OpenVerifyToken(tokenString string) (*OpenClaims, error) {
 			return nil, common.ErrTokenInvalid
 		}
 	}
+	// 3. 校验通过，返回 Claims
 	return claims, nil
 }

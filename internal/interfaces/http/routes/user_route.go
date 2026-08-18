@@ -8,7 +8,9 @@ import (
 
 // 用户公开接口
 func InitUserPublicRoutes(r *gin.RouterGroup, userAuthHandler *handler.UserAuthHandler, userHandler *handler.UserHandler) {
+	// 用户注册
 	r.POST("/user/register", userAuthHandler.Register)
+	// 用户登录
 	r.POST("/user/login", userAuthHandler.Login)
 	// 查看他人主页
 	r.GET("/user/profile", userHandler.GetPublicProfile)

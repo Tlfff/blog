@@ -12,9 +12,9 @@ import (
 
 // DeadLetterProducer 死信队列生产者
 type DeadLetterProducer struct {
-	writer *kafka.Writer
-	config config.Kafka
-	closed bool // 不需要锁保护，因为 Close 只在程序退出时调用
+	writer *kafka.Writer // 死信 topic 对应的 writer
+	config config.Kafka  // Kafka 配置
+	closed bool          // 不需要锁保护，因为 Close 只在程序退出时调用
 }
 
 // 创建死信队列生产者
@@ -56,6 +56,7 @@ func NewDeadLetterProducer(cfg config.Kafka) (*DeadLetterProducer, error) {
 
 // Send 发送消息到死信队列
 func (p *DeadLetterProducer) Send(ctx context.Context, dlMsg *DeadLetterMessage) error {
+	// 1. 已关闭的生产者不允许再发送
 	if p.closed {
 		return fmt.Errorf("死信队列生产者已关闭")
 	}
@@ -92,7 +93,8 @@ func (p *DeadLetterProducer) Send(ctx context.Context, dlMsg *DeadLetterMessage)
 
 // 带重试的发送方法
 func (p *DeadLetterProducer) SendWithRetry(ctx context.Context, dlMsg *DeadLetterMessage, maxRetries int) error {
-	var lastErr error
+	// 1. 循环重试发送，记录最后一次错误
+	var lastErr error // 最后一次发送失败的错误
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		err := p.Send(ctx, dlMsg)
 		if err == nil {
@@ -114,11 +116,13 @@ func (p *DeadLetterProducer) SendWithRetry(ctx context.Context, dlMsg *DeadLette
 
 // 关闭死信队列生产者
 func (p *DeadLetterProducer) Close() error {
+	// 1. 已关闭则直接返回，保证幂等
 	if p.closed {
 		return nil
 	}
 	p.closed = true
 
+	// 2. 关闭底层 writer，释放网络连接
 	if p.writer != nil {
 		if err := p.writer.Close(); err != nil {
 			return fmt.Errorf("关闭死信队列 Writer 失败: %w", err)

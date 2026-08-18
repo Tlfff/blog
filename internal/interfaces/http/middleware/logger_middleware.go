@@ -27,6 +27,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 		// 顺手让响应头也带上，方便前端拿着这个 ID 找后端对账
 		c.Header("X-Trace-ID", traceID)
 
+		// 1.1 记录请求进入时间与基础请求信息，供结束日志计算耗时
 		startTime := time.Now()
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery

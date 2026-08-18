@@ -31,7 +31,7 @@ type GetReplyListRequest struct {
 	LastID   uint64 `form:"last_id" binding:"min=0"`           // 游标ID
 }
 
-// 管理员后台强删
 type AdminDeleteRequest struct {
-	ID uint64 `json:"id" binding:"required,min=1"`
+	// AdminDeleteRequest 是管理员强制删除评论的请求 DTO。
+	ID uint64 `json:"id" binding:"required,min=1"` //
 }

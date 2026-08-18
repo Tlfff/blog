@@ -2,6 +2,7 @@ package consts
 
 import "time"
 
+// 分布式锁与缓存过期相关常量
 const (
 	LockExpire       = 3 * time.Second       // 锁过期时间
 	RetryCount       = 5                     // 重试次数

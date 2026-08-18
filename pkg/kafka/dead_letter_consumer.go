@@ -23,13 +23,13 @@ type DeadLetterHandler func(ctx context.Context, dlMsg *DeadLetterMessage) error
 // DeadLetterConsumer 死信队列消费者
 // 独立的消费者组，消费 dead_letter topic 的消息
 type DeadLetterConsumer struct {
-	reader  *kafka.Reader     // 死信队列的 Reader
-	config  config.Kafka      // Kafka 配置
-	handler DeadLetterHandler // 死信消息处理器
-	mu      sync.RWMutex
+	reader  *kafka.Reader      // 死信队列的 Reader
+	config  config.Kafka       // Kafka 配置
+	handler DeadLetterHandler  // 死信消息处理器
+	mu      sync.RWMutex       // 读写锁，保护 running 状态
 	cancel  context.CancelFunc // 取消函数
-	wg      sync.WaitGroup
-	running bool // 是否正在运行
+	wg      sync.WaitGroup     // 等待消费 goroutine 退出
+	running bool               // 是否正在运行
 }
 
 // NewDeadLetterConsumer 创建死信队列消费者
@@ -38,6 +38,7 @@ type DeadLetterConsumer struct {
 //   - cfg: Kafka 配置
 //   - handler: 死信消息处理器，由业务方实现
 func NewDeadLetterConsumer(cfg config.Kafka, handler DeadLetterHandler) (*DeadLetterConsumer, error) {
+	// 1. 获取死信队列相关配置：broker 列表、topic 与消费者组
 
 	// 1. 获取配置
 	brokers := cfg.GetBrokerList()
@@ -68,6 +69,7 @@ func NewDeadLetterConsumer(cfg config.Kafka, handler DeadLetterHandler) (*DeadLe
 	}, nil
 }
 
+// 启动死信队列消费者，阻塞直到上下文取消或调用 Stop
 // 启动死信队列消费者（阻塞）
 func (c *DeadLetterConsumer) Start(ctx context.Context) error {
 	// 1. 检查是否已启用
@@ -98,11 +100,13 @@ func (c *DeadLetterConsumer) Start(ctx context.Context) error {
 	return nil
 }
 
+// 循环拉取死信消息，解析元信息后交给业务处理器并提交 offset
 // 消费循环
 func (c *DeadLetterConsumer) consumeLoop(ctx context.Context) {
 	defer c.wg.Done()
 	defer c.reader.Close()
 
+	// 1. 循环拉取消息，直到上下文被取消
 	for {
 		select {
 		case <-ctx.Done():
@@ -155,7 +159,7 @@ func (c *DeadLetterConsumer) consumeLoop(ctx context.Context) {
 	}
 }
 
-// commitWithRetry 提交 offset（含重试）
+// 提交 offset 并在失败时按次数递增间隔重试
 func (c *DeadLetterConsumer) commitWithRetry(ctx context.Context, msg kafka.Message) {
 	commitMaxRetries := c.config.GetDeadLetterMaxRetries()
 	commitWait := time.Duration(c.config.Consumer.CommitWait) * time.Millisecond
@@ -177,6 +181,7 @@ func (c *DeadLetterConsumer) commitWithRetry(ctx context.Context, msg kafka.Mess
 	}
 }
 
+// 停止死信队列消费者，取消上下文并等待消费协程退出
 // Stop 停止死信队列消费者
 func (c *DeadLetterConsumer) Stop() error {
 	if c == nil {
@@ -201,11 +206,13 @@ func (c *DeadLetterConsumer) Stop() error {
 	return nil
 }
 
+// 关闭死信队列消费者，等价于 Stop
 // Close 关闭死信队列消费者
 func (c *DeadLetterConsumer) Close() error {
 	return c.Stop()
 }
 
+// 检查死信队列消费者是否正在运行
 // IsRunning 检查是否正在运行
 func (c *DeadLetterConsumer) IsRunning() bool {
 	if c == nil {

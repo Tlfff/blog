@@ -1,3 +1,4 @@
+// Package oss 封装 MinIO 对象存储的预签名上传、移动与删除能力。
 package oss
 
 import (
@@ -9,11 +10,13 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
+// MinioClient 是 MinIO 对象存储客户端封装。
 type MinioClient struct {
-	client *minio.Client
-	bucket string
+	client *minio.Client // MinIO 原生客户端
+	bucket string        // 默认操作的 bucket 名称
 }
 
+// 创建 MinIO 客户端封装，useSSL 控制是否使用 HTTPS 访问
 func NewMinioClient(endpoint, ak, sk, bucket string, useSSL bool) (*MinioClient, error) {
 	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(ak, sk, ""),
@@ -25,7 +28,7 @@ func NewMinioClient(endpoint, ak, sk, bucket string, useSSL bool) (*MinioClient,
 	return &MinioClient{client: client, bucket: bucket}, nil
 }
 
-// 生成预签名 PUT URL
+// 生成预签名 PUT URL，调用方可在 ttl 有效期内直传文件到对象存储
 func (m *MinioClient) PresignedPutURL(ctx context.Context, objectKey string, ttl time.Duration) (string, error) {
 	url, err := m.client.PresignedPutObject(ctx, m.bucket, objectKey, ttl)
 	if err != nil {
@@ -34,7 +37,7 @@ func (m *MinioClient) PresignedPutURL(ctx context.Context, objectKey string, ttl
 	return url.String(), nil
 }
 
-// 删除对象
+// 删除指定对象
 func (m *MinioClient) DeleteObject(ctx context.Context, objectKey string) error {
 	return m.client.RemoveObject(ctx, m.bucket, objectKey, minio.RemoveObjectOptions{})
 }
@@ -54,7 +57,7 @@ func (m *MinioClient) MoveObject(ctx context.Context, srcKey, dstKey string) err
 	return m.client.RemoveObject(ctx, m.bucket, srcKey, minio.RemoveObjectOptions{})
 }
 
-// 获取对象完整 URL
+// 拼接对象的对外访问完整 URL
 func (m *MinioClient) GetObjectURL(publicDomain, objectKey string) string {
 	return publicDomain + "/" + objectKey
 }

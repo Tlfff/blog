@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// 负责连接 MongoDB
+// 连接 MongoDB 并返回指定库的数据库句柄
 func NewMongoDBClient(username, password, host, dbname string, port int) (*mongo.Database, error) {
 	var dsn string
 	// authSource=admin：官方镜像通过 MONGO_INITDB_ROOT_USERNAME 创建的用户存放在 admin 库，

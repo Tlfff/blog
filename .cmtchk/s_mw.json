@@ -1,0 +1,34 @@
+{
+ "internal/interfaces/http/middleware/admin_check_middleware.go": {
+   "inner": {
+     "14": ["1. 从上下文取出鉴权中间件注入的用户信息"],
+     "15": ["2. 角色不是管理员则中断请求"],
+     "21": ["3. 校验通过，放行到后续 Handler"]
+   }
+ },
+ "internal/interfaces/http/middleware/error_middleware.go": {
+   "before": {
+     "10": ["统一收口 Handler 通过 c.Error 抛出的错误，转换为业务错误码并返回"]
+   },
+   "inner": {
+     "12": ["1. 先执行后续 Handler，等业务处理完再统一处理错误"],
+     "20": ["2. 将业务错误映射为对外错误码后返回"]
+   }
+ },
+ "internal/interfaces/http/middleware/duplicate_middleware.go": {
+   "before": {
+     "33": ["拦截同一用户在 expire 时间内对同一路由的重复提交"]
+   }
+ },
+ "internal/interfaces/http/middleware/auth_middleware.go": {
+   "before": {
+     "12": ["校验 Authorization 请求头并返回用户上下文与原始 Token"]
+   },
+   "inner": {
+     "48": ["1. 校验 Token 并解析用户信息"],
+     "55": ["2. 校验通过，把用户信息与 Token 注入上下文供 Handler 使用"],
+     "68": ["1. 尝试校验 Token，失败也不拦截请求"],
+     "70": ["2. 已登录则注入用户信息，未登录按游客继续处理"]
+   }
+ }
+}
