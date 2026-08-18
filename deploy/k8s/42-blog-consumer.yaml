@@ -1,4 +1,4 @@
-# Kafka 消费者：消费 notification 和 view_history 两个 topic，启动命令 kafka-consume
+# Kafka 消费者：保留为兼容入口；生产环境消费者已由 Community Service（blog-community）承载
 # 纯后台任务，不需要对外暴露端口，所以没有 Service
 apiVersion: apps/v1
 kind: Deployment

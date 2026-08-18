@@ -3,95 +3,142 @@ package community
 import (
 	domaincommunity "blog/internal/domain/community"
 	"blog/internal/model"
-	"blog/internal/repository"
 	"blog/pkg/database"
 	"context"
 
 	"gorm.io/gorm"
 )
 
-type articleLikeRepositoryAdapter struct {
-	repo repository.ArticleLikeRepository
+type articleLikeRepository struct {
+	db *gorm.DB
 }
 
-// NewArticleLikeRepository 将 GORM 文章点赞 Repository 适配为 Community 领域 Port。
-func NewArticleLikeRepository(repo repository.ArticleLikeRepository) domaincommunity.ArticleLikeRepository {
-	return &articleLikeRepositoryAdapter{repo: repo}
+// NewArticleLikeRepository 返回直接持有 GORM 的文章点赞 Repository 实现。
+func NewArticleLikeRepository(db *gorm.DB) domaincommunity.ArticleLikeRepository {
+	return &articleLikeRepository{db: db}
 }
 
-func (a *articleLikeRepositoryAdapter) SetLiked(ctx context.Context, userID, articleID uint64, liked bool) error {
+func (r *articleLikeRepository) SetLiked(ctx context.Context, userID, articleID uint64, liked bool) error {
 	status := domaincommunity.LikeStatusCanceled
 	delta := -1
 	if liked {
 		status = domaincommunity.LikeStatusLiked
 		delta = 1
 	}
-	ok, err := a.repo.FindRecord(ctx, userID, articleID)
+	exists, err := r.findRecord(ctx, userID, articleID)
 	if err != nil {
 		return err
 	}
-	return database.RunTx(ctx, a.repo.GetDB(), func(tx *gorm.DB) error {
-		if ok {
-			if err := a.repo.Update(ctx, tx, userID, articleID, status); err != nil {
+	return database.RunTx(ctx, r.db, func(tx *gorm.DB) error {
+		if exists {
+			if err := tx.WithContext(ctx).
+				Model(&model.ArticleLike{}).
+				Where("user_id = ? AND article_id = ?", userID, articleID).
+				Update("status", status).Error; err != nil {
 				return err
 			}
 		} else {
 			like := &model.ArticleLike{UserID: userID, ArticleID: articleID, Status: status}
-			if err := a.repo.Insert(ctx, tx, like); err != nil {
+			if err := tx.WithContext(ctx).Create(like).Error; err != nil {
 				return err
 			}
 		}
-		return a.repo.UpdateArticleLikeCountDelta(ctx, tx, articleID, delta)
+		return tx.WithContext(ctx).
+			Model(&model.Article{}).
+			Where("id = ?", articleID).
+			UpdateColumn("like_count", gorm.Expr("like_count + ?", delta)).Error
 	})
 }
 
-func (a *articleLikeRepositoryAdapter) IsLiked(ctx context.Context, userID, articleID uint64) (bool, error) {
-	return a.repo.IsLiked(ctx, userID, articleID)
+func (r *articleLikeRepository) IsLiked(ctx context.Context, userID, articleID uint64) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&model.ArticleLike{}).
+		Where("user_id = ? and article_id = ? and status=?", userID, articleID, model.ArticleLiked).
+		Count(&count).Error
+	return count > 0, err
 }
 
-func (a *articleLikeRepositoryAdapter) GetLikedUserIDs(ctx context.Context, articleID uint64) ([]uint64, error) {
-	return a.repo.GetLikedUserIDs(ctx, articleID)
+func (r *articleLikeRepository) GetLikedUserIDs(ctx context.Context, articleID uint64) ([]uint64, error) {
+	var userIDs []uint64
+	err := r.db.WithContext(ctx).Model(&model.ArticleLike{}).
+		Where("article_id=? and status=?", articleID, model.ArticleLiked).
+		Pluck("user_id", &userIDs).Error
+	return userIDs, err
 }
 
-type commentLikeRepositoryAdapter struct {
-	repo repository.CommentLikeRepository
+func (r *articleLikeRepository) findRecord(ctx context.Context, userID, articleID uint64) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&model.ArticleLike{}).
+		Select("id").
+		Where("user_id=? and article_id=?", userID, articleID).
+		Count(&count).Error
+	return count > 0, err
 }
 
-// NewCommentLikeRepository 将 GORM 评论点赞 Repository 适配为 Community 领域 Port。
-func NewCommentLikeRepository(repo repository.CommentLikeRepository) domaincommunity.CommentLikeRepository {
-	return &commentLikeRepositoryAdapter{repo: repo}
+type commentLikeRepository struct {
+	db *gorm.DB
 }
 
-func (a *commentLikeRepositoryAdapter) SetLiked(ctx context.Context, userID, commentID uint64, liked bool) error {
+// NewCommentLikeRepository 返回直接持有 GORM 的评论点赞 Repository 实现。
+func NewCommentLikeRepository(db *gorm.DB) domaincommunity.CommentLikeRepository {
+	return &commentLikeRepository{db: db}
+}
+
+func (r *commentLikeRepository) SetLiked(ctx context.Context, userID, commentID uint64, liked bool) error {
 	status := domaincommunity.LikeStatusCanceled
 	delta := -1
 	if liked {
 		status = domaincommunity.LikeStatusLiked
 		delta = 1
 	}
-	ok, err := a.repo.FindRecord(ctx, userID, commentID)
+	exists, err := r.findRecord(ctx, userID, commentID)
 	if err != nil {
 		return err
 	}
-	return database.RunTx(ctx, a.repo.GetDB(), func(tx *gorm.DB) error {
-		if ok {
-			if err := a.repo.Update(ctx, tx, userID, commentID, status); err != nil {
+	return database.RunTx(ctx, r.db, func(tx *gorm.DB) error {
+		if exists {
+			if err := tx.WithContext(ctx).
+				Model(&model.CommentLike{}).
+				Where("user_id = ? AND comment_id = ?", userID, commentID).
+				Update("status", status).Error; err != nil {
 				return err
 			}
 		} else {
 			like := &model.CommentLike{UserID: userID, CommentID: commentID, Status: status}
-			if err := a.repo.Insert(ctx, tx, like); err != nil {
+			if err := tx.WithContext(ctx).Create(like).Error; err != nil {
 				return err
 			}
 		}
-		return a.repo.UpdateCommentLikeCountDelta(ctx, tx, commentID, delta)
+		return tx.WithContext(ctx).
+			Model(&model.Comment{}).
+			Where("id = ?", commentID).
+			UpdateColumn("like_count", gorm.Expr("like_count + ?", delta)).Error
 	})
 }
 
-func (a *commentLikeRepositoryAdapter) IsLiked(ctx context.Context, userID, commentID uint64) (bool, error) {
-	return a.repo.IsLiked(ctx, userID, commentID)
+func (r *commentLikeRepository) IsLiked(ctx context.Context, userID, commentID uint64) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&model.CommentLike{}).
+		Where("user_id = ? and comment_id = ? and status=?", userID, commentID, model.CommentLiked).
+		Count(&count).Error
+	return count > 0, err
 }
 
-func (a *commentLikeRepositoryAdapter) GetLikedUserIDs(ctx context.Context, commentID uint64) ([]uint64, error) {
-	return a.repo.GetLikedUserIDs(ctx, commentID)
+func (r *commentLikeRepository) GetLikedUserIDs(ctx context.Context, commentID uint64) ([]uint64, error) {
+	var userIDs []uint64
+	err := r.db.WithContext(ctx).Model(&model.CommentLike{}).
+		Where("comment_id=? and status=?", commentID, model.CommentLiked).
+		Pluck("user_id", &userIDs).Error
+	return userIDs, err
+}
+
+func (r *commentLikeRepository) findRecord(ctx context.Context, userID, commentID uint64) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&model.CommentLike{}).
+		Select("id").
+		Where("user_id=? and comment_id=?", userID, commentID).
+		Count(&count).Error
+	return count > 0, err
 }

@@ -1,0 +1,16 @@
+name: content
+id: content-service
+enabled: true
+grpc_addr: "127.0.0.1:9102"
+grpc_timeout: 3s
+redis_prefix: "blog:content:"
+kafka_groups:
+  notification: ""
+  view_history: ""
+peers:
+  - name: identity
+    addr: "127.0.0.1:9101"
+  - name: community
+    addr: "127.0.0.1:9103"
+  - name: gateway
+    addr: "127.0.0.1:8080"

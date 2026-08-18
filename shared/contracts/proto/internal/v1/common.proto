@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package blog.internal.v1;
+
+option go_package = "blog/shared/contracts/gen/internalv1;internalv1";
+
+message Empty {}
+
+message UserIDRequest {
+  uint64 user_id = 1;
+}
+
+message ArticleUserRequest {
+  uint64 article_id = 1;
+  uint64 user_id = 2;
+}
+
+message UploadURLResponse {
+  string upload_url = 1;
+  string object_key = 2;
+  string url = 3;
+}

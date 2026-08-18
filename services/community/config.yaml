@@ -1,0 +1,16 @@
+name: community
+id: community-service
+enabled: true
+grpc_addr: "127.0.0.1:9103"
+grpc_timeout: 3s
+redis_prefix: "blog:community:"
+kafka_groups:
+  notification: "blog_community_notification_consumer"
+  view_history: "blog_community_view_consumer"
+peers:
+  - name: identity
+    addr: "127.0.0.1:9101"
+  - name: content
+    addr: "127.0.0.1:9102"
+  - name: gateway
+    addr: "127.0.0.1:8080"

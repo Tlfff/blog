@@ -142,7 +142,7 @@ func (f *fakeImageStorage) MoveObject(_ context.Context, srcKey, dstKey string) 
 
 func TestContentService_ArticleLifecycle(t *testing.T) {
 	repo := newFakeArticleRepo()
-	s := NewService(repo, &fakeImageStorage{}, nil, "https://cdn.example", []string{"png", "jpg"})
+	s := NewService(repo, nil, &fakeImageStorage{}, nil, "https://cdn.example", []string{"png", "jpg"})
 	ctx := context.Background()
 
 	if err := s.CreateArticle(ctx, 100, "草稿", "内容", []string{"Go"}, domaincontent.StatusDraft); err != nil {
@@ -174,7 +174,7 @@ func TestContentService_ArticleLifecycle(t *testing.T) {
 
 func TestContentService_PublishedListAndAvailable(t *testing.T) {
 	repo := newFakeArticleRepo()
-	s := NewService(repo, &fakeImageStorage{}, nil, "https://cdn.example", nil)
+	s := NewService(repo, nil, &fakeImageStorage{}, nil, "https://cdn.example", nil)
 	ctx := context.Background()
 
 	_ = s.CreateArticle(ctx, 1, "A", "内容", nil, domaincontent.StatusPublished)
@@ -202,7 +202,7 @@ func TestContentService_PublishedListAndAvailable(t *testing.T) {
 
 func TestContentService_ImageContract(t *testing.T) {
 	storage := &fakeImageStorage{}
-	s := NewService(newFakeArticleRepo(), storage, nil, "https://cdn.example", []string{"png", "jpg"})
+	s := NewService(newFakeArticleRepo(), nil, storage, nil, "https://cdn.example", []string{"png", "jpg"})
 	ctx := context.Background()
 
 	if _, _, err := s.GetUploadURL(ctx, "exe"); !errors.Is(err, common.ErrInvalidRequestBody) {

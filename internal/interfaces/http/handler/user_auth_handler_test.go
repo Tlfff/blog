@@ -13,7 +13,6 @@ import (
 	"blog/internal/dto/user"
 	identityinfra "blog/internal/infrastructure/identity"
 	"blog/internal/model"
-	"blog/internal/repository"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -113,9 +112,8 @@ func TestUserAuthHandler_AllRoutes(t *testing.T) {
 	_ = db.AutoMigrate(&model.User{})
 
 	// 3.  完美对齐升级后的构造函数
-	userRepo := repository.NewUserRepository(db)
 	identityService := identityapp.NewService(
-		identityinfra.NewUserRepository(userRepo),
+		identityinfra.NewUserRepository(db),
 		identityinfra.NewTokenSession(auth.NewTokenAuth(newFakeSessionStore())),
 		nil,
 		nil,

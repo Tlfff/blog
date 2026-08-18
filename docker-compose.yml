@@ -116,8 +116,17 @@ services:
       - "8080:8080"
     volumes:
       - ./config/config.docker.yaml:/app/config/config.yaml:ro  # 用 docker 专用配置覆盖容器内默认的 config.yaml
+      - ./services/identity/config.yaml:/app/services/identity/config.yaml:ro
+      - ./services/content/config.yaml:/app/services/content/config.yaml:ro
+      - ./services/community/config.yaml:/app/services/community/config.yaml:ro
       - ./pkg/resource:/app/pkg/resource:ro  # IP 地理位置数据库（只读挂载，方便更新）
     depends_on:   # 依赖的其他服务
+      blog-identity:
+        condition: service_started
+      blog-content:
+        condition: service_started
+      blog-community:
+        condition: service_started
       mysql:
         condition: service_healthy    # 等待 MySQL 服务健康
       redis:
@@ -139,7 +148,16 @@ services:
       - "9100:9100"
     volumes:
       - ./config/config.docker.yaml:/app/config/config.yaml:ro
+      - ./services/identity/config.yaml:/app/services/identity/config.yaml:ro
+      - ./services/content/config.yaml:/app/services/content/config.yaml:ro
+      - ./services/community/config.yaml:/app/services/community/config.yaml:ro
     depends_on:
+      blog-identity:
+        condition: service_started
+      blog-content:
+        condition: service_started
+      blog-community:
+        condition: service_started
       mysql:
         condition: service_healthy
       redis:
@@ -166,6 +184,80 @@ services:
         condition: service_healthy
     networks:
       - blog-net
+
+  # Identity Service
+  blog-identity:
+    image: blog-identity:latest
+    container_name: blog-identity
+    restart: always
+    build:
+      context: .
+      dockerfile: services/identity/Dockerfile
+    ports:
+      - "9101:9101"
+    volumes:
+      - ./config/config.docker.yaml:/app/config/config.yaml:ro
+      - ./services/identity/config.yaml:/app/services/identity/config.yaml:ro
+      - ./pkg/resource:/app/pkg/resource:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - blog-net
+
+  # Content Service
+  blog-content:
+    image: blog-content:latest
+    container_name: blog-content
+    restart: always
+    build:
+      context: .
+      dockerfile: services/content/Dockerfile
+    ports:
+      - "9102:9102"
+    volumes:
+      - ./config/config.docker.yaml:/app/config/config.yaml:ro
+      - ./services/content/config.yaml:/app/services/content/config.yaml:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      blog-identity:
+        condition: service_started
+    networks:
+      - blog-net
+
+  # Community Service
+  blog-community:
+    image: blog-community:latest
+    container_name: blog-community
+    restart: always
+    build:
+      context: .
+      dockerfile: services/community/Dockerfile
+    ports:
+      - "9103:9103"
+    volumes:
+      - ./config/config.docker.yaml:/app/config/config.yaml:ro
+      - ./services/community/config.yaml:/app/services/community/config.yaml:ro
+      - ./pkg/resource:/app/pkg/resource:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      blog-identity:
+        condition: service_started
+      blog-content:
+        condition: service_started
+    networks:
+      - blog-net
+
 # 数据卷定义，把容器内部的数据目录，挂载到 Docker 管理的外部存储空间，这样数据就和容器本身分离了
 volumes:
   mysql_data:   # 创建一个名为 "mysql_data" 的数据卷

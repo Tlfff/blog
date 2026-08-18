@@ -3,29 +3,31 @@ package community
 import (
 	domaincommunity "blog/internal/domain/community"
 	"blog/internal/model"
-	"blog/internal/repository"
 	"context"
+
+	"gorm.io/gorm"
 )
 
-type viewHistoryRepositoryAdapter struct {
-	repo *repository.ArticleViewHistoryRepository
+type viewHistoryRepository struct {
+	db *gorm.DB
 }
 
-// NewViewHistoryRepository 将 GORM 浏览历史 Repository 适配为 Community 领域 Port。
-func NewViewHistoryRepository(repo *repository.ArticleViewHistoryRepository) domaincommunity.ViewHistoryRepository {
-	return &viewHistoryRepositoryAdapter{repo: repo}
+// NewViewHistoryRepository 返回直接持有 GORM 的浏览历史 Repository 实现。
+func NewViewHistoryRepository(db *gorm.DB) domaincommunity.ViewHistoryRepository {
+	return &viewHistoryRepository{db: db}
 }
 
-func (a *viewHistoryRepositoryAdapter) Create(ctx context.Context, history *domaincommunity.ViewHistory) error {
-	m := &model.ArticleViewHistory{
+func (r *viewHistoryRepository) Create(ctx context.Context, history *domaincommunity.ViewHistory) error {
+	return r.db.WithContext(ctx).Create(&model.ArticleViewHistory{
 		UserID:      history.UserID,
 		ArticleID:   history.ArticleID,
 		CreatedTime: history.CreatedTime,
 		UpdatedTime: history.UpdatedTime,
-	}
-	return a.repo.CreateViewHistory(ctx, m)
+	}).Error
 }
 
-func (a *viewHistoryRepositoryAdapter) IncrementViewCount(ctx context.Context, articleID uint64) error {
-	return a.repo.IncrementViewCount(ctx, articleID)
+func (r *viewHistoryRepository) IncrementViewCount(ctx context.Context, articleID uint64) error {
+	return r.db.WithContext(ctx).Model(&model.Article{}).
+		Where("id = ?", articleID).
+		UpdateColumn("view_count", gorm.Expr("view_count + ?", 1)).Error
 }

@@ -1,11 +1,12 @@
 package middleware
 
 import (
-	"blog/internal/infrastructure/trace"
 	"bytes"
 	"io"
 	"log"
 	"time"
+
+	"blog/shared/platform/trace"
 
 	"github.com/gin-gonic/gin"
 )

@@ -5,14 +5,18 @@ import (
 	"blog/internal/infrastructure/bootstrap"
 	communityinfra "blog/internal/infrastructure/community"
 	"blog/internal/infrastructure/config"
+	grpcclient "blog/internal/interfaces/grpc/client"
 	mq "blog/internal/interfaces/mq"
-	"blog/internal/repository"
+	internalv1 "blog/shared/contracts/gen/internalv1"
+	svcconfig "blog/shared/platform/config"
+	platformgrpc "blog/shared/platform/grpc"
 	"context"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -53,21 +57,24 @@ var kafkaConsumeCmd = &cobra.Command{
 		}
 		defer rdb.Close()
 
-		// 5. 初始化 Repository
-		userRepo := repository.NewUserRepository(db)
-		artRepo := repository.NewArticleRepository(db)
-		ntfRepo := repository.NewNotificationRepository(mongodb)
-		historyRepo := repository.NewArticleViewHistoryRepository(db)
-
 		// 6. 初始化 Service
+		identitySvcCfg, err := svcconfig.Load("services/identity/config.yaml")
+		if err != nil {
+			log.Fatalf("加载 Identity 服务配置失败: %v", err)
+		}
+		identityConn, err := platformgrpc.Dial(identitySvcCfg.GRPCAddr, "community-service", 3*time.Second)
+		if err != nil {
+			log.Fatalf("连接 Identity Service 失败: %v", err)
+		}
+		defer identityConn.Close()
 		communityService := communityapp.NewService(
 			nil,
 			nil,
 			nil,
-			communityinfra.NewViewHistoryRepository(historyRepo),
-			communityinfra.NewNotificationRepository(ntfRepo),
-			communityinfra.NewArticleQuery(artRepo),
-			communityinfra.NewUserInfoQuery(userRepo),
+			communityinfra.NewViewHistoryRepository(db),
+			communityinfra.NewNotificationRepository(mongodb),
+			communityinfra.NewArticleQuery(db),
+			grpcclient.NewCommunityUserInfoClient(internalv1.NewIdentityServiceClient(identityConn)),
 			nil,
 			nil,
 			nil,

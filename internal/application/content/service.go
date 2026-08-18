@@ -21,6 +21,7 @@ var articleImageURLRe = regexp.MustCompile(`https?://[^\s"'<>()]+`)
 
 type Service struct {
 	repo          domaincontent.ArticleRepository
+	users         domaincontent.UserQuery
 	images        domaincontent.ArticleImageStorage
 	interactions  domaincontent.ArticleInteractionQuery
 	publicDomain  string
@@ -30,6 +31,7 @@ type Service struct {
 // NewService 组装 Content Application 用例依赖。
 func NewService(
 	repo domaincontent.ArticleRepository,
+	users domaincontent.UserQuery,
 	images domaincontent.ArticleImageStorage,
 	interactions domaincontent.ArticleInteractionQuery,
 	publicDomain string,
@@ -41,6 +43,7 @@ func NewService(
 	}
 	return &Service{
 		repo:         repo,
+		users:        users,
 		images:       images,
 		interactions: interactions,
 		publicDomain: publicDomain,
@@ -227,6 +230,11 @@ func (s *Service) GetAvailableList(ctx context.Context, page, pageSize uint64, i
 	return newExternalListResponse(list, uint64(total), page, pageSize), nil
 }
 
+// GetArticleInfo 返回文章供服务间只读查询使用的基本信息。
+func (s *Service) GetArticleInfo(ctx context.Context, articleID uint64) (*domaincontent.Article, error) {
+	return s.findArticle(ctx, articleID)
+}
+
 func (s *Service) GetUploadURL(ctx context.Context, fileExt string) (uploadURL, url string, err error) {
 	if s.images == nil {
 		return "", "", common.ErrSystem
@@ -279,6 +287,13 @@ func (s *Service) PromoteImages(ctx context.Context, articleID uint64, content s
 }
 
 func (s *Service) buildDetail(ctx context.Context, detail *domaincontent.ArticleWithAuthor, userID uint64) (*articledto.ArticleDetailResponse, error) {
+	if s.users != nil {
+		if user, err := s.users.FindUserByID(ctx, detail.AuthorID); err == nil {
+			detail.Nickname = user.Nickname
+			detail.Avatar = user.Avatar
+			detail.LastLoginIP = user.LastLoginIP
+		}
+	}
 	isLiked := false
 	if userID > 0 && s.interactions != nil {
 		isLiked, _ = s.interactions.IsUserLikedArticle(ctx, userID, detail.ID)

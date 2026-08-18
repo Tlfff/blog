@@ -1,19 +1,17 @@
 package cmd
 
 import (
-	communityapp "blog/internal/application/community"
-	contentapp "blog/internal/application/content"
-	identityapp "blog/internal/application/identity"
 	"blog/internal/infrastructure/bootstrap"
-	communityinfra "blog/internal/infrastructure/community"
 	"blog/internal/infrastructure/config"
-	contentinfra "blog/internal/infrastructure/content"
-	identityinfra "blog/internal/infrastructure/identity"
+	grpcclient "blog/internal/interfaces/grpc/client"
 	grpchandler "blog/internal/interfaces/grpc/handler"
 	grpcserver "blog/internal/interfaces/grpc/server"
-	"blog/internal/repository"
+	internalv1 "blog/shared/contracts/gen/internalv1"
+	svcconfig "blog/shared/platform/config"
+	platformgrpc "blog/shared/platform/grpc"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -24,23 +22,13 @@ var grpcCmd = &cobra.Command{
 	Use:   "grpc",
 	Short: "启动二方gRPC服务",
 	Run: func(cmd *cobra.Command, args []string) {
-		// 1. 加载配置文件
 		cfg, err := config.LoadConfig("config/config.yaml")
 		if err != nil {
 			fmt.Printf("[error]:加载配置文件失败：%v\n", err)
 			return
 		}
-		// 2. 注入二方服务专用JWT密钥
 		bootstrap.InitOpenJWT(cfg.OpenJWT.Secret)
 
-		// 3. 初始化数据库连接
-		db, err := bootstrap.NewMySQL(cfg)
-		if err != nil {
-			fmt.Printf("[error]:数据库连接初始化失败：%v\n", err)
-			return
-		}
-
-		// 4. 初始化Redis连接
 		rdb, err := bootstrap.NewRedis(cfg)
 		if err != nil {
 			fmt.Printf("[error]:Redis连接初始化失败：%v\n", err)
@@ -48,66 +36,61 @@ var grpcCmd = &cobra.Command{
 		}
 		defer rdb.Close()
 
-		// 5. 初始化repository
-		userRepo := repository.NewUserRepository(db)
-		artRepo := repository.NewArticleRepository(db)
-		commentRepo := repository.NewCommentRepository(db)
+		identitySvcCfg, err := svcconfig.Load("services/identity/config.yaml")
+		if err != nil {
+			fmt.Printf("[error]:加载 Identity 服务配置失败：%v\n", err)
+			return
+		}
+		contentSvcCfg, err := svcconfig.Load("services/content/config.yaml")
+		if err != nil {
+			fmt.Printf("[error]:加载 Content 服务配置失败：%v\n", err)
+			return
+		}
+		communitySvcCfg, err := svcconfig.Load("services/community/config.yaml")
+		if err != nil {
+			fmt.Printf("[error]:加载 Community 服务配置失败：%v\n", err)
+			return
+		}
 
-		// 6. 初始化service
-		// gRPC 二方服务用不到 OSS 功能，不注入 OSS
-		identityService := identityapp.NewService(
-			identityinfra.NewUserRepository(userRepo),
-			nil,
-			nil,
-			nil,
-			"",
-			nil,
-		)
-		communityService := communityapp.NewService(
-			communityinfra.NewCommentRepository(commentRepo, artRepo),
-			nil,
-			nil,
-			nil,
-			nil,
-			nil,
-			nil,
-			nil,
-			nil,
-			nil,
-			nil,
-		)
-		// 二方服务用不到 OSS 与互动查询
-		contentService := contentapp.NewService(
-			contentinfra.NewArticleRepository(artRepo),
-			nil,
-			nil,
-			"",
-			nil,
-		)
+		identityConn, err := platformgrpc.Dial(identitySvcCfg.GRPCAddr, "gateway-service", 3*time.Second)
+		if err != nil {
+			fmt.Printf("[error]:连接 Identity Service 失败：%v\n", err)
+			return
+		}
+		defer identityConn.Close()
+		contentConn, err := platformgrpc.Dial(contentSvcCfg.GRPCAddr, "gateway-service", 3*time.Second)
+		if err != nil {
+			fmt.Printf("[error]:连接 Content Service 失败：%v\n", err)
+			return
+		}
+		defer contentConn.Close()
+		communityConn, err := platformgrpc.Dial(communitySvcCfg.GRPCAddr, "gateway-service", 3*time.Second)
+		if err != nil {
+			fmt.Printf("[error]:连接 Community Service 失败：%v\n", err)
+			return
+		}
+		defer communityConn.Close()
 
-		// 7. 初始化gRPC handler
-		userHandler := grpchandler.NewUserHandler(identityService)
-		commentHandler := grpchandler.NewCommentHandler(communityService)
-		articleHandler := grpchandler.NewArticleHandler(contentService)
+		userHandler := grpchandler.NewUserHandler(grpcclient.NewIdentityClient(internalv1.NewIdentityServiceClient(identityConn)))
+		articleHandler := grpchandler.NewArticleHandler(grpcclient.NewContentClient(internalv1.NewContentServiceClient(contentConn)))
+		commentHandler := grpchandler.NewCommentHandler(grpcclient.NewCommunityClient(internalv1.NewCommunityServiceClient(communityConn)))
 
-		// 8. 组装gRPC Server（含统一认证拦截器：二方JWT / 三方HMAC）
 		s := grpcserver.NewGRPCServer(&grpcserver.AppHandler{
 			Article: articleHandler,
 			User:    userHandler,
 			Comment: commentHandler,
 		}, rdb, cfg.ThirdParty)
 
-		// 9. 监听端口（优先命令行参数，默认读config）
-		port := grpcPort
-		if port == "" {
-			port = cfg.GRPC.Port
+		listenPort := grpcPort
+		if listenPort == "" {
+			listenPort = cfg.GRPC.Port
 		}
-		lis, err := net.Listen("tcp", ":"+port)
+		lis, err := net.Listen("tcp", ":"+listenPort)
 		if err != nil {
 			fmt.Printf("[error]:gRPC监听端口失败：%v\n", err)
 			return
 		}
-		fmt.Printf("二方gRPC服务启动，监听端口：%s\n", port)
+		fmt.Printf("二方gRPC服务启动，监听端口：%s\n", listenPort)
 		if err := s.Serve(lis); err != nil {
 			fmt.Printf("[error]:gRPC服务启动失败：%v\n", err)
 		}
@@ -115,8 +98,6 @@ var grpcCmd = &cobra.Command{
 }
 
 func init() {
-	// 1. 将grpc注册到root下
 	rootCmd.AddCommand(grpcCmd)
-	// 2. 绑定端口参数，默认走config中的grpc.port
 	grpcCmd.Flags().StringVarP(&grpcPort, "port", "p", "", "指定gRPC监听端口，默认读取config中的grpc.port")
 }

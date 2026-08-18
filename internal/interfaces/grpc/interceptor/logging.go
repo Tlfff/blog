@@ -1,10 +1,11 @@
 package interceptor
 
 import (
-	"blog/internal/infrastructure/trace"
 	"context"
 	"log"
 	"time"
+
+	"blog/shared/platform/trace"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"

@@ -1,0 +1,138 @@
+syntax = "proto3";
+
+package blog.internal.v1;
+
+option go_package = "blog/shared/contracts/gen/internalv1;internalv1";
+
+import "internal/v1/common.proto";
+
+// IdentityService 是 Identity Service 对统一入口和其他服务暴露的内部 gRPC 接口。
+service IdentityService {
+  rpc Register(RegisterRequest) returns (Empty);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Logout(LogoutRequest) returns (Empty);
+  rpc GetMyProfile(UserIDRequest) returns (MyProfile);
+  rpc GetPublicProfile(UserIDRequest) returns (PublicProfile);
+  rpc UpdateProfile(UpdateProfileRequest) returns (Empty);
+  rpc VerifyOldPassword(VerifyOldPasswordRequest) returns (VerifyOldPasswordResponse);
+  rpc ChangePassword(ChangePasswordRequest) returns (Empty);
+  rpc UpdatePassword(UpdatePasswordRequest) returns (Empty);
+  rpc UpdateAccount(UpdateAccountRequest) returns (Empty);
+  rpc GetAvatarUploadURL(GetAvatarUploadURLRequest) returns (UploadURLResponse);
+  rpc ConfirmAvatar(ConfirmAvatarRequest) returns (ConfirmAvatarResponse);
+  rpc GetUserBasicInfo(UserIDRequest) returns (UserBasicInfo);
+  rpc ListUserBasicInfo(ListUsersRequest) returns (ListUsersResponse);
+}
+
+message RegisterRequest {
+  string phone = 1;
+  string password = 2;
+  string nickname = 3;
+  string client_ip = 4;
+}
+
+message LoginRequest {
+  string phone = 1;
+  string nickname = 2;
+  string password = 3;
+  string client_ip = 4;
+  string device = 5;
+  bool remember_me = 6;
+}
+
+message LoginResponse {
+  string access_token = 1;
+}
+
+message LogoutRequest {
+  string token = 1;
+}
+
+message MyProfile {
+  uint64 id = 1;
+  string nickname = 2;
+  string avatar = 3;
+  int32 role = 4;
+  int64 last_login_time = 5;
+  string last_login_ip = 6;
+}
+
+message PublicProfile {
+  uint64 id = 1;
+  string nickname = 2;
+  string avatar = 3;
+}
+
+message UpdateProfileRequest {
+  uint64 user_id = 1;
+  string nickname = 2;
+  string avatar = 3;
+}
+
+message VerifyOldPasswordRequest {
+  uint64 user_id = 1;
+  string old_password = 2;
+}
+
+message VerifyOldPasswordResponse {
+  string change_token = 1;
+}
+
+message ChangePasswordRequest {
+  uint64 user_id = 1;
+  string change_token = 2;
+  string new_password = 3;
+  string current_token = 4;
+}
+
+message UpdatePasswordRequest {
+  uint64 user_id = 1;
+  string old_password = 2;
+  string new_password = 3;
+}
+
+message UpdateAccountRequest {
+  uint64 user_id = 1;
+  string phone = 2;
+}
+
+message GetAvatarUploadURLRequest {
+  uint64 user_id = 1;
+  string file_ext = 2;
+}
+
+message ConfirmAvatarRequest {
+  uint64 user_id = 1;
+  string object_key = 2;
+}
+
+message ConfirmAvatarResponse {
+  string avatar_url = 1;
+}
+
+message UserBasicInfo {
+  uint64 id = 1;
+  string nickname = 2;
+  string avatar = 3;
+  int64 last_login_time = 4;
+  string last_login_ip = 5;
+}
+
+message ListUsersRequest {
+  uint64 page = 1;
+  uint64 page_size = 2;
+  bool is_desc = 3;
+}
+
+message UserListItem {
+  uint64 id = 1;
+  string nickname = 2;
+  string avatar = 3;
+}
+
+message ListUsersResponse {
+  repeated UserListItem items = 1;
+  uint64 total = 2;
+  uint64 page = 3;
+  uint64 page_size = 4;
+}

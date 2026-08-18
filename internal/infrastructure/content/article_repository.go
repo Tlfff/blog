@@ -3,25 +3,24 @@ package content
 import (
 	domaincontent "blog/internal/domain/content"
 	"blog/internal/model"
-	"blog/internal/repository"
 	"context"
 	"errors"
 
 	"gorm.io/gorm"
 )
 
-type articleRepositoryAdapter struct {
-	repo *repository.ArticleRepository
+type articleRepository struct {
+	db *gorm.DB
 }
 
-// NewArticleRepository 将现有 GORM ArticleRepository 适配为 Content 领域 Port。
-func NewArticleRepository(repo *repository.ArticleRepository) domaincontent.ArticleRepository {
-	return &articleRepositoryAdapter{repo: repo}
+// NewArticleRepository 返回直接持有 GORM 的 Content 文章 Repository 实现。
+func NewArticleRepository(db *gorm.DB) domaincontent.ArticleRepository {
+	return &articleRepository{db: db}
 }
 
-func (a *articleRepositoryAdapter) Create(ctx context.Context, article *domaincontent.Article) error {
+func (r *articleRepository) Create(ctx context.Context, article *domaincontent.Article) error {
 	m := toModelArticle(article)
-	if err := a.repo.CreateArticle(ctx, m); err != nil {
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
 		return err
 	}
 	article.ID = m.ID
@@ -30,63 +29,99 @@ func (a *articleRepositoryAdapter) Create(ctx context.Context, article *domainco
 	return nil
 }
 
-func (a *articleRepositoryAdapter) FindByID(ctx context.Context, id uint64) (*domaincontent.Article, error) {
-	m, err := a.repo.FindArticleByID(ctx, id)
+func (r *articleRepository) FindByID(ctx context.Context, id uint64) (*domaincontent.Article, error) {
+	var m model.Article
+	err := r.db.WithContext(ctx).Model(&model.Article{}).
+		Select("id", "author_id", "title", "content", "tags", "status", "view_count", "like_count", "comment_count", "created_time", "updated_time").
+		Where("id=?", id).
+		Take(&m).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domaincontent.ErrArticleNotFound
 		}
 		return nil, err
 	}
-	return toDomainArticle(m), nil
+	return toDomainArticle(&m), nil
 }
 
-func (a *articleRepositoryAdapter) FindWithAuthorByID(ctx context.Context, id uint64) (*domaincontent.ArticleWithAuthor, error) {
-	m, err := a.repo.FindArticleAndUserInfoByID(ctx, id)
+func (r *articleRepository) FindWithAuthorByID(ctx context.Context, id uint64) (*domaincontent.ArticleWithAuthor, error) {
+	article, err := r.FindByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, domaincontent.ErrArticleNotFound
-		}
 		return nil, err
 	}
-	return &domaincontent.ArticleWithAuthor{
-		Article:     *toDomainArticle(&m.Article),
-		Nickname:    m.Nickname,
-		Avatar:      m.Avatar,
-		LastLoginIP: m.LastLoginIp,
-	}, nil
+	return &domaincontent.ArticleWithAuthor{Article: *article}, nil
 }
 
-func (a *articleRepositoryAdapter) Update(ctx context.Context, article *domaincontent.Article) error {
-	return a.repo.UpdateArticle(ctx, toModelArticle(article))
+func (r *articleRepository) Update(ctx context.Context, article *domaincontent.Article) error {
+	return r.db.WithContext(ctx).Model(&model.Article{}).
+		Where("id=?", article.ID).
+		Select("title", "content", "status", "tags").
+		Updates(toModelArticle(article)).Error
 }
 
-func (a *articleRepositoryAdapter) SoftDelete(ctx context.Context, articleID uint64) error {
-	return a.repo.DeleteArticle(ctx, articleID)
+func (r *articleRepository) SoftDelete(ctx context.Context, articleID uint64) error {
+	return r.db.WithContext(ctx).Model(&model.Article{}).
+		Where("id=?", articleID).
+		Updates(map[string]any{"status": model.Deleted}).Error
 }
 
-func (a *articleRepositoryAdapter) Clear(ctx context.Context, articleID uint64) error {
-	return a.repo.ClearArticle(ctx, articleID, 0)
+func (r *articleRepository) Clear(ctx context.Context, articleID uint64) error {
+	return r.db.WithContext(ctx).Table("articles").
+		Where("id=?", articleID).
+		Delete(nil).Error
 }
 
-func (a *articleRepositoryAdapter) ListWithCursor(ctx context.Context, lastID uint64, pageSize int, isDesc bool, status int8) ([]*domaincontent.Article, error) {
-	models, err := a.repo.GetListWithCursor(ctx, lastID, pageSize, isDesc, status)
-	if err != nil {
+func (r *articleRepository) ListWithCursor(ctx context.Context, lastID uint64, pageSize int, isDesc bool, status int8) ([]*domaincontent.Article, error) {
+	tx := r.db.WithContext(ctx).Model(&model.Article{}).
+		Select("id", "author_id", "title", "content", "tags", "status", "view_count", "like_count", "comment_count", "created_time", "updated_time")
+	tx = applyStatusCondition(tx, status)
+	if isDesc {
+		tx = tx.Where("id < ?", lastID).Order("id DESC")
+	} else {
+		tx = tx.Where("id > ?", lastID).Order("id ASC")
+	}
+	var models []*model.Article
+	if err := tx.Limit(pageSize).Find(&models).Error; err != nil {
 		return nil, err
 	}
 	return toDomainArticles(models), nil
 }
 
-func (a *articleRepositoryAdapter) ListWithOffset(ctx context.Context, page, pageSize int, isDesc bool, status int8) ([]*domaincontent.Article, error) {
-	models, err := a.repo.GetListWithOffset(ctx, page, pageSize, isDesc, status)
-	if err != nil {
+func (r *articleRepository) ListWithOffset(ctx context.Context, page, pageSize int, isDesc bool, status int8) ([]*domaincontent.Article, error) {
+	tx := r.db.WithContext(ctx).Model(&model.Article{}).
+		Select("id", "author_id", "title", "content", "tags", "status", "view_count", "like_count", "comment_count", "created_time", "updated_time")
+	tx = applyStatusCondition(tx, status)
+	if isDesc {
+		tx = tx.Order("id DESC")
+	} else {
+		tx = tx.Order("id ASC")
+	}
+	var models []*model.Article
+	if err := tx.Limit(pageSize).Offset((page - 1) * pageSize).Find(&models).Error; err != nil {
 		return nil, err
 	}
 	return toDomainArticles(models), nil
 }
 
-func (a *articleRepositoryAdapter) CountByStatus(ctx context.Context, status int8) (int64, error) {
-	return a.repo.GetArticleCountByStatus(ctx, status)
+func (r *articleRepository) CountByStatus(ctx context.Context, status int8) (int64, error) {
+	var count int64
+	tx := r.db.WithContext(ctx).Model(&model.Article{})
+	tx = applyStatusCondition(tx, status)
+	if err := tx.Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func applyStatusCondition(tx *gorm.DB, status int8) *gorm.DB {
+	switch status {
+	case domaincontent.StatusAll:
+		return tx
+	case domaincontent.StatusAllExceptDeleted:
+		return tx.Where("status IN ?", []int8{domaincontent.StatusDraft, domaincontent.StatusPublished})
+	default:
+		return tx.Where("status = ?", status)
+	}
 }
 
 func toDomainArticle(m *model.Article) *domaincontent.Article {

@@ -1,0 +1,16 @@
+name: identity
+id: identity-service
+enabled: true
+grpc_addr: "127.0.0.1:9101"
+grpc_timeout: 3s
+redis_prefix: "blog:identity:"
+kafka_groups:
+  notification: ""
+  view_history: ""
+peers:
+  - name: content
+    addr: "127.0.0.1:9102"
+  - name: community
+    addr: "127.0.0.1:9103"
+  - name: gateway
+    addr: "127.0.0.1:8080"

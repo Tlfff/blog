@@ -6,7 +6,7 @@
 
 ## 2. 已完成边界
 
-- 建立四个层次目录与三个领域模块：`internal/interfaces`、`internal/application`、`internal/domain/identity|content|community`、`internal/infrastructure`、`internal/shared`。
+- 建立四个层次目录与三个领域模块：`internal/interfaces`、`internal/application`、`internal/domain/identity|content|community`、`internal/infrastructure`；共享能力在 `shared/platform`。
 - Identity：注册、登录、退出、会话、改密、资料、头像、用户信息查询已迁移为 Application 用例；用户/会话/密码规则进入 Domain；GORM/Redis/MinIO 能力进入 Infrastructure Adapter。
 - Content：文章生命周期、分页列表、详情、垃圾箱、开放列表与图片上传/转正已迁移为 Application 用例；状态/权限规则进入 Domain；Repository/MinIO 进入 Infrastructure Adapter。
 - Community：评论、点赞、浏览、热榜、通知已迁移为 Application 用例；评论层级、点赞幂等、权限、统计与通知规则进入 Domain；MySQL/MongoDB/Redis/Kafka 进入 Infrastructure Adapter。

@@ -3,62 +3,56 @@ package community
 import (
 	domaincommunity "blog/internal/domain/community"
 	"blog/internal/model"
-	"blog/internal/repository"
 	"context"
+
+	"gorm.io/gorm"
 )
 
 type articleQueryAdapter struct {
-	repo *repository.ArticleRepository
+	db *gorm.DB
 }
 
-// NewArticleQuery 将 GORM 文章 Repository 适配为 Community 只读查询 Port。
-func NewArticleQuery(repo *repository.ArticleRepository) domaincommunity.ArticleQuery {
-	return &articleQueryAdapter{repo: repo}
+// NewArticleQuery 返回直接持有 GORM 的 Community 文章只读查询实现。
+func NewArticleQuery(db *gorm.DB) domaincommunity.ArticleQuery {
+	return &articleQueryAdapter{db: db}
 }
 
 func (a *articleQueryAdapter) FindByID(ctx context.Context, id uint64) (*domaincommunity.ArticleInfo, error) {
-	article, err := a.repo.FindArticleByID(ctx, id)
+	var m model.Article
+	err := a.db.WithContext(ctx).
+		Select("id,author_id,title").
+		Where("id=?", id).
+		First(&m).Error
 	if err != nil {
 		return nil, err
 	}
-	return toArticleInfo(article), nil
+	return toArticleInfo(&m), nil
 }
 
 func (a *articleQueryAdapter) GetHotListByIDs(ctx context.Context, ids []uint64) ([]*domaincommunity.ArticleInfo, error) {
-	articles, err := a.repo.GetHotListByIDs(ctx, ids)
+	var models []*model.Article
+	err := a.db.WithContext(ctx).Model(&model.Article{}).
+		Select("id,title, view_count, comment_count, like_count").
+		Where("id IN ?", ids).
+		Find(&models).Error
 	if err != nil {
 		return nil, err
 	}
-	return toArticleInfos(articles), nil
+	return toArticleInfos(models), nil
 }
 
 func (a *articleQueryAdapter) GetTopHotArticles(ctx context.Context, limit int) ([]*domaincommunity.ArticleInfo, error) {
-	articles, err := a.repo.GetTopHotArticles(ctx, limit)
+	var models []*model.Article
+	err := a.db.WithContext(ctx).Model(&model.Article{}).
+		Select("id, view_count, comment_count, like_count").
+		Where("status = ?", model.Published).
+		Order("(view_count + like_count + comment_count) DESC").
+		Limit(limit).
+		Find(&models).Error
 	if err != nil {
 		return nil, err
 	}
-	return toArticleInfos(articles), nil
-}
-
-type userInfoQueryAdapter struct {
-	repo *repository.UserRepository
-}
-
-// NewUserInfoQuery 将 GORM 用户 Repository 适配为 Community 只读查询 Port。
-func NewUserInfoQuery(repo *repository.UserRepository) domaincommunity.UserInfoQuery {
-	return &userInfoQueryAdapter{repo: repo}
-}
-
-func (a *userInfoQueryAdapter) FindUserByID(ctx context.Context, id uint64) (*domaincommunity.UserInfo, error) {
-	user, err := a.repo.FindUserByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	return &domaincommunity.UserInfo{
-		ID:       user.ID,
-		Nickname: user.Nickname,
-		Avatar:   user.Avatar,
-	}, nil
+	return toArticleInfos(models), nil
 }
 
 func toArticleInfo(m *model.Article) *domaincommunity.ArticleInfo {

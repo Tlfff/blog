@@ -12,7 +12,6 @@ import (
 	"blog/internal/common"
 	identityinfra "blog/internal/infrastructure/identity"
 	"blog/internal/model"
-	"blog/internal/repository"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/sqlite"
@@ -59,9 +58,8 @@ func TestUserHandler_AllRoutes(t *testing.T) {
 
 	// 3.  完美对齐升级后的构造函数
 	// 这一步和你的 main.go 逻辑完全一致，利用内存模式原地起飞
-	userRepo := repository.NewUserRepository(db)
 	identityService := identityapp.NewService(
-		identityinfra.NewUserRepository(userRepo),
+		identityinfra.NewUserRepository(db),
 		nil,
 		nil,
 		nil,

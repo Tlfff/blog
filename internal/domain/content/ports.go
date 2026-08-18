@@ -29,3 +29,16 @@ type ArticleImageStorage interface {
 type ArticleInteractionQuery interface {
 	IsUserLikedArticle(ctx context.Context, userID, articleID uint64) (bool, error)
 }
+
+// UserInfo 是文章详情所需的作者公开信息。
+type UserInfo struct {
+	ID           uint64
+	Nickname     string
+	Avatar       string
+	LastLoginIP  string
+}
+
+// UserQuery 是作者信息查询 Port，由 Identity 侧提供。
+type UserQuery interface {
+	FindUserByID(ctx context.Context, id uint64) (*UserInfo, error)
+}

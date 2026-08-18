@@ -3,25 +3,24 @@ package identity
 import (
 	domainidentity "blog/internal/domain/identity"
 	"blog/internal/model"
-	"blog/internal/repository"
 	"context"
 	"errors"
 
 	"gorm.io/gorm"
 )
 
-type userRepositoryAdapter struct {
-	repo *repository.UserRepository
+type userRepository struct {
+	db *gorm.DB
 }
 
-// NewUserRepository 将现有 GORM UserRepository 适配为 Identity 领域 Port。
-func NewUserRepository(repo *repository.UserRepository) domainidentity.UserRepository {
-	return &userRepositoryAdapter{repo: repo}
+// NewUserRepository 返回直接持有 GORM 的 Identity 用户 Repository 实现。
+func NewUserRepository(db *gorm.DB) domainidentity.UserRepository {
+	return &userRepository{db: db}
 }
 
-func (a *userRepositoryAdapter) CreateUser(ctx context.Context, user *domainidentity.User) error {
+func (r *userRepository) CreateUser(ctx context.Context, user *domainidentity.User) error {
 	m := toModelUser(user)
-	if err := a.repo.CreateUser(ctx, m); err != nil {
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
 		return err
 	}
 	user.ID = m.ID
@@ -30,31 +29,46 @@ func (a *userRepositoryAdapter) CreateUser(ctx context.Context, user *domainiden
 	return nil
 }
 
-func (a *userRepositoryAdapter) GetUserByAccount(ctx context.Context, phone, nickname string) (*domainidentity.User, error) {
-	m, err := a.repo.GetUserByAccount(ctx, phone, nickname)
+func (r *userRepository) GetUserByAccount(ctx context.Context, phone, nickname string) (*domainidentity.User, error) {
+	var m model.User
+	tx := r.db.WithContext(ctx).Model(&model.User{}).
+		Select("id,phone,password,nickname,avatar,role").
+		Where("status = ?", model.UserNormal)
+	if phone != "" {
+		tx = tx.Where("phone = ?", phone)
+	}
+	if nickname != "" {
+		tx = tx.Where("nickname = ?", nickname)
+	}
+	if err := tx.Take(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domainidentity.ErrUserNotFound
+		}
+		return nil, err
+	}
+	return toDomainUser(&m), nil
+}
+
+func (r *userRepository) FindUserByID(ctx context.Context, id uint64) (*domainidentity.User, error) {
+	var m model.User
+	err := r.db.WithContext(ctx).Where("id = ? AND status = ?", id, model.UserNormal).Take(&m).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domainidentity.ErrUserNotFound
 		}
 		return nil, err
 	}
-	return toDomainUser(m), nil
+	return toDomainUser(&m), nil
 }
 
-func (a *userRepositoryAdapter) FindUserByID(ctx context.Context, id uint64) (*domainidentity.User, error) {
-	m, err := a.repo.FindUserByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, domainidentity.ErrUserNotFound
-		}
-		return nil, err
+func (r *userRepository) FindUsersByIDs(ctx context.Context, ids []uint64) ([]*domainidentity.User, error) {
+	if len(ids) == 0 {
+		return []*domainidentity.User{}, nil
 	}
-	return toDomainUser(m), nil
-}
-
-func (a *userRepositoryAdapter) FindUsersByIDs(ctx context.Context, ids []uint64) ([]*domainidentity.User, error) {
-	models, err := a.repo.FindUsersByIDs(ctx, ids)
-	if err != nil {
+	var models []*model.User
+	if err := r.db.WithContext(ctx).
+		Where("id IN ? AND status = ?", ids, model.UserNormal).
+		Find(&models).Error; err != nil {
 		return nil, err
 	}
 	users := make([]*domainidentity.User, 0, len(models))
@@ -64,13 +78,23 @@ func (a *userRepositoryAdapter) FindUsersByIDs(ctx context.Context, ids []uint64
 	return users, nil
 }
 
-func (a *userRepositoryAdapter) UpdateUser(ctx context.Context, user *domainidentity.User) error {
-	return a.repo.UpdateUser(ctx, toModelUser(user))
+func (r *userRepository) UpdateUser(ctx context.Context, user *domainidentity.User) error {
+	return r.db.WithContext(ctx).Model(&model.User{}).
+		Where("id = ? AND status = ?", user.ID, model.UserNormal).
+		Updates(toModelUser(user)).Error
 }
 
-func (a *userRepositoryAdapter) GetUserList(ctx context.Context, page, pageSize int, isDesc bool) ([]*domainidentity.User, error) {
-	models, err := a.repo.GetUserList(ctx, page, pageSize, isDesc)
-	if err != nil {
+func (r *userRepository) GetUserList(ctx context.Context, page, pageSize int, isDesc bool) ([]*domainidentity.User, error) {
+	tx := r.db.WithContext(ctx).
+		Select("ID,Nickname,Avatar").
+		Where("status = ?", model.UserNormal)
+	if isDesc {
+		tx = tx.Order("id desc")
+	} else {
+		tx = tx.Order("id asc")
+	}
+	var models []*model.User
+	if err := tx.Limit(pageSize).Offset((page - 1) * pageSize).Find(&models).Error; err != nil {
 		return nil, err
 	}
 	users := make([]*domainidentity.User, 0, len(models))
@@ -80,8 +104,10 @@ func (a *userRepositoryAdapter) GetUserList(ctx context.Context, page, pageSize 
 	return users, nil
 }
 
-func (a *userRepositoryAdapter) CountUsers(ctx context.Context) (int64, error) {
-	return a.repo.CountUsers(ctx)
+func (r *userRepository) CountUsers(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&model.User{}).Where("status = ?", model.UserNormal).Count(&count).Error
+	return count, err
 }
 
 func toDomainUser(m *model.User) *domainidentity.User {

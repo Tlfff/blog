@@ -1,0 +1,112 @@
+# Community Service 服务级配置
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blog-community-config
+  namespace: lf-blog
+data:
+  config.yaml: |
+    name: community
+    id: community-service
+    grpc_addr: "0.0.0.0:9103"
+    grpc_timeout: 3s
+    peers:
+      - name: identity
+        addr: "blog-identity:9101"
+      - name: content
+        addr: "blog-content:9102"
+      - name: gateway
+        addr: "blog-server:8080"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: blog-community
+  namespace: lf-blog
+spec:
+  type: ClusterIP
+  selector:
+    app: blog-community
+  ports:
+    - name: grpc
+      port: 9103
+      targetPort: grpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blog-community
+  namespace: lf-blog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blog-community
+  template:
+    metadata:
+      labels:
+        app: blog-community
+    spec:
+      imagePullSecrets:
+        - name: tencent-ccr
+      containers:
+        - name: blog-community
+          image: ccr.ccs.tencentyun.com/lf-blog/blog-community:v1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: grpc
+              containerPort: 9103
+          startupProbe:
+            tcpSocket:
+              port: grpc
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 24
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: service-config
+              mountPath: /app/services/community/config.yaml
+              subPath: config.yaml
+              readOnly: true
+            - name: business-config
+              mountPath: /app/config/config.yaml
+              subPath: config.yaml
+              readOnly: true
+            - name: ip-resource
+              mountPath: /app/pkg/resource
+              readOnly: true
+      volumes:
+        - name: service-config
+          configMap:
+            name: blog-community-config
+            items:
+              - key: config.yaml
+                path: config.yaml
+        - name: business-config
+          secret:
+            secretName: blog-config
+            items:
+              - key: config.yaml
+                path: config.yaml
+        - name: ip-resource
+          hostPath:
+            path: /data/blog/pkg/resource
+            type: DirectoryOrCreate

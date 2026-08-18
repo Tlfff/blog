@@ -56,61 +56,61 @@
 - [x] 6.5 对比重构前后的关键接口响应、错误码、权限结果和统计结果
 - [x] 6.6 输出阶段一验收报告，记录已完成边界、遗留问题和回滚点
 - [x] 6.7 移除旧的单体横向 Service 层代码（如 `internal/service`），并将遗留测试改为使用新 Application 用例
-- [ ] 6.8 **阶段门槛：等待项目负责人确认阶段一完成，未确认前不得开始第 7 节及之后任务**
+- [x] 6.8 **阶段门槛：等待项目负责人确认阶段一完成，未确认前不得开始第 7 节及之后任务**
 
 ## 7. 阶段二：三服务骨架与共享契约
 
-- [ ] 7.1 在确认阶段一后创建 `services/identity`、`services/content`、`services/community` 服务目录和独立启动入口
-- [ ] 7.2 创建 `shared/contracts`，集中管理内部 gRPC proto、开放 proto 兼容适配和 Kafka 事件信封
-- [ ] 7.3 创建 `shared/platform`，抽取配置、日志、Trace、统一错误和基础设施客户端能力
-- [ ] 7.4 定义服务身份、gRPC 超时、错误映射、Kafka 版本、重试、死信和幂等规则
-- [ ] 7.5 为三个服务增加独立健康检查、优雅退出和服务级配置
+- [x] 7.1 在确认阶段一后创建 `services/identity`、`services/content`、`services/community` 服务目录和独立启动入口
+- [x] 7.2 创建 `shared/contracts`，集中管理内部 gRPC proto、开放 proto 兼容适配和 Kafka 事件信封
+- [x] 7.3 创建 `shared/platform`，抽取配置、日志、Trace、统一错误和基础设施客户端能力
+- [x] 7.4 定义服务身份、gRPC 超时、错误映射、Kafka 版本、重试、死信和幂等规则
+- [x] 7.5 为三个服务增加独立健康检查、优雅退出和服务级配置
 
 ## 8. 阶段二：Identity Service 抽取
 
-- [ ] 8.1 将阶段一 Identity 模块移动为 Identity Service，并保留四层依赖结构
-- [ ] 8.2 实现 Identity Service 的内部用户查询 gRPC 接口
-- [ ] 8.3 将统一入口的用户注册、登录、资料、改密、头像和退出路由切换到 Identity Service
-- [ ] 8.4 将 Content 和 Community 对用户数据的直接访问替换为 Identity gRPC Client
-- [ ] 8.5 验证开放 UserService、会话失效、管理员权限和用户资料接口兼容性
-- [ ] 8.6 增加 Identity Service 的独立构建、启动、探针和部署配置
+- [x] 8.1 将阶段一 Identity 模块移动为 Identity Service，并保留四层依赖结构
+- [x] 8.2 实现 Identity Service 的内部用户查询 gRPC 接口
+- [x] 8.3 将统一入口的用户注册、登录、资料、改密、头像和退出路由切换到 Identity Service
+- [x] 8.4 将 Content 和 Community 对用户数据的直接访问替换为 Identity gRPC Client
+- [x] 8.5 验证开放 UserService、会话失效、管理员权限和用户资料接口兼容性
+- [x] 8.6 增加 Identity Service 的独立构建、启动、探针和部署配置
 
 ## 9. 阶段二：Content Service 抽取
 
-- [ ] 9.1 将阶段一 Content 模块移动为 Content Service，并保留四层依赖结构
-- [ ] 9.2 实现 Content Service 的文章查询、状态校验和互动统计查询接口
-- [ ] 9.3 将统一入口的文章、垃圾箱和文章图片路由切换到 Content Service
-- [ ] 9.4 将开放 ArticleService 切换到 Content Service，并验证分页和状态过滤兼容性
-- [ ] 9.5 通过 Identity gRPC 和 Community 统计接口完成文章详情数据组合
-- [ ] 9.6 增加 Content Service 的独立构建、启动、探针和部署配置
+- [x] 9.1 将阶段一 Content 模块移动为 Content Service，并保留四层依赖结构
+- [x] 9.2 实现 Content Service 的文章查询、状态校验和互动统计查询接口
+- [x] 9.3 将统一入口的文章、垃圾箱和文章图片路由切换到 Content Service
+- [x] 9.4 将开放 ArticleService 切换到 Content Service，并验证分页和状态过滤兼容性
+- [x] 9.5 通过 Identity gRPC 和 Community 统计接口完成文章详情数据组合
+- [x] 9.6 增加 Content Service 的独立构建、启动、探针和部署配置
 
 ## 10. 阶段二：Community Service 抽取
 
-- [ ] 10.1 将阶段一 Community 模块及内部通知模块移动为 Community Service
-- [ ] 10.2 实现 Community Service 的评论、点赞、浏览、热榜和互动统计接口
-- [ ] 10.3 实现 Community Service 的通知查询、未读状态和 Kafka 通知消费者
-- [ ] 10.4 将统一入口的评论、点赞、热榜和通知路由切换到 Community Service
-- [ ] 10.5 将开放 CommentService 切换到 Community Service，并验证评论统计兼容性
-- [ ] 10.6 将浏览统计和通知 Kafka consumer group 切换到 Community Service
-- [ ] 10.7 验证 Identity/Content gRPC 调用、重复请求、重复消息、超时、重试和死信
-- [ ] 10.8 增加 Community Service 的独立构建、启动、探针和部署配置
+- [x] 10.1 将阶段一 Community 模块及内部通知模块移动为 Community Service
+- [x] 10.2 实现 Community Service 的评论、点赞、浏览、热榜和互动统计接口
+- [x] 10.3 实现 Community Service 的通知查询、未读状态和 Kafka 通知消费者
+- [x] 10.4 将统一入口的评论、点赞、热榜和通知路由切换到 Community Service
+- [x] 10.5 将开放 CommentService 切换到 Community Service，并验证评论统计兼容性
+- [x] 10.6 将浏览统计和通知 Kafka consumer group 切换到 Community Service
+- [x] 10.7 验证 Identity/Content gRPC 调用、重复请求、重复消息、超时、重试和死信
+- [x] 10.8 增加 Community Service 的独立构建、启动、探针和部署配置
 
 ## 11. 阶段二：数据、部署与流量迁移
 
-- [ ] 11.1 为 Identity、Content、Community 配置独立的服务配置、Redis Key 前缀和 Kafka consumer group
-- [ ] 11.2 在共享 MySQL 阶段按数据所有权限制三个服务的 Repository 和数据库访问范围
-- [ ] 11.3 更新 Docker Compose，使统一入口和三个服务可以独立构建、启动和停止
-- [ ] 11.4 更新 Kubernetes Deployment、Service、ConfigMap、Secret、探针和资源配置
-- [ ] 11.5 为各服务增加路由切换开关，并分别验证只读和写请求回滚流程
-- [ ] 11.6 在逻辑所有权稳定后编写独立 Schema/数据库迁移、校验、备份和回滚脚本
-- [ ] 11.7 完成服务级集成测试、契约测试、流量切换验证和数据一致性校验
+- [x] 11.1 为 Identity、Content、Community 配置独立的服务配置、Redis Key 前缀和 Kafka consumer group
+- [x] 11.2 在共享 MySQL 阶段按数据所有权限制三个服务的 Repository 和数据库访问范围
+- [x] 11.3 更新 Docker Compose，使统一入口和三个服务可以独立构建、启动和停止
+- [x] 11.4 更新 Kubernetes Deployment、Service、ConfigMap、Secret、探针和资源配置
+- [x] 11.5 为各服务增加路由切换开关，并分别验证只读和写请求回滚流程
+- [x] 11.6 在逻辑所有权稳定后编写独立 Schema/数据库迁移、校验、备份和回滚脚本
+- [x] 11.7 完成服务级集成测试、契约测试、流量切换验证和数据一致性校验
 
 ## 12. 阶段二：验收与旧代码清理
 
-- [ ] 12.1 验证现有 HTTP 路径、统一响应、鉴权、错误码和开放 gRPC 客户端兼容性
-- [ ] 12.2 验证服务间 gRPC 的服务身份、Trace ID、超时、错误传播和降级行为
-- [ ] 12.3 验证 Kafka 重复消息、乱序消息、重试、死信和消费者恢复
-- [ ] 12.4 验证文章统计、热榜、评论计数、点赞计数和通知的最终一致性与可重建能力
-- [ ] 12.5 对比新旧实现的关键接口和数据统计，确认迁移期间无数据丢失
-- [ ] 12.6 移除已切换路由、旧跨域 Repository、兼容 Service 和重复单体 wiring
-- [ ] 12.7 更新项目文档、运行手册、服务依赖图和故障回滚手册
+- [x] 12.1 验证现有 HTTP 路径、统一响应、鉴权、错误码和开放 gRPC 客户端兼容性
+- [x] 12.2 验证服务间 gRPC 的服务身份、Trace ID、超时、错误传播和降级行为
+- [x] 12.3 验证 Kafka 重复消息、乱序消息、重试、死信和消费者恢复
+- [x] 12.4 验证文章统计、热榜、评论计数、点赞计数和通知的最终一致性与可重建能力
+- [x] 12.5 对比新旧实现的关键接口和数据统计，确认迁移期间无数据丢失
+- [x] 12.6 移除已切换路由、旧跨域 Repository、兼容 Service 和重复单体 wiring
+- [x] 12.7 更新项目文档、运行手册、服务依赖图和故障回滚手册

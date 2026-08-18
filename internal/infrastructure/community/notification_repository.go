@@ -3,31 +3,45 @@ package community
 import (
 	domaincommunity "blog/internal/domain/community"
 	"blog/internal/model"
-	"blog/internal/repository"
 	"context"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type notificationRepositoryAdapter struct {
-	repo repository.NotificationRepository
+type notificationRepository struct {
+	db *mongo.Database
 }
 
-// NewNotificationRepository 将 MongoDB 通知 Repository 适配为 Community 领域 Port。
-func NewNotificationRepository(repo repository.NotificationRepository) domaincommunity.NotificationRepository {
-	return &notificationRepositoryAdapter{repo: repo}
+// NewNotificationRepository 返回直接持有 MongoDB 的通知 Repository 实现。
+func NewNotificationRepository(db *mongo.Database) domaincommunity.NotificationRepository {
+	return &notificationRepository{db: db}
 }
 
-func (a *notificationRepositoryAdapter) Insert(ctx context.Context, notification *domaincommunity.Notification) error {
+func (r *notificationRepository) Insert(ctx context.Context, notification *domaincommunity.Notification) error {
 	m := toModelNotification(notification)
-	if err := a.repo.Insert(ctx, m); err != nil {
+	res, err := r.db.Collection("notifications").InsertOne(ctx, m)
+	if err != nil {
 		return err
 	}
-	notification.ID = m.ID.Hex()
+	notification.ID = res.InsertedID.(interface{ Hex() string }).Hex()
 	return nil
 }
 
-func (a *notificationRepositoryAdapter) GetList(ctx context.Context, receiverID uint64, page, pageSize int64) ([]*domaincommunity.Notification, error) {
-	models, err := a.repo.GetList(ctx, receiverID, page, pageSize)
+func (r *notificationRepository) GetList(ctx context.Context, receiverID uint64, page, pageSize int64) ([]*domaincommunity.Notification, error) {
+	opts := options.Find().
+		SetSort(bson.M{"created_time": -1}).
+		SetLimit(pageSize).
+		SetSkip((page - 1) * pageSize)
+	cursor, err := r.db.Collection("notifications").Find(ctx, bson.M{"receiver_id": receiverID}, opts)
 	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var models []*model.Notification
+	if err := cursor.All(ctx, &models); err != nil {
 		return nil, err
 	}
 	list := make([]*domaincommunity.Notification, 0, len(models))
@@ -37,12 +51,19 @@ func (a *notificationRepositoryAdapter) GetList(ctx context.Context, receiverID 
 	return list, nil
 }
 
-func (a *notificationRepositoryAdapter) MarkAllAsRead(ctx context.Context, receiverID uint64) error {
-	return a.repo.MarkAllAsRead(ctx, receiverID)
+func (r *notificationRepository) MarkAllAsRead(ctx context.Context, receiverID uint64) error {
+	_, err := r.db.Collection("notifications").UpdateMany(ctx,
+		bson.M{"receiver_id": receiverID, "is_read": false},
+		bson.M{"$set": bson.M{"is_read": true}},
+	)
+	return err
 }
 
-func (a *notificationRepositoryAdapter) GetUnreadCount(ctx context.Context, receiverID uint64) (int64, error) {
-	return a.repo.GetUnreadCount(ctx, receiverID)
+func (r *notificationRepository) GetUnreadCount(ctx context.Context, receiverID uint64) (int64, error) {
+	return r.db.Collection("notifications").CountDocuments(ctx, bson.M{
+		"receiver_id": receiverID,
+		"is_read":     false,
+	})
 }
 
 func toModelNotification(n *domaincommunity.Notification) *model.Notification {

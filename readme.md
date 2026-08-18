@@ -205,26 +205,24 @@ gRPC 服务（默认端口 `9100`，定义见 `proto/blogopen/v1`）：
 
 ```text
 .
-├── cmd/                    # Cobra 命令：server / grpc / kafka-consume / migrate
-├── config/                 # YAML 配置结构与加载（含 Kafka 配置）
-├── deploy/k8s/             # Kubernetes 清单（命名空间、配置、中间件、三个工作负载）
-├── gen/                    # protoc 生成的 gRPC 代码
+├── cmd/                    # 统一入口 Cobra 命令：server / grpc / kafka-consume / migrate
+├── config/                 # 业务 YAML 配置
+├── deploy/k8s/             # Kubernetes 清单（中间件、统一入口、三个服务）
+├── gen/                    # 开放 API protoc 生成代码
 ├── proto/blogopen/v1/      # 开放 API 的 proto 定义
+├── services/               # Identity / Content / Community 三个服务
+├── shared/                 # contracts（内部 gRPC、Kafka 信封）与 platform（配置/日志/Trace/客户端）
 ├── internal/
+│   ├── interfaces/         # HTTP / 开放 gRPC / Kafka 入口适配
+│   ├── application/        # Identity / Content / Community 应用用例
+│   ├── domain/             # 领域模型、规则与 Port
+│   ├── infrastructure/     # 配置、bootstrap、领域 Adapter
 │   ├── auth/               # Token 会话、JWT、HMAC、密码哈希
-│   ├── common/             # 统一响应、错误码、校验器、防重、浏览窗口
-│   ├── consts/             # Redis key 与锁常量
-│   ├── cron/               # 定时任务管理器与热榜校准
+│   ├── common/             # 统一响应、错误码、校验器、防重
 │   ├── dto/                # 各模块请求 / 响应模型
-│   ├── grpc/               # gRPC server、handler、认证拦截器
-│   ├── handler/            # HTTP 处理器
 │   ├── message/            # Kafka 消息体定义
-│   ├── middleware/         # 认证、管理员校验、日志、异常、防重、浏览历史
 │   ├── model/              # 持久化模型与状态 / 角色枚举
-│   ├── mq/                 # Kafka 消息处理器与注册表
-│   ├── repository/         # MySQL / MongoDB 数据访问
-│   ├── routes/             # 公开 / 登录 / 管理员 / 可选登录路由
-│   └── service/            # 业务规则、事务、缓存、异步投递
+│   └── repository/         # MySQL / MongoDB 数据访问
 ├── pkg/
 │   ├── database/           # MySQL、MongoDB、Redis 客户端
 │   ├── kafka/              # 客户端、生产者、消费者、死信队列
@@ -242,16 +240,21 @@ gRPC 服务（默认端口 `9100`，定义见 `proto/blogopen/v1`）：
 # 1. 准备配置：按需修改数据库、Redis、MongoDB、Kafka、MinIO、JWT 等配置
 vim config/config.yaml
 
-# 2. 初始化数据库（自动执行 scripts/mysql 下的建库建表脚本）
+# 2. 启动基础设施
+docker compose up -d mysql redis mongodb kafka
+
+# 3. 初始化数据库（自动执行 scripts/mysql 下的建库建表脚本）
 go run . migrate
 
-# 3. 启动 HTTP 服务（默认 8080）
+# 4. 启动三个服务
+go run ./services/identity
+go run ./services/content
+go run ./services/community
+
+# 5. 启动统一 HTTP 入口（默认 8080）
 go run . server -p 8080
 
-# 4. 启动 Kafka 消费者（通知与浏览历史落库）
-go run . kafka-consume
-
-# 5. 按需启动开放 API 服务（默认读取 config 中的 grpc.port）
+# 6. 按需启动开放 API 服务（默认读取 config 中的 grpc.port）
 go run . grpc
 ```
 
