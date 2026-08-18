@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
+	identityapp "blog/internal/application/identity"
 	"blog/internal/auth"
 	"blog/internal/common"
 	"blog/internal/dto/user"
+	identityinfra "blog/internal/infrastructure/identity"
 	"blog/internal/model"
 	"blog/internal/repository"
-	"blog/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -113,7 +114,15 @@ func TestUserAuthHandler_AllRoutes(t *testing.T) {
 
 	// 3.  完美对齐升级后的构造函数
 	userRepo := repository.NewUserRepository(db)
-	userAuthService := service.NewUserAuthService(userRepo, auth.NewTokenAuth(newFakeSessionStore()))
+	identityService := identityapp.NewService(
+		identityinfra.NewUserRepository(userRepo),
+		identityinfra.NewTokenSession(auth.NewTokenAuth(newFakeSessionStore())),
+		nil,
+		nil,
+		"",
+		nil,
+	)
+	userAuthService := identityService
 	h := NewUserAuthHandler(userAuthService)
 
 	// 4. 大表格：按“时光流逝”的顺序，先测异常，再测成功注册，最后测登录

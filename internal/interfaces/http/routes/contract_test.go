@@ -2,7 +2,6 @@ package routes
 
 import (
 	"blog/internal/interfaces/http/handler"
-	"blog/internal/service"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -18,7 +17,7 @@ func TestHTTPRouteContract(t *testing.T) {
 		Comment:     handler.NewCommentHandler(nil),
 		Like:        handler.NewLikeHandler(nil, nil),
 		Notify:      handler.NewNotificationHandler(nil),
-		ViewHistory: (*service.ArticleViewHistoryService)(nil),
+		ViewHistory: nil,
 		Redis:       nil,
 	}
 
