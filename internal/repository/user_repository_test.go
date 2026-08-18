@@ -1,95 +1,56 @@
 package repository
 
-// func newTestUser(id int64, phone string, status int8) *model.User {
-// 	return &model.User{
-// 		ID:       id,
-// 		Phone:    phone,
-// 		Nickname: "test",
-// 		Password: "pwd",
-// 		Status:   status,
-// 	}
-// }
+import (
+	"blog/internal/model"
+	"context"
+	"testing"
 
-// func TestUserRepository_CreateUser(t *testing.T) {
-// 	repo := NewUserRepository()
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+)
 
-// 	user := newTestUser(1, "13800138000", 1)
+func TestUserRepositoryCRUD(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("无法启动内存测试数据库: %v", err)
+	}
+	if err := db.AutoMigrate(&model.User{}); err != nil {
+		t.Fatalf("迁移用户表失败: %v", err)
+	}
 
-// 	err := repo.CreateUser(user)
-// 	if err != nil {
-// 		t.Fatalf("创建用户失败: %v", err)
-// 	}
+	repo := NewUserRepository(db)
+	ctx := context.Background()
+	user := &model.User{
+		Nickname: "测试用户",
+		Phone:    "13800138000",
+		Password: "hash",
+		Role:     model.RoleUser,
+		Status:   model.UserNormal,
+	}
+	if err := repo.CreateUser(ctx, user); err != nil {
+		t.Fatalf("创建用户失败: %v", err)
+	}
+	if user.ID == 0 {
+		t.Fatal("创建用户后 ID 未回填")
+	}
 
-// 	got, err := repo.GetUserByAccount("13800138000")
-// 	if err != nil {
-// 		t.Fatalf("查询用户失败: %v", err)
-// 	}
+	got, err := repo.FindUserByID(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("查询用户失败: %v", err)
+	}
+	if got.Nickname != "测试用户" {
+		t.Fatalf("用户昵称不一致: %s", got.Nickname)
+	}
 
-// 	if got.Phone != "13800138000" {
-// 		t.Fatalf("手机号不匹配")
-// 	}
-// }
-
-// func TestUserRepository_GetUserByPhone_NotFound(t *testing.T) {
-// 	repo := NewUserRepository()
-
-// 	_, err := repo.GetUserByAccount("not-exist")
-// 	if err == nil {
-// 		t.Fatalf("期望用户不存在错误，但没有返回")
-// 	}
-// }
-
-// func TestUserRepository_GetUserByPhone_Disabled(t *testing.T) {
-// 	repo := NewUserRepository()
-
-// 	repo.CreateUser(newTestUser(1, "13800138000", 0)) // status=0 禁用
-
-// 	_, err := repo.GetUserByAccount("13800138000")
-// 	if err == nil {
-// 		t.Fatalf("期望禁用用户错误，但没有返回")
-// 	}
-// }
-
-// func TestUserRepository_FindUserByID(t *testing.T) {
-// 	repo := NewUserRepository()
-
-// 	repo.CreateUser(newTestUser(100, "13800138000", 1))
-
-// 	user, err := repo.FindUserByID(100)
-// 	if err != nil {
-// 		t.Fatalf("查找失败: %v", err)
-// 	}
-
-// 	if user.ID != 100 {
-// 		t.Fatalf("用户ID不匹配")
-// 	}
-// }
-
-// func TestUserRepository_FindUserByID_NotFound(t *testing.T) {
-// 	repo := NewUserRepository()
-
-// 	_, err := repo.FindUserByID(999)
-// 	if err == nil {
-// 		t.Fatalf("期望找不到用户错误")
-// 	}
-// }
-
-// func TestUserRepository_UpdateUser(t *testing.T) {
-// 	repo := NewUserRepository()
-
-// 	repo.CreateUser(newTestUser(1, "13800138000", 1))
-
-// 	updated := newTestUser(1, "13800138000", 1)
-// 	updated.Nickname = "updated-name"
-
-// 	err := repo.UpdateUser(updated)
-// 	if err != nil {
-// 		t.Fatalf("更新失败: %v", err)
-// 	}
-
-// 	user, _ := repo.GetUserByAccount("13800138000")
-
-// 	if user.Nickname != "updated-name" {
-// 		t.Fatalf("更新未生效")
-// 	}
-// }
+	got.Nickname = "新昵称"
+	if err := repo.UpdateUser(ctx, got); err != nil {
+		t.Fatalf("更新用户失败: %v", err)
+	}
+	after, err := repo.FindUserByID(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("更新后查询失败: %v", err)
+	}
+	if after.Nickname != "新昵称" {
+		t.Fatalf("更新未生效: %s", after.Nickname)
+	}
+}

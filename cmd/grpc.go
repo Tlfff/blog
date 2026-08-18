@@ -1,13 +1,17 @@
 package cmd
 
 import (
-	"blog/config"
-	"blog/internal/auth"
-	grpchandler "blog/internal/grpc/handler"
-	grpcserver "blog/internal/grpc/server"
+	communityapp "blog/internal/application/community"
+	contentapp "blog/internal/application/content"
+	identityapp "blog/internal/application/identity"
+	"blog/internal/infrastructure/bootstrap"
+	communityinfra "blog/internal/infrastructure/community"
+	"blog/internal/infrastructure/config"
+	contentinfra "blog/internal/infrastructure/content"
+	identityinfra "blog/internal/infrastructure/identity"
+	grpchandler "blog/internal/interfaces/grpc/handler"
+	grpcserver "blog/internal/interfaces/grpc/server"
 	"blog/internal/repository"
-	"blog/internal/service"
-	"blog/pkg/database"
 	"fmt"
 	"net"
 
@@ -27,17 +31,17 @@ var grpcCmd = &cobra.Command{
 			return
 		}
 		// 2. 注入二方服务专用JWT密钥
-		auth.InitOpenJWT(cfg.OpenJWT.Secret)
+		bootstrap.InitOpenJWT(cfg.OpenJWT.Secret)
 
 		// 3. 初始化数据库连接
-		db, err := database.NewMySQLClient(cfg.Database.Username, cfg.Database.Password, cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName)
+		db, err := bootstrap.NewMySQL(cfg)
 		if err != nil {
 			fmt.Printf("[error]:数据库连接初始化失败：%v\n", err)
 			return
 		}
 
 		// 4. 初始化Redis连接
-		rdb, err := database.NewRedisClient(cfg.Redis)
+		rdb, err := bootstrap.NewRedis(cfg)
 		if err != nil {
 			fmt.Printf("[error]:Redis连接初始化失败：%v\n", err)
 			return
@@ -51,15 +55,40 @@ var grpcCmd = &cobra.Command{
 
 		// 6. 初始化service
 		// gRPC 二方服务用不到 OSS 功能，不注入 OSS
-		userService := service.NewUserService(userRepo)
-		commentService := service.NewCommentService(commentRepo, artRepo, rdb)
-		// 二方服务用不到文章点赞逻辑，artLikeService 传 nil
-		artService := service.NewArticleService(artRepo, nil, rdb)
+		identityService := identityapp.NewService(
+			identityinfra.NewUserRepository(userRepo),
+			nil,
+			nil,
+			nil,
+			"",
+			nil,
+		)
+		communityService := communityapp.NewService(
+			communityinfra.NewCommentRepository(commentRepo, artRepo),
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+		)
+		// 二方服务用不到 OSS 与互动查询
+		contentService := contentapp.NewService(
+			contentinfra.NewArticleRepository(artRepo),
+			nil,
+			nil,
+			"",
+			nil,
+		)
 
 		// 7. 初始化gRPC handler
-		userHandler := grpchandler.NewUserHandler(userService)
-		commentHandler := grpchandler.NewCommentHandler(commentService)
-		articleHandler := grpchandler.NewArticleHandler(artService)
+		userHandler := grpchandler.NewUserHandler(identityService)
+		commentHandler := grpchandler.NewCommentHandler(communityService)
+		articleHandler := grpchandler.NewArticleHandler(contentService)
 
 		// 8. 组装gRPC Server（含统一认证拦截器：二方JWT / 三方HMAC）
 		s := grpcserver.NewGRPCServer(&grpcserver.AppHandler{

@@ -1,23 +1,22 @@
 package cmd
 
 import (
-	"blog/config"
-	"blog/internal/auth"
-	"blog/internal/common"
+	communityapp "blog/internal/application/community"
+	contentapp "blog/internal/application/content"
+	identityapp "blog/internal/application/identity"
 	"blog/internal/cron"
-	"blog/internal/handler"
+	"blog/internal/auth"
+	"blog/internal/infrastructure/bootstrap"
+	communityinfra "blog/internal/infrastructure/community"
+	"blog/internal/infrastructure/config"
+	contentinfra "blog/internal/infrastructure/content"
+	identityinfra "blog/internal/infrastructure/identity"
+	handler "blog/internal/interfaces/http/handler"
+	"blog/internal/interfaces/http/routes"
 	"blog/internal/repository"
-	"blog/internal/routes"
-	"blog/internal/service"
-	"blog/pkg/database"
-	"blog/pkg/kafka"
-	"blog/pkg/oss"
-	iputil "blog/pkg/util/ip"
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -38,19 +37,17 @@ var serverCmd = &cobra.Command{
 			return
 		}
 		// 1.1 初始化自定义验证器
-		common.InitValidator()
+		bootstrap.InitValidator()
 		// 1.2 初始化ip工具类
-		dir, _ := os.Getwd() // 获取当前程序运行的绝对路径
-		dbPath := filepath.Join(dir, "pkg/resource/ip2region.xdb")
-		if err := iputil.InitIPSearcher(dbPath); err != nil {
+		if err := bootstrap.InitIPSearcher(); err != nil {
 			log.Fatalf("[error]:初始化 IP 解析器失败: %v", err)
 		}
 		// 在程序退出时，释放内存
-		defer iputil.Close()
+		defer bootstrap.CloseIP()
 
 		// 2 初始化数据库连接
 		// 2.1 初始化mysql
-		db, err := database.NewMySQLClient(config.Database.Username, config.Database.Password, config.Database.Host, config.Database.Port, config.Database.DBName)
+		db, err := bootstrap.NewMySQL(config)
 		if err != nil {
 			fmt.Printf("[error]:数据库连接初始化失败：%v\n", err)
 			return // 连接失败必须立刻拦截并退出，不能往下传 nil！
@@ -62,17 +59,21 @@ var serverCmd = &cobra.Command{
 			return
 		}
 		// 2.2 初始化mongodb
-		mongodb, err := database.NewMongoDBClient(config.Mongodb.Username, config.Mongodb.Password, config.Mongodb.Host, config.Mongodb.DBName, config.Mongodb.Port)
+		mongodb, err := bootstrap.NewMongoDB(config)
+		if err != nil {
+			fmt.Printf("[error]:MongoDB连接初始化失败:%v\n", err)
+			return
+		}
 
 		// 3. 初始化redis连接
-		rdb, err := database.NewRedisClient(config.Redis)
+		rdb, err := bootstrap.NewRedis(config)
 		if err != nil {
 			fmt.Printf("[error]:Redis连接初始化失败:%v\n", err)
 			return
 		}
 		defer rdb.Close()
 		// 3.1 初始化Kafka客户端
-		kafkaClient, err := kafka.NewClient(config.Kafka)
+		kafkaClient, err := bootstrap.NewKafka(config)
 		if err != nil {
 			fmt.Printf("[error]:Kafka客户端初始化失败:%v\n", err)
 			return
@@ -93,51 +94,63 @@ var serverCmd = &cobra.Command{
 		ntfRepo := repository.NewNotificationRepository(mongodb)
 
 		// 4.1.1 初始化 MinIO 客户端
-		ossClient, err := oss.NewMinioClient(
-			config.OSS.Endpoint,
-			config.OSS.AccessKeyID,
-			config.OSS.SecretAccessKey,
-			config.OSS.Bucket,
-			config.OSS.UseSSL,
-		)
+		ossClient, err := bootstrap.NewOSS(config)
 		if err != nil {
 			fmt.Printf("[error]:MinIO客户端初始化失败:%v\n", err)
 			return
 		}
 
 		// 4.2 初始化service
-		ntfService := service.NewNotificationService(ntfRepo)
-		artLikeService := service.NewArticleLikeService(artLikeRepo, artRepo, rdb, ntfService, userRepo, kafkaClient)
-		comLikeService := service.NewCommentLikeService(commentLikeRepo, commentRepo, rdb)
 		tokenAuth := auth.NewTokenAuth(rdb)
-		userAuthService := service.NewUserAuthService(userRepo, tokenAuth)
-		userService := service.NewUserService(userRepo, rdb)
-		userService.SetOSS(ossClient, config.OSS.PublicDomain, config.OSS.AllowedExts)
-		historyService := service.NewArticleViewHistoryService(historyRepo, kafkaClient)
-		artService := service.NewArticleService(artRepo, artLikeService, rdb)
-		artService.SetOSS(ossClient, config.OSS.PublicDomain)
-		artRankService := service.NewArticleRankService(artRepo, rdb)
-		commentService := service.NewCommentService(commentRepo, artRepo, rdb)
-		articleImageService := service.NewArticleImageService(ossClient, config.OSS.PublicDomain, config.OSS.AllowedExts)
+		identityService := identityapp.NewService(
+			identityinfra.NewUserRepository(userRepo),
+			identityinfra.NewTokenSession(tokenAuth),
+			identityinfra.NewPasswordChangeTokenStore(rdb),
+			identityinfra.NewAvatarStorage(ossClient),
+			config.OSS.PublicDomain,
+			config.OSS.AllowedExts,
+		)
+		articleLikePort := communityinfra.NewArticleLikeRepository(artLikeRepo)
+		commentLikePort := communityinfra.NewCommentLikeRepository(commentLikeRepo)
+		communityService := communityapp.NewService(
+			communityinfra.NewCommentRepository(commentRepo, artRepo),
+			articleLikePort,
+			commentLikePort,
+			communityinfra.NewViewHistoryRepository(historyRepo),
+			communityinfra.NewNotificationRepository(ntfRepo),
+			communityinfra.NewArticleQuery(artRepo),
+			communityinfra.NewUserInfoQuery(userRepo),
+			communityinfra.NewLikeCache(rdb, articleLikePort, commentLikePort),
+			communityinfra.NewLikeCountStore(rdb),
+			communityinfra.NewHotRankStore(rdb),
+			communityinfra.NewEventPublisher(kafkaClient),
+		)
+		contentService := contentapp.NewService(
+			contentinfra.NewArticleRepository(artRepo),
+			contentinfra.NewArticleImageStorage(ossClient),
+			communityService,
+			config.OSS.PublicDomain,
+			config.OSS.AllowedExts,
+		)
 
 		// 初始化排行榜
 		initCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		if err := artRankService.RebuildHotRank(initCtx); err != nil {
+		if err := communityService.RebuildHotRank(initCtx); err != nil {
 			log.Printf("[WARN] 热门文章排行榜初始化失败或超时, err: %v", err)
 		}
 		cancel() //释放定时器资源
 
 		// 4.3 初始化handler
-		userAuthHandler := handler.NewUserAuthHandler(userAuthService)
-		userHandler := handler.NewUserHandler(userService, userAuthService)
-		articleHandler := handler.NewArticleHandler(artService, artRankService, articleImageService)
-		commentHandler := handler.NewCommentHandler(commentService)
-		likeHandler := handler.NewLikeHandler(artLikeService, comLikeService)
-		ntfHandler := handler.NewNotificationHandler(ntfService)
+		userAuthHandler := handler.NewUserAuthHandler(identityService)
+		userHandler := handler.NewUserHandler(identityService, identityService)
+		articleHandler := handler.NewArticleHandler(contentService, communityService)
+		commentHandler := handler.NewCommentHandler(communityService)
+		likeHandler := handler.NewLikeHandler(communityService, communityService)
+		ntfHandler := handler.NewNotificationHandler(communityService)
 
 		// 4.4 初始化定时器
 		// likeSyncJob := cron.NewLikeSyncJob(likeService)
-		rankJob := cron.NewRankSyncJob(artRankService)
+		rankJob := cron.NewRankSyncJob(communityService)
 		// 传入所有定时任务，由全局管理器统一调度
 		cronMgr := cron.NewCronManager(rankJob)
 		cronMgr.Start()
@@ -151,7 +164,7 @@ var serverCmd = &cobra.Command{
 			Comment:     commentHandler,
 			Like:        likeHandler,
 			Notify:      ntfHandler,
-			ViewHistory: historyService,
+			ViewHistory: communityService,
 			Redis:       rdb,
 		}
 

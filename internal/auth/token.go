@@ -19,6 +19,17 @@ const (
 	RememberTokenTTL = 30 * 24 * time.Hour // 30天
 )
 
+// SessionStore 是 TokenAuth 需要的 Redis 会话存储能力。
+// 使用窄接口而不是 *redis.Client，便于测试替换为内存实现。
+type SessionStore interface {
+	Get(ctx context.Context, key string) *redis.StringCmd
+	Set(ctx context.Context, key string, value any, expiration time.Duration) *redis.StatusCmd
+	Del(ctx context.Context, keys ...string) *redis.IntCmd
+	SAdd(ctx context.Context, key string, members ...any) *redis.IntCmd
+	SMembers(ctx context.Context, key string) *redis.StringSliceCmd
+	SRem(ctx context.Context, key string, members ...any) *redis.IntCmd
+}
+
 // 登录会话信息
 type Session struct {
 	UserID    uint64 `json:"user_id"`
@@ -30,10 +41,10 @@ type Session struct {
 
 // Token 认证服务
 type TokenAuth struct {
-	rdb *redis.Client
+	rdb SessionStore
 }
 
-func NewTokenAuth(rdb *redis.Client) *TokenAuth {
+func NewTokenAuth(rdb SessionStore) *TokenAuth {
 	return &TokenAuth{rdb: rdb}
 }
 

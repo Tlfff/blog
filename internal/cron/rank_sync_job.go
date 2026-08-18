@@ -1,17 +1,21 @@
 package cron
 
 import (
-	"blog/internal/service"
 	"context"
 	"log"
 	"time"
 )
 
-type RankSyncJob struct {
-	rankService *service.ArticleRankService
+// RankRebuilder 是热榜重建接口。
+type RankRebuilder interface {
+	RebuildHotRank(ctx context.Context) error
 }
 
-func NewRankSyncJob(rankService *service.ArticleRankService) *RankSyncJob {
+type RankSyncJob struct {
+	rankService RankRebuilder
+}
+
+func NewRankSyncJob(rankService RankRebuilder) *RankSyncJob {
 	return &RankSyncJob{
 		rankService: rankService,
 	}

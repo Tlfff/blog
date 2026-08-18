@@ -1,13 +1,12 @@
 package cmd
 
 import (
-	"blog/config"
-	"blog/internal/common"
-	"blog/internal/mq"
+	communityapp "blog/internal/application/community"
+	"blog/internal/infrastructure/bootstrap"
+	communityinfra "blog/internal/infrastructure/community"
+	"blog/internal/infrastructure/config"
+	mq "blog/internal/interfaces/mq"
 	"blog/internal/repository"
-	"blog/internal/service"
-	"blog/pkg/database"
-	"blog/pkg/kafka"
 	"context"
 	"fmt"
 	"log"
@@ -30,15 +29,9 @@ var kafkaConsumeCmd = &cobra.Command{
 			return
 		}
 		// 1.1 初始化自定义验证器
-		common.InitValidator()
+		bootstrap.InitValidator()
 		// 2. 初始化 MySQL
-		db, err := database.NewMySQLClient(
-			cfg.Database.Username,
-			cfg.Database.Password,
-			cfg.Database.Host,
-			cfg.Database.Port,
-			cfg.Database.DBName,
-		)
+		db, err := bootstrap.NewMySQL(cfg)
 		if err != nil {
 			log.Fatalf("初始化 MySQL 失败: %v", err)
 		}
@@ -48,19 +41,13 @@ var kafkaConsumeCmd = &cobra.Command{
 			return
 		}
 		// 3. 初始化 MongoDB
-		mongodb, err := database.NewMongoDBClient(
-			cfg.Mongodb.Username,
-			cfg.Mongodb.Password,
-			cfg.Mongodb.Host,
-			cfg.Mongodb.DBName,
-			cfg.Mongodb.Port,
-		)
+		mongodb, err := bootstrap.NewMongoDB(cfg)
 		if err != nil {
 			log.Fatalf("初始化 MongoDB 失败: %v", err)
 		}
 
 		// 4. 初始化 Redis
-		rdb, err := database.NewRedisClient(cfg.Redis)
+		rdb, err := bootstrap.NewRedis(cfg)
 		if err != nil {
 			log.Fatalf("初始化 Redis 失败: %v", err)
 		}
@@ -69,24 +56,33 @@ var kafkaConsumeCmd = &cobra.Command{
 		// 5. 初始化 Repository
 		userRepo := repository.NewUserRepository(db)
 		artRepo := repository.NewArticleRepository(db)
-		artLikeRepo := repository.NewArticleLikeRepository(db)
 		ntfRepo := repository.NewNotificationRepository(mongodb)
 		historyRepo := repository.NewArticleViewHistoryRepository(db)
 
 		// 6. 初始化 Service
-		ntfService := service.NewNotificationService(ntfRepo)
-		artLikeService := service.NewArticleLikeService(artLikeRepo, artRepo, rdb, ntfService, userRepo, nil)
-		historyService := service.NewArticleViewHistoryService(historyRepo, nil)
+		communityService := communityapp.NewService(
+			nil,
+			nil,
+			nil,
+			communityinfra.NewViewHistoryRepository(historyRepo),
+			communityinfra.NewNotificationRepository(ntfRepo),
+			communityinfra.NewArticleQuery(artRepo),
+			communityinfra.NewUserInfoQuery(userRepo),
+			nil,
+			nil,
+			nil,
+			nil,
+		)
 
 		// 7. 创建 Kafka 客户端（只用于消费）
-		kafkaClient, err := kafka.NewClient(cfg.Kafka)
+		kafkaClient, err := bootstrap.NewKafka(cfg)
 		if err != nil {
 			log.Fatalf("创建 Kafka 客户端失败: %v", err)
 		}
 		defer kafkaClient.Close()
 
 		// 8. 注册消息处理器
-		handlers := mq.RegisterHandlers(artLikeService, historyService)
+		handlers := mq.RegisterHandlers(communityService, communityService)
 
 		// 9. 初始化消费者
 		if err := kafkaClient.InitConsumer(handlers); err != nil {

@@ -237,7 +237,7 @@ func (s *ArticleLikeService) updateRankZSet(ctx context.Context, articleID uint6
 
 // 计算文章热度
 func calcHotScore(viewCount, likeCount, commentCount uint32) float64 {
-	return float64(1*viewCount + 2*likeCount + 1*commentCount)
+	return float64(viewCount + likeCount + commentCount)
 }
 
 // 判断用户是否点赞过该文章，供文章详情页展示使用

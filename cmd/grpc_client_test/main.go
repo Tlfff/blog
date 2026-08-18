@@ -3,7 +3,7 @@
 package main
 
 import (
-	"blog/config"
+	"blog/internal/infrastructure/config"
 	"blog/internal/auth"
 	"context"
 	"fmt"

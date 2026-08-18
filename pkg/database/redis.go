@@ -1,7 +1,7 @@
 package database
 
 import (
-	"blog/config"
+	"blog/internal/infrastructure/config"
 	"context"
 
 	"github.com/redis/go-redis/v9"

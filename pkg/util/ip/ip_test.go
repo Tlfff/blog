@@ -1,9 +1,22 @@
 package ip
 
-import "testing"
+import (
+	"path/filepath"
+	"runtime"
+	"testing"
+)
+
+func resourcePath(t *testing.T, name string) string {
+	t.Helper()
+	_, sourceFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("无法定位测试文件路径")
+	}
+	return filepath.Join(filepath.Dir(sourceFile), "..", "..", "resource", name)
+}
 
 func TestConvertIPToRegion(t *testing.T) {
-	dbPath := "../resource/ip2region.xdb"
+	dbPath := resourcePath(t, "ip2region.xdb")
 
 	if err := InitIPSearcher(dbPath); err != nil {
 		t.Fatalf("初始化 IP 查询器失败: %v", err)
