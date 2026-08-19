@@ -1,12 +1,15 @@
 package cmd
 
 import (
-	communityapp "blog/internal/application/community"
-	"blog/internal/infrastructure/bootstrap"
-	communityinfra "blog/internal/infrastructure/community"
-	"blog/internal/infrastructure/config"
-	grpcclient "blog/internal/interfaces/grpc/client"
-	mq "blog/internal/interfaces/mq"
+	articleapp "blog/internal/article/application"
+	articleinfra "blog/internal/article/infrastructure"
+	commentinfra "blog/internal/comment/infrastructure"
+	notificationapp "blog/internal/notification/application"
+	notificationinfra "blog/internal/notification/infrastructure"
+	"blog/internal/platform/bootstrap"
+	"blog/internal/platform/config"
+	grpcclient "blog/internal/platform/interfaces/grpc/client"
+	mq "blog/internal/platform/interfaces/mq"
 	internalv1 "blog/shared/contracts/gen/internalv1"
 	svcconfig "blog/shared/platform/config"
 	platformgrpc "blog/shared/platform/grpc"
@@ -67,19 +70,9 @@ var kafkaConsumeCmd = &cobra.Command{
 			log.Fatalf("连接 Identity Service 失败: %v", err)
 		}
 		defer identityConn.Close()
-		communityService := communityapp.NewService(
-			nil,
-			nil,
-			nil,
-			communityinfra.NewViewHistoryRepository(db),
-			communityinfra.NewNotificationRepository(mongodb),
-			communityinfra.NewArticleQuery(db),
-			grpcclient.NewCommunityUserInfoClient(internalv1.NewIdentityServiceClient(identityConn)),
-			nil,
-			nil,
-			nil,
-			nil,
-		)
+		identityClient := internalv1.NewIdentityServiceClient(identityConn)
+		notificationService := notificationapp.NewService(notificationinfra.NewNotificationRepository(mongodb), notificationinfra.NewLocalArticleQuery(db), grpcclient.NewCommunityUserInfoClient(identityClient), notificationinfra.NewCommentQuery(commentinfra.NewCommentRepository(db)))
+		articleService := articleapp.NewEngagementService(articleinfra.NewViewHistoryRepository(db), nil, nil, nil)
 
 		// 7. 创建 Kafka 客户端（只用于消费）
 		kafkaClient, err := bootstrap.NewKafka(cfg)
@@ -89,7 +82,7 @@ var kafkaConsumeCmd = &cobra.Command{
 		defer kafkaClient.Close()
 
 		// 8. 注册消息处理器
-		handlers := mq.RegisterHandlers(communityService, communityService)
+		handlers := mq.RegisterHandlers(notificationService, articleService)
 
 		// 9. 初始化消费者
 		if err := kafkaClient.InitConsumer(handlers); err != nil {

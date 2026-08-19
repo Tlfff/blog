@@ -2,7 +2,7 @@
 package errors
 
 import (
-	"blog/internal/common"
+	"blog/internal/shared/common"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

@@ -2,10 +2,11 @@
 package grpc
 
 import (
-	communityapp "blog/internal/application/community"
-	articledto "blog/internal/dto/article"
-	commentdto "blog/internal/dto/comment"
-	notificationdto "blog/internal/dto/notification"
+	articleapp "blog/internal/article/application"
+	communityapp "blog/internal/comment/application"
+	likeapp "blog/internal/like/application"
+	notificationapp "blog/internal/notification/application"
+	notificationdomain "blog/internal/notification/domain"
 	internalv1 "blog/shared/contracts/gen/internalv1"
 	platformerrors "blog/shared/platform/errors"
 	"context"
@@ -14,15 +15,18 @@ import (
 // CommunityServer 把 Community Application 用例暴露为内部 gRPC 服务。
 type CommunityServer struct {
 	internalv1.UnimplementedCommunityServiceServer
-	app *communityapp.Service
+	comments      *communityapp.Service
+	likes         *likeapp.Service
+	articles      *articleapp.EngagementService
+	notifications *notificationapp.Service
 }
 
-func NewCommunityServer(app *communityapp.Service) *CommunityServer {
-	return &CommunityServer{app: app}
+func NewCommunityServer(comments *communityapp.Service, likes *likeapp.Service, articles *articleapp.EngagementService, notifications *notificationapp.Service) *CommunityServer {
+	return &CommunityServer{comments: comments, likes: likes, articles: articles, notifications: notifications}
 }
 
 func (s *CommunityServer) CreateComment(ctx context.Context, req *internalv1.CreateCommentRequest) (*internalv1.CreateCommentResponse, error) {
-	resp, err := s.app.CreateComment(ctx, req.ArticleId, req.RootId, req.UserId, req.ReplyToUserId, req.Content, req.Ip)
+	resp, err := s.comments.CreateComment(ctx, req.ArticleId, req.RootId, req.UserId, req.ReplyToUserId, req.Content, req.Ip)
 	if err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
@@ -30,7 +34,7 @@ func (s *CommunityServer) CreateComment(ctx context.Context, req *internalv1.Cre
 }
 
 func (s *CommunityServer) ListRootComments(ctx context.Context, req *internalv1.ListRootCommentsRequest) (*internalv1.RootCommentList, error) {
-	resp, err := s.app.ListRootComments(ctx, req.ArticleId, req.LastId, int(req.Page), int(req.PageSize), req.IsDesc, req.AuthorId)
+	resp, err := s.comments.ListRootComments(ctx, req.ArticleId, req.LastId, int(req.Page), int(req.PageSize), req.IsDesc, req.AuthorId)
 	if err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
@@ -59,7 +63,7 @@ func (s *CommunityServer) ListRootComments(ctx context.Context, req *internalv1.
 }
 
 func (s *CommunityServer) ListReplies(ctx context.Context, req *internalv1.ListRepliesRequest) (*internalv1.ReplyList, error) {
-	resp, err := s.app.ListReplies(ctx, req.RootId, req.LastId, int(req.Page), int(req.PageSize))
+	resp, err := s.comments.ListReplies(ctx, req.RootId, req.LastId, int(req.Page), int(req.PageSize))
 	if err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
@@ -93,14 +97,14 @@ func (s *CommunityServer) ListReplies(ctx context.Context, req *internalv1.ListR
 }
 
 func (s *CommunityServer) DeleteComment(ctx context.Context, req *internalv1.DeleteCommentRequest) (*internalv1.Empty, error) {
-	if err := s.app.DeleteComment(ctx, req.CommentId, req.UserId, req.IsAdmin); err != nil {
+	if err := s.comments.DeleteComment(ctx, req.CommentId, req.UserId, req.IsAdmin); err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
 	return &internalv1.Empty{}, nil
 }
 
 func (s *CommunityServer) GetCommentStats(ctx context.Context, req *internalv1.CommentIDRequest) (*internalv1.CommentStats, error) {
-	stats, err := s.app.GetCommentStats(ctx, req.CommentId)
+	stats, err := s.comments.GetCommentStats(ctx, req.CommentId)
 	if err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
@@ -108,35 +112,35 @@ func (s *CommunityServer) GetCommentStats(ctx context.Context, req *internalv1.C
 }
 
 func (s *CommunityServer) ArticleLike(ctx context.Context, req *internalv1.ArticleUserRequest) (*internalv1.Empty, error) {
-	if err := s.app.ArticleLike(ctx, req.UserId, req.ArticleId); err != nil {
+	if err := s.likes.LikeArticle(ctx, req.UserId, req.ArticleId); err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
 	return &internalv1.Empty{}, nil
 }
 
 func (s *CommunityServer) ArticleCancelLike(ctx context.Context, req *internalv1.ArticleUserRequest) (*internalv1.Empty, error) {
-	if err := s.app.ArticleCancelLike(ctx, req.UserId, req.ArticleId); err != nil {
+	if err := s.likes.CancelArticle(ctx, req.UserId, req.ArticleId); err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
 	return &internalv1.Empty{}, nil
 }
 
 func (s *CommunityServer) CommentLike(ctx context.Context, req *internalv1.CommentUserRequest) (*internalv1.Empty, error) {
-	if err := s.app.CommentLike(ctx, req.UserId, req.CommentId); err != nil {
+	if err := s.likes.LikeComment(ctx, req.UserId, req.CommentId); err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
 	return &internalv1.Empty{}, nil
 }
 
 func (s *CommunityServer) CommentCancelLike(ctx context.Context, req *internalv1.CommentUserRequest) (*internalv1.Empty, error) {
-	if err := s.app.CommentCancelLike(ctx, req.UserId, req.CommentId); err != nil {
+	if err := s.likes.CancelComment(ctx, req.UserId, req.CommentId); err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
 	return &internalv1.Empty{}, nil
 }
 
 func (s *CommunityServer) IsUserLikedArticle(ctx context.Context, req *internalv1.ArticleUserRequest) (*internalv1.LikeState, error) {
-	liked, err := s.app.IsUserLikedArticle(ctx, req.UserId, req.ArticleId)
+	liked, err := s.likes.IsUserLikedArticle(ctx, req.UserId, req.ArticleId)
 	if err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
@@ -144,7 +148,7 @@ func (s *CommunityServer) IsUserLikedArticle(ctx context.Context, req *internalv
 }
 
 func (s *CommunityServer) GetHotRank(ctx context.Context, req *internalv1.HotRankRequest) (*internalv1.HotRank, error) {
-	rank, err := s.app.GetHotRank(ctx)
+	rank, err := s.articles.GetHotRank(ctx)
 	if err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
@@ -163,44 +167,38 @@ func (s *CommunityServer) GetHotRank(ctx context.Context, req *internalv1.HotRan
 }
 
 func (s *CommunityServer) RebuildHotRank(ctx context.Context, _ *internalv1.Empty) (*internalv1.Empty, error) {
-	if err := s.app.RebuildHotRank(ctx); err != nil {
+	if err := s.articles.RebuildHotRank(ctx); err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
 	return &internalv1.Empty{}, nil
 }
 
 func (s *CommunityServer) SendViewHistory(ctx context.Context, req *internalv1.ViewHistoryRequest) (*internalv1.Empty, error) {
-	if err := s.app.SendViewHistory(ctx, req.UserId, req.ArticleId); err != nil {
+	if err := s.articles.SendViewHistory(ctx, req.UserId, req.ArticleId); err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
 	return &internalv1.Empty{}, nil
 }
 
 func (s *CommunityServer) GetNotifications(ctx context.Context, req *internalv1.NotificationListRequest) (*internalv1.NotificationList, error) {
-	resp, err := s.app.GetMyNotifications(ctx, req.UserId, req.Page, req.PageSize)
+	resp, err := s.notifications.GetMyNotifications(ctx, req.UserId, req.Page, req.PageSize)
 	if err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
-	items := make([]*internalv1.NotificationItem, 0, len(resp.List))
-	for _, item := range resp.List {
+	items := make([]*internalv1.NotificationItem, 0, len(resp))
+	for _, item := range resp {
+		content, _ := item.Content.(notificationdomain.LikeArticleContent)
 		items = append(items, &internalv1.NotificationItem{
-			Id:             item.ID,
-			Type:           int32(item.Type),
-			IsRead:         item.IsRead,
-			CreatedTime:    item.CreatedTime,
-			SenderId:       item.SenderID,
-			SenderNickname: item.SenderNickname,
-			SenderAvatar:   item.SenderAvatar,
-			ActionText:     item.ActionText,
-			ArticleId:      item.ArticleID,
-			Title:          item.Title,
+			Id: item.ID, Type: int32(item.Type), IsRead: item.IsRead, CreatedTime: item.CreatedTime.Unix(),
+			SenderId: item.Sender.UserID, SenderNickname: item.Sender.Nickname, SenderAvatar: item.Sender.Avatar,
+			ActionText: "赞了你的文章", ArticleId: content.ArticleID, Title: content.ArticleTitle,
 		})
 	}
-	return &internalv1.NotificationList{Items: items, Page: resp.Page, PageSize: resp.PageSize}, nil
+	return &internalv1.NotificationList{Items: items, Page: req.Page, PageSize: req.PageSize}, nil
 }
 
 func (s *CommunityServer) GetUnreadCount(ctx context.Context, req *internalv1.UserIDRequest) (*internalv1.UnreadCount, error) {
-	count, err := s.app.GetUnreadCount(ctx, req.UserId)
+	count, err := s.notifications.GetUnreadCount(ctx, req.UserId)
 	if err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
@@ -208,14 +206,8 @@ func (s *CommunityServer) GetUnreadCount(ctx context.Context, req *internalv1.Us
 }
 
 func (s *CommunityServer) ClearUnread(ctx context.Context, req *internalv1.UserIDRequest) (*internalv1.Empty, error) {
-	if err := s.app.ClearUnread(ctx, req.UserId); err != nil {
+	if err := s.notifications.ClearUnread(ctx, req.UserId); err != nil {
 		return nil, platformerrors.ToGRPC(err)
 	}
 	return &internalv1.Empty{}, nil
 }
-
-var (
-	_ articledto.HotRankItem
-	_ commentdto.CreateCommentResponse
-	_ notificationdto.NotificationListResponse
-)

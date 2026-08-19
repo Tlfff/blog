@@ -1,8 +1,8 @@
 package kafka
 
 import (
-	"blog/internal/infrastructure/config"
-	"blog/internal/common"
+	"blog/internal/platform/config"
+	"blog/internal/shared/common"
 	"context"
 	"errors"
 	"log"

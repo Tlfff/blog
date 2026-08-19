@@ -2,11 +2,11 @@
 package main
 
 import (
-	contentapp "blog/internal/application/content"
-	"blog/internal/infrastructure/bootstrap"
-	"blog/internal/infrastructure/config"
-	contentinfra "blog/internal/infrastructure/content"
-	grpcclient "blog/internal/interfaces/grpc/client"
+	contentapp "blog/internal/article/application"
+	contentinfra "blog/internal/article/infrastructure"
+	"blog/internal/platform/bootstrap"
+	"blog/internal/platform/config"
+	grpcclient "blog/internal/platform/interfaces/grpc/client"
 	contentgrpc "blog/services/content/internal/grpc"
 	internalv1 "blog/shared/contracts/gen/internalv1"
 	svcconfig "blog/shared/platform/config"

@@ -38,8 +38,10 @@ check_layer() {
 }
 
 status=0
-check_layer internal/domain || status=1
-check_layer internal/application || status=1
+for context in user article comment like notification; do
+	check_layer "internal/$context/domain" || status=1
+	check_layer "internal/$context/application" || status=1
+done
 
 if [ "$status" -eq 0 ]; then
 	echo "架构依赖检查通过"

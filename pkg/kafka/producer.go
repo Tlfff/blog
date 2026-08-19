@@ -1,9 +1,9 @@
 package kafka
 
 import (
-	"blog/internal/infrastructure/config"
-	"blog/internal/common"
-	"blog/internal/message"
+	"blog/internal/platform/config"
+	"blog/internal/shared/common"
+	message "blog/shared/contracts/events/messages"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,7 +17,7 @@ import (
 // Producer 是 Kafka 生产者，为每个 topic 维护独立的 writer。
 type Producer struct {
 	writers map[string]*kafka.Writer // 各 topic 对应的 writer，key 为 topic 配置名
-	config  config.Kafka // Kafka 配置
+	config  config.Kafka             // Kafka 配置
 }
 
 // 创建 Kafka 生产者。
@@ -70,6 +70,7 @@ func NewProducer(cfg config.Kafka) (*Producer, error) {
 		config:  cfg,
 	}, nil
 }
+
 // 按 topic 选择分区负载均衡策略
 func getBalancer(topicKey string) kafka.Balancer {
 	switch topicKey {

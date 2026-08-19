@@ -2,7 +2,7 @@
 package kafka
 
 import (
-	"blog/internal/infrastructure/config"
+	"blog/internal/platform/config"
 	"sync"
 )
 

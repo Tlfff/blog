@@ -4,14 +4,13 @@
 
 ```text
 internal/
-  interfaces/       # HTTP、开放 gRPC、Kafka 入口适配
-  application/      # 用例与应用服务
-  domain/
-    identity/
-    content/
-    community/
-  infrastructure/   # MySQL、Redis、MongoDB、Kafka、MinIO 适配器
-  shared/           # 错误、响应、Trace、公共纯类型
+  user/             # 用户界限上下文
+  article/          # 文章界限上下文，包含浏览统计与热榜
+  comment/          # 评论界限上下文
+  like/             # 点赞界限上下文
+  notification/     # 通知界限上下文
+  shared/           # 跨上下文的纯公共能力
+  platform/         # 认证、配置、启动、定时任务与协议适配
 ```
 
 ## 2. 依赖方向
@@ -73,5 +72,5 @@ Infrastructure -> Domain/Application 定义的 Port
 ## 5. 执行方式
 
 - `make check-arch` 运行 `scripts/check_architecture.sh`。
-- 检查脚本扫描 `internal/domain` 与 `internal/application` 的 Go import，命中禁止列表即失败。
+- 检查脚本扫描五个上下文的 `domain` 与 `application` Go import，命中禁止列表即失败。
 - 阶段一后续每个模块迁移完成时必须通过该检查。

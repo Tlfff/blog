@@ -2,8 +2,8 @@
 package grpc
 
 import (
-	identityapp "blog/internal/application/identity"
-	userdto "blog/internal/dto/user"
+	identityapp "blog/internal/user/application"
+	userdto "blog/internal/user/application/dto"
 	internalv1 "blog/shared/contracts/gen/internalv1"
 	platformerrors "blog/shared/platform/errors"
 	"context"

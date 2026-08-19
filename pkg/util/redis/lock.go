@@ -2,7 +2,7 @@
 package redis
 
 import (
-	"blog/internal/common"
+	"blog/internal/shared/common"
 	"context"
 	"embed"
 	"log"

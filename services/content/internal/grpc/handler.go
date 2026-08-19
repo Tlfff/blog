@@ -2,8 +2,8 @@
 package grpc
 
 import (
-	contentapp "blog/internal/application/content"
-	articledto "blog/internal/dto/article"
+	contentapp "blog/internal/article/application"
+	articledto "blog/internal/article/application/dto"
 	internalv1 "blog/shared/contracts/gen/internalv1"
 	platformerrors "blog/shared/platform/errors"
 	"context"

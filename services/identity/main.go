@@ -2,11 +2,11 @@
 package main
 
 import (
-	identityapp "blog/internal/application/identity"
-	"blog/internal/auth"
-	"blog/internal/infrastructure/bootstrap"
-	"blog/internal/infrastructure/config"
-	identityinfra "blog/internal/infrastructure/identity"
+	"blog/internal/platform/auth"
+	"blog/internal/platform/bootstrap"
+	"blog/internal/platform/config"
+	identityapp "blog/internal/user/application"
+	identityinfra "blog/internal/user/infrastructure"
 	identitygrpc "blog/services/identity/internal/grpc"
 	internalv1 "blog/shared/contracts/gen/internalv1"
 	svcconfig "blog/shared/platform/config"

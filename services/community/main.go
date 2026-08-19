@@ -2,12 +2,17 @@
 package main
 
 import (
-	communityapp "blog/internal/application/community"
-	"blog/internal/infrastructure/bootstrap"
-	communityinfra "blog/internal/infrastructure/community"
-	"blog/internal/infrastructure/config"
-	grpcclient "blog/internal/interfaces/grpc/client"
-	mq "blog/internal/interfaces/mq"
+	articleapp "blog/internal/article/application"
+	articleinfra "blog/internal/article/infrastructure"
+	commentapp "blog/internal/comment/application"
+	commentinfra "blog/internal/comment/infrastructure"
+	likeapp "blog/internal/like/application"
+	likeinfra "blog/internal/like/infrastructure"
+	notificationapp "blog/internal/notification/application"
+	notificationinfra "blog/internal/notification/infrastructure"
+	"blog/internal/platform/bootstrap"
+	"blog/internal/platform/config"
+	mq "blog/internal/platform/interfaces/mq"
 	communitygrpc "blog/services/community/internal/grpc"
 	internalv1 "blog/shared/contracts/gen/internalv1"
 	svcconfig "blog/shared/platform/config"
@@ -77,33 +82,24 @@ func main() {
 	}
 	defer contentConn.Close()
 
-	articleLikePort := communityinfra.NewArticleLikeRepository(db)
-	commentLikePort := communityinfra.NewCommentLikeRepository(db)
-	communityService := communityapp.NewService(
-		communityinfra.NewCommentRepository(db),
-		articleLikePort,
-		commentLikePort,
-		communityinfra.NewViewHistoryRepository(db),
-		communityinfra.NewNotificationRepository(mongodb),
-		grpcclient.NewCommunityArticleQueryClient(
-			internalv1.NewContentServiceClient(contentConn),
-			communityinfra.NewArticleQuery(db),
-		),
-		grpcclient.NewCommunityUserInfoClient(internalv1.NewIdentityServiceClient(identityConn)),
-		communityinfra.NewLikeCache(rdb, articleLikePort, commentLikePort),
-		communityinfra.NewLikeCountStore(rdb),
-		communityinfra.NewHotRankStore(rdb),
-		communityinfra.NewEventPublisher(kafkaClient),
-	)
+	articleLikePort := likeinfra.NewArticleLikeRepository(db, articleinfra.NewArticleLikeStatistics(db))
+	commentLikePort := likeinfra.NewCommentLikeRepository(db, commentinfra.NewCommentLikeStatistics(db))
+	commentRepo := commentinfra.NewCommentRepository(db, articleinfra.NewArticleStatistics(db))
+	contentClient := internalv1.NewContentServiceClient(contentConn)
+	identityClient := internalv1.NewIdentityServiceClient(identityConn)
+	commentService := commentapp.NewService(commentRepo, commentinfra.NewArticleQuery(contentClient), likeinfra.NewLikeCountStore(rdb), commentinfra.NewCommentEventPublisher(kafkaClient))
+	likeService := likeapp.NewService(articleLikePort, commentLikePort, likeinfra.NewTargetQuery(contentClient, commentRepo), likeinfra.NewEventPublisher(kafkaClient))
+	articleService := articleapp.NewEngagementService(articleinfra.NewViewHistoryRepository(db), articleinfra.NewHotRankStore(rdb), articleinfra.NewRankingQuery(db), articleinfra.NewViewEventPublisher(kafkaClient))
+	notificationService := notificationapp.NewService(notificationinfra.NewNotificationRepository(mongodb), notificationinfra.NewArticleQuery(contentClient), notificationinfra.NewUserInfoQuery(identityClient), notificationinfra.NewCommentQuery(commentRepo))
 
-	if err := communityService.RebuildHotRank(context.Background()); err != nil {
+	if err := articleService.RebuildHotRank(context.Background()); err != nil {
 		log.Printf("[WARN] Community Service 热榜初始化失败: %v", err)
 	}
 
 	// Kafka 消费者由 Community Service 承载。
 	consumerCtx, cancelConsumer := context.WithCancel(context.Background())
 	defer cancelConsumer()
-	if err := kafkaClient.InitConsumer(mq.RegisterHandlers(communityService, communityService)); err != nil {
+	if err := kafkaClient.InitConsumer(mq.RegisterHandlers(notificationService, articleService)); err != nil {
 		log.Fatalf("初始化 Kafka 消费者失败: %v", err)
 	}
 	go func() {
@@ -117,7 +113,7 @@ func main() {
 		allowed[peer.Name+"-service"] = true
 	}
 	if err := server.Run(cfg.GRPCAddr, cfg.Name, allowed, func(s *grpc.Server) {
-		internalv1.RegisterCommunityServiceServer(s, communitygrpc.NewCommunityServer(communityService))
+		internalv1.RegisterCommunityServiceServer(s, communitygrpc.NewCommunityServer(commentService, likeService, articleService, notificationService))
 	}); err != nil {
 		log.Fatalf("Community Service 启动失败: %v", err)
 	}

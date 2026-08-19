@@ -1,11 +1,11 @@
 package cmd
 
 import (
-	"blog/internal/infrastructure/bootstrap"
-	"blog/internal/infrastructure/config"
-	grpcclient "blog/internal/interfaces/grpc/client"
-	grpchandler "blog/internal/interfaces/grpc/handler"
-	grpcserver "blog/internal/interfaces/grpc/server"
+	"blog/internal/platform/bootstrap"
+	"blog/internal/platform/config"
+	grpcclient "blog/internal/platform/interfaces/grpc/client"
+	grpchandler "blog/internal/platform/interfaces/grpc/handler"
+	grpcserver "blog/internal/platform/interfaces/grpc/server"
 	internalv1 "blog/shared/contracts/gen/internalv1"
 	svcconfig "blog/shared/platform/config"
 	platformgrpc "blog/shared/platform/grpc"

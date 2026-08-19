@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"blog/internal/cron"
-	"blog/internal/infrastructure/bootstrap"
-	"blog/internal/infrastructure/config"
-	grpcclient "blog/internal/interfaces/grpc/client"
-	handler "blog/internal/interfaces/http/handler"
-	"blog/internal/interfaces/http/routes"
+	"blog/internal/platform/bootstrap"
+	"blog/internal/platform/config"
+	"blog/internal/platform/cron"
+	grpcclient "blog/internal/platform/interfaces/grpc/client"
+	handler "blog/internal/platform/interfaces/http/handler"
+	"blog/internal/platform/interfaces/http/routes"
 	internalv1 "blog/shared/contracts/gen/internalv1"
 	svcconfig "blog/shared/platform/config"
 	platformgrpc "blog/shared/platform/grpc"
