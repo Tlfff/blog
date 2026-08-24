@@ -16,7 +16,7 @@ const (
 // 二方服务JWT签名密钥，由启动流程从配置文件注入，与C端用户JWT密钥完全隔离
 var openJWTSecret []byte
 
-// 注入二方服务JWT密钥，gRPC服务启动时调用一次
+// InitOpenJWT 注入开放 gRPC 二方 JWT 密钥。
 func InitOpenJWT(secret string) {
 	openJWTSecret = []byte(secret)
 }
@@ -24,14 +24,12 @@ func InitOpenJWT(secret string) {
 // 二方服务token的Payload：
 // service_id 标识调用方服务（授权主体），team_id 标识所属团队（仅用于统计，不参与授权）
 type OpenClaims struct {
-	ServiceID string `json:"service_id"` // 调用方服务标识，作为授权主体
-	TeamID    string `json:"team_id"`    // 所属团队标识，仅用于统计，不参与授权
-	jwt.RegisteredClaims
+	ServiceID            string `json:"service_id"` // 调用方服务标识，作为授权主体
+	TeamID               string `json:"team_id"`    // 所属团队标识，仅用于统计，不参与授权
+	jwt.RegisteredClaims        // JWT 标准声明
 }
 
-// 给内部服务颁发token（平台组统一下发）
-// 给二方服务颁发 token，由平台组统一下发
-// serviceID 为授权主体，teamID 仅用于统计
+// OpenGenerateToken 为二方服务颁发 JWT。
 func OpenGenerateToken(serviceID, teamID string) (string, error) {
 	// 1. 校验密钥是否已注入
 	if len(openJWTSecret) == 0 {
@@ -52,7 +50,7 @@ func OpenGenerateToken(serviceID, teamID string) (string, error) {
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(openJWTSecret)
 }
 
-// 解析并校验二方token（gRPC拦截器使用）
+// OpenVerifyToken 解析并校验二方 JWT。
 // 解析并校验二方 token，供 gRPC 拦截器使用
 func OpenVerifyToken(tokenString string) (*OpenClaims, error) {
 	// 1. 解析 token 并校验签名、签发者与过期时间

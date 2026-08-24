@@ -7,6 +7,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// NewRedisClient 创建并检查 Redis 客户端连接。
 func NewRedisClient(cfg config.Redis) (*redis.Client, error) {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     cfg.Addr,

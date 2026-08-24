@@ -41,11 +41,11 @@ internal/
 每个业务上下文按实际需要包含：
 
 ```text
-domain          聚合、状态、领域错误和 Repository Port
-application     Command、Query、用例编排和 Application Port
-infrastructure  MySQL、MongoDB、Redis、Kafka、MinIO 与本地 ACL Adapter
-interfaces      HTTP、gRPC 或 Kafka 协议 Adapter，仅建立真实入口
-module.go       显式构造上下文并暴露 Facade 与入口 Adapter
+domain      聚合、状态、领域错误和 Repository Port
+app         Command、Query、用例编排和 Application Port
+infra       MySQL、MongoDB、Redis、Kafka、MinIO 与本地 ACL Adapter
+interfaces  HTTP、gRPC 或 Kafka 协议 Adapter，仅建立真实入口
+module.go   显式构造上下文并暴露 Facade 与入口 Adapter
 ```
 
 ## 3. 上下文依赖
@@ -110,3 +110,7 @@ openspec validate refactor-to-ddd --type change --strict --no-interactive
 ```
 
 架构检查会拒绝技术 SDK 进入 Domain/Application、跨上下文依赖 Infrastructure/Interfaces、旧全局技术分层目录、旧 `pkg` 和旧根 `config` Go 包引用。
+
+## 8. 领域模型充血策略
+
+本项目采用选择性充血模型，详细的值对象选择、领域行为归属和 Domain Service 判断见 `docs/architecture/domain-modeling.md`。

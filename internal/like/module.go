@@ -2,9 +2,9 @@
 package like
 
 import (
-	likeapp "blog/internal/like/application"
+	likeapp "blog/internal/like/app"
 	likedomain "blog/internal/like/domain"
-	likeinfra "blog/internal/like/infrastructure"
+	likeinfra "blog/internal/like/infra"
 	likehttp "blog/internal/like/interfaces/http"
 	"blog/internal/platform/kafka"
 

@@ -99,6 +99,7 @@ func closeResources(resources *bootstrap.Resources) {
 	}
 }
 
+// init 注册 HTTP Server 子命令及端口参数。
 func init() {
 	rootCmd.AddCommand(serverCmd)
 	serverCmd.Flags().StringVarP(&port, "port", "p", "8080", "指定服务器监听端口")

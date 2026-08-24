@@ -41,7 +41,7 @@ type Consumer struct {
 	running  bool                      // 消费者是否正在运行中
 }
 
-//	创建消费者
+// NewConsumer 创建 Kafka Consumer。
 //
 // 参数：
 //   - cfg: Kafka 配置
@@ -225,7 +225,18 @@ func (c *Consumer) consumeTopic(ctx context.Context, topicKey string, reader *ka
 
 }
 
-// 批量消费消息，按照 partition 分组处理，每个 partition 内按 offset 排序处理
+// flushBatch 批量处理消息并提交各分区最新 Offset。
+//
+// 参数说明：
+//   - ctx：消费上下文，用于控制取消和超时。
+//   - topicKey：配置中的业务 Topic Key。
+//   - batch：待处理的 Kafka 消息批次。
+//   - handler：业务消息处理函数。
+//   - reader：当前 Topic Reader。
+//   - maxRetries：业务处理最大重试次数。
+//   - retryWait：业务处理重试间隔。
+//   - commitMaxRetries：Offset 提交最大重试次数。
+//   - commitWait：Offset 提交重试间隔。
 func (c *Consumer) flushBatch(ctx context.Context, topicKey string, batch []kafka.Message, handler MessageHandler, reader *kafka.Reader, maxRetries int, retryWait time.Duration, commitMaxRetries int, commitWait time.Duration) {
 	// 1. 如果批次为空，直接返回
 	if len(batch) == 0 {
@@ -286,6 +297,15 @@ func (c *Consumer) flushBatch(ctx context.Context, topicKey string, batch []kafk
 	}
 }
 
+// handleMessageWithRetry 按配置重试处理单条 Kafka 消息。
+//
+// 参数说明：
+//   - ctx：消费上下文，用于控制取消和超时。
+//   - topicKey：配置中的业务 Topic Key。
+//   - msg：待处理的 Kafka 消息。
+//   - handler：业务消息处理函数。
+//   - maxRetries：业务处理最大重试次数。
+//   - retryIntervalBase：重试基础等待时间。
 func (c *Consumer) handleMessageWithRetry(ctx context.Context, topicKey string, msg kafka.Message, handler MessageHandler, maxRetries int, retryIntervalBase time.Duration) error {
 	var lastErr error
 
@@ -339,7 +359,7 @@ func waitForRetry(ctx context.Context, delay time.Duration) error {
 	}
 }
 
-// 关闭消费者
+// Close 关闭 Kafka Consumer。
 func (c *Consumer) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -375,7 +395,7 @@ func (c *Consumer) Close() error {
 	return nil
 }
 
-// 检查消费者是否正在运行
+// IsRunning 检查 Kafka Consumer 是否正在运行。
 func (c *Consumer) IsRunning() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

@@ -27,16 +27,16 @@ check_imports() {
 # 1. 检查五个上下文的层级依赖。
 for context in $contexts; do
 	check_imports "internal/$context/domain" "$forbidden_domain_app"
-	check_imports "internal/$context/application" "$forbidden_domain_app"
+	check_imports "internal/$context/app" "$forbidden_domain_app"
 	check_imports "internal/$context/interfaces" "$forbidden_context_interfaces"
 
-	for layer in domain application infrastructure interfaces; do
+	for layer in domain app infra interfaces; do
 		dir="internal/$context/$layer"
 		[ -d "$dir" ] || continue
 		for file in $(find "$dir" -type f -name '*.go' ! -name '*_test.go'); do
 			for other in $contexts; do
 				[ "$other" = "$context" ] && continue
-				if grep -Eq "^[[:space:]]*\"blog/internal/$other/(infrastructure|interfaces)(/|\")" "$file"; then
+				if grep -Eq "^[[:space:]]*\"blog/internal/$other/(infra|interfaces)(/|\")" "$file"; then
 					echo "架构违规: $file 直接依赖 $other 的 Infrastructure 或 Interfaces"
 					status=1
 				fi

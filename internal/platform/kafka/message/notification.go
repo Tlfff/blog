@@ -2,6 +2,7 @@ package message
 
 import "time"
 
+// NotificationMsg 表示文章点赞通知 Kafka 消息。
 type NotificationMsg struct {
 	NotifyType  int8      `json:"notify_type"`  // 通知类型，和model.Type一致
 	SenderID    uint64    `json:"sender_id"`    // 操作人ID

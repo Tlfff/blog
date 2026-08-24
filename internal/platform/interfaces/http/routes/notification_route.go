@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 通知路由
+// InitNotificationPrivateRoutes 注册通知私有路由。
 func InitNotificationPrivateRoutes(r *gin.RouterGroup, NotificationHandler *notificationhttp.NotificationHandler) {
 	// 获取未读通知数量
 	r.GET("/ntf/unread-count", NotificationHandler.GetUnreadCount)

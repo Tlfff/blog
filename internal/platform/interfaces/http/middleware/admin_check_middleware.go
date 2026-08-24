@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 检查是否为管理者
+// AdminCheckMiddleware 创建管理员权限校验中间件。
 func AdminCheckMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 1. 从上下文取出鉴权中间件注入的用户信息

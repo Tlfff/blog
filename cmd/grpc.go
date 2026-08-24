@@ -62,6 +62,7 @@ var grpcCmd = &cobra.Command{
 	},
 }
 
+// init 注册 gRPC 子命令及端口参数。
 func init() {
 	rootCmd.AddCommand(grpcCmd)
 	grpcCmd.Flags().StringVarP(&grpcPort, "port", "p", "", "指定gRPC监听端口，默认读取config中的grpc.port")

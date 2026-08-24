@@ -181,7 +181,7 @@
 ```text
 internal
 ├── article
-│   ├── application
+│   ├── app
 │   │   ├── dto
 │   │   ├── engagement_service.go
 │   │   ├── rank.go
@@ -193,7 +193,7 @@ internal
 │   │   ├── hot_rank.go
 │   │   ├── ports.go
 │   │   └── view_history.go
-│   ├── infrastructure
+│   ├── infra
 │   │   ├── model
 │   │   ├── article_repository.go
 │   │   ├── article_image_storage.go
@@ -208,7 +208,7 @@ internal
 │       └── kafka
 │
 ├── comment
-│   ├── application
+│   ├── app
 │   │   ├── dto
 │   │   ├── comments.go
 │   │   ├── like_projection.go
@@ -217,7 +217,7 @@ internal
 │   │   ├── comment.go
 │   │   ├── errors.go
 │   │   └── ports.go
-│   ├── infrastructure
+│   ├── infra
 │   │   ├── model
 │   │   ├── article_query.go
 │   │   ├── comment_repository.go
@@ -229,7 +229,7 @@ internal
 │       └── kafka
 │
 ├── like
-│   ├── application
+│   ├── app
 │   │   ├── dto
 │   │   ├── like_service.go
 │   │   └── service.go
@@ -237,7 +237,7 @@ internal
 │   │   ├── like.go
 │   │   ├── ports.go
 │   │   └── repositories.go
-│   ├── infrastructure
+│   ├── infra
 │   │   ├── model
 │   │   ├── event_publisher.go
 │   │   ├── like_cache.go
@@ -248,13 +248,13 @@ internal
 │       └── kafka
 │
 ├── notification
-│   ├── application
+│   ├── app
 │   │   ├── dto
 │   │   └── service.go
 │   ├── domain
 │   │   ├── notification.go
 │   │   └── ports.go
-│   ├── infrastructure
+│   ├── infra
 │   │   ├── model
 │   │   ├── notification_repository.go
 │   │   └── queries.go
@@ -264,7 +264,7 @@ internal
 │       └── kafka
 │
 └── user
-    ├── application
+    ├── app
     │   ├── dto
     │   └── service.go
     ├── domain
@@ -273,7 +273,7 @@ internal
     │   ├── ports.go
     │   ├── session.go
     │   └── user.go
-    ├── infrastructure
+    ├── infra
     │   ├── model
     │   ├── avatar_storage.go
     │   ├── password_change_token_store.go
@@ -434,7 +434,7 @@ User Application Facade
 文章不直接依赖：
 
 ```text
-user/infrastructure/user_repository.go
+user/infra/user_repository.go
 ```
 
 ### 7.3 评论与文章
@@ -513,8 +513,8 @@ Notification
 
 ```text
 domain
-application
-infrastructure
+app
+infra
 interfaces
 相关测试
 ```

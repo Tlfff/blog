@@ -31,12 +31,11 @@ const (
 
 // 认证拦截器（三方）：校验外部合作方的 HMAC 签名
 type HmacAuthInterceptor struct {
-	// accessKeyID -> 合作方密钥配置（来自配置文件，不建表）
-	partners map[string]config.Partner
-	rdb      *redis.Client // 用于 nonce 去重
+	partners map[string]config.Partner // AccessKeyID 到合作方密钥配置的映射
+	rdb      *redis.Client             // 用于 nonce 去重的 Redis 客户端
 }
 
-// 用配置文件中的合作方列表构建拦截器
+// NewHmacAuthInterceptor 根据合作方配置创建 HMAC 认证拦截器。
 func NewHmacAuthInterceptor(rdb *redis.Client, partners []config.Partner) *HmacAuthInterceptor {
 	m := make(map[string]config.Partner, len(partners))
 	for _, p := range partners {
@@ -50,7 +49,7 @@ func (h *HmacAuthInterceptor) Unary() grpc.UnaryServerInterceptor {
 	return h.Intercept
 }
 
-// 校验三方 HMAC 签名，通过后把合作方身份注入 context
+// Intercept 校验三方 HMAC 签名并注入合作方身份。
 func (h *HmacAuthInterceptor) Intercept(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	// 1. 从 metadata 取出签名要素
 	md, ok := metadata.FromIncomingContext(ctx)

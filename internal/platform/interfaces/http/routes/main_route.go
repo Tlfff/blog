@@ -25,7 +25,7 @@ type AppHandler struct {
 	Redis       *redis.Client                // Redis 客户端，供鉴权中间件校验会话
 }
 
-// 注册全局中间件并按权限维度挂载全部路由组
+// InitRoute 注册全局中间件并按权限维度挂载全部路由组。
 func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 	// 1. 全局中间件
 	r.Use(middleware.LoggerMiddleware())

@@ -7,12 +7,14 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
+// CronManager 管理进程内全部定时任务。
 type CronManager struct {
-	cronEngine *cron.Cron
+	cronEngine *cron.Cron              // Cron 调度引擎
 	entryIDs   map[string]cron.EntryID // 记录任务ID，便于后续管理
-	jobs       []CronJob
+	jobs       []CronJob               // 已注册的定时任务
 }
 
+// NewCronManager 创建并注册定时任务管理器。
 func NewCronManager(jobs ...CronJob) *CronManager {
 	// 全局唯一 cron 实例
 	engine := cron.New(
@@ -49,11 +51,13 @@ func NewCronManager(jobs ...CronJob) *CronManager {
 	return mgr
 }
 
+// Start 启动定时任务调度器。
 func (m *CronManager) Start() {
 	m.cronEngine.Start()
 	log.Println("[Cron Manager] 定时任务引擎启动")
 }
 
+// Stop 停止定时任务调度器并等待任务退出。
 func (m *CronManager) Stop() {
 	ctx := m.cronEngine.Stop()
 	<-ctx.Done()

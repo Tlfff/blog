@@ -3,7 +3,7 @@ package http
 import (
 	"blog/internal/platform/interfaces/http/response"
 	apperrors "blog/internal/shared/apperrors"
-	userresult "blog/internal/user/application/dto"
+	userresult "blog/internal/user/app/dto"
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -11,20 +11,25 @@ import (
 
 // UserAuthUsecase 是注册、登录、退出登录的应用用例接口。
 type UserAuthUsecase interface {
+	// Register 注册用户。
 	Register(ctx context.Context, phone, password, nickname, clientIP string) error
+	// Login 登录用户并创建会话。
 	Login(ctx context.Context, phone, nickname, password, clientIP, device string, rememberMe bool) (*userresult.LoginResponse, error)
+	// Logout 删除当前用户会话。
 	Logout(ctx context.Context, token string) error
 }
 
+// UserAuthHandler 处理用户注册和登录 HTTP 请求。
 type UserAuthHandler struct {
-	userAuth UserAuthUsecase
+	userAuth UserAuthUsecase // 用户认证应用用例
 }
 
+// NewUserAuthHandler 创建 User 认证 HTTP Handler。
 func NewUserAuthHandler(userAuth UserAuthUsecase) *UserAuthHandler {
 	return &UserAuthHandler{userAuth: userAuth}
 }
 
-// 处理用户注册请求
+// Register 处理用户注册请求。
 func (h *UserAuthHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 	// 1. 解析前端传来的 JSON 请求体
@@ -50,7 +55,7 @@ func (h *UserAuthHandler) Register(c *gin.Context) {
 	response.OK(c, "注册成功", nil)
 }
 
-// 处理用户登录请求
+// Login 处理用户登录请求。
 func (h *UserAuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 

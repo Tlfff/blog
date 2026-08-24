@@ -2,7 +2,7 @@ package grpc
 
 import (
 	grpcinterface "blog/internal/platform/interfaces/grpc"
-	userdto "blog/internal/user/application/dto"
+	userdto "blog/internal/user/app/dto"
 	"context"
 
 	userv1 "blog/gen/user"
@@ -13,21 +13,22 @@ import (
 
 // UserQueryUsecase 是开放 gRPC 用户查询的应用用例接口。
 type UserQueryUsecase interface {
+	// GetUserBasicInfo 查询用户基本信息。
 	GetUserBasicInfo(ctx context.Context, userID uint64) (*userdto.UserBasicInfoResponse, error)
 }
 
-// 实现二方服务的用户接口
-
+// UserHandler 实现开放 gRPC 用户服务。
 type UserHandler struct {
-	userv1.UnimplementedUserServiceServer // 防止编译错误
-	userService                           UserQueryUsecase
+	userv1.UnimplementedUserServiceServer                  // 防止编译错误
+	userService                           UserQueryUsecase // 用户查询应用用例
 }
 
+// NewUserHandler 创建 User gRPC Handler。
 func NewUserHandler(userService UserQueryUsecase) *UserHandler {
 	return &UserHandler{userService: userService}
 }
 
-// 获取用户基本信息（头像、昵称、最后登录信息）—— 二方服务
+// GetUserBasicInfo 获取用户基本信息。
 func (h *UserHandler) GetUserBasicInfo(ctx context.Context, req *userv1.GetUserBasicInfoRequest) (*userv1.GetUserBasicInfoResponse, error) {
 	// 1. 入参校验
 	if req.UserId <= 0 {
@@ -48,7 +49,7 @@ func (h *UserHandler) GetUserBasicInfo(ctx context.Context, req *userv1.GetUserB
 	}, nil
 }
 
-// 获取用户公开信息（ID、头像、昵称）—— 三方合作方服务
+// GetPublicUserInfo 获取用户公开信息。
 func (h *UserHandler) GetPublicUserInfo(ctx context.Context, req *userv1.GetUserInfoRequest) (*userv1.GetUserInfoResponse, error) {
 	// 1. 入参校验
 	if req.UserId <= 0 {

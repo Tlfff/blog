@@ -43,41 +43,48 @@ type UserQuery interface {
 	FindUserByID(ctx context.Context, id uint64) (*UserInfo, error) // 按用户ID查询作者公开信息
 }
 
+// ViewHistoryRepository 定义文章浏览历史持久化能力。
 type ViewHistoryRepository interface {
-	Create(ctx context.Context, history *ViewHistory) error
-	IncrementViewCount(ctx context.Context, articleID uint64) error
+	Create(ctx context.Context, history *ViewHistory) error         // 创建浏览历史
+	IncrementViewCount(ctx context.Context, articleID uint64) error // 增加文章浏览量
 }
 
+// HotRankStore 定义文章热榜存储能力。
 type HotRankStore interface {
-	GetTop(ctx context.Context, limit int) ([]HotRankItem, error)
-	Rebuild(ctx context.Context, entries []HotRankItem) error
+	GetTop(ctx context.Context, limit int) ([]HotRankItem, error) // 查询热榜前 N 条
+	Rebuild(ctx context.Context, entries []HotRankItem) error     // 全量重建热榜
 }
 
+// ArticleInfo 表示热榜查询所需的文章最小信息。
 type ArticleInfo struct {
-	ID           uint64
-	AuthorID     uint64
-	Title        string
-	ViewCount    uint32
-	LikeCount    uint32
-	CommentCount uint32
+	ID           uint64 // 文章唯一标识
+	AuthorID     uint64 // 作者用户唯一标识
+	Title        string // 文章标题
+	ViewCount    uint32 // 浏览量
+	LikeCount    uint32 // 点赞数
+	CommentCount uint32 // 评论数
 }
 
+// RankingQuery 定义文章热榜所需的数据库查询能力。
 type RankingQuery interface {
-	GetHotListByIDs(ctx context.Context, ids []uint64) ([]*ArticleInfo, error)
-	GetTopHotArticles(ctx context.Context, limit int) ([]*ArticleInfo, error)
+	GetHotListByIDs(ctx context.Context, ids []uint64) ([]*ArticleInfo, error) // 批量查询热榜文章信息
+	GetTopHotArticles(ctx context.Context, limit int) ([]*ArticleInfo, error)  // 查询热度最高的文章
 }
 
+// ViewEventPublisher 定义浏览历史事件发布能力。
 type ViewEventPublisher interface {
-	SendViewHistory(ctx context.Context, event ViewHistoryEvent) error
+	SendViewHistory(ctx context.Context, event ViewHistoryEvent) error // 发布浏览历史事件
 }
 
+// ViewHistoryEvent 表示文章浏览历史领域事件。
 type ViewHistoryEvent struct {
-	ArticleID   uint64
-	UserID      uint64
-	CreatedTime time.Time
+	ArticleID   uint64    // 被浏览文章唯一标识
+	UserID      uint64    // 浏览用户唯一标识，游客为 0
+	CreatedTime time.Time // 浏览发生时间
 }
 
 // LikeCountProjection 更新 Article 上下文拥有的点赞数投影。
 type LikeCountProjection interface {
+	// IncrementLikeCount 按增量调整文章点赞数。
 	IncrementLikeCount(ctx context.Context, articleID uint64, delta int64) error
 }

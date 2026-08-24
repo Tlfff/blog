@@ -10,7 +10,7 @@ type HotRankItem struct {
 	LikeCount    uint32  // 点赞数
 }
 
-// 按当前热度公式计算文章热度，公式为浏览量、点赞数、评论数三者之和
+// CalcHotScore 按当前公式计算文章热度。
 func CalcHotScore(viewCount, likeCount, commentCount uint32) float64 {
 	return float64(viewCount + likeCount + commentCount)
 }

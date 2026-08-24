@@ -39,7 +39,7 @@ func checkToken(c *gin.Context, rdb *redis.Client) (*auth.UserContext, string, e
 	return userCtx, token, nil
 }
 
-// 必须登录的场景
+// MustAuth 创建强制登录认证中间件。
 func MustAuth(rdbs ...*redis.Client) gin.HandlerFunc {
 	var rdb *redis.Client
 	if len(rdbs) > 0 {
@@ -61,7 +61,7 @@ func MustAuth(rdbs ...*redis.Client) gin.HandlerFunc {
 	}
 }
 
-// 可选认证中间件，登录和未登录有不同逻辑
+// OptionalAuth 创建可选登录认证中间件。
 func OptionalAuth(rdbs ...*redis.Client) gin.HandlerFunc {
 	var rdb *redis.Client
 	if len(rdbs) > 0 {

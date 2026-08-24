@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 用户公开接口
+// InitUserPublicRoutes 注册用户公开路由。
 func InitUserPublicRoutes(r *gin.RouterGroup, userAuthHandler *userhttp.UserAuthHandler, userHandler *userhttp.UserHandler) {
 	// 用户注册
 	r.POST("/user/register", userAuthHandler.Register)
@@ -16,7 +16,7 @@ func InitUserPublicRoutes(r *gin.RouterGroup, userAuthHandler *userhttp.UserAuth
 	r.GET("/user/profile", userHandler.GetPublicProfile)
 }
 
-// 用户私密接口
+// InitUserPrivateRoutes 注册用户私有路由。
 func InitUserPrivateRoutes(r *gin.RouterGroup, userHandler *userhttp.UserHandler) {
 	// 查看个人主页
 	r.GET("/my/profile", userHandler.GetMyProfile)

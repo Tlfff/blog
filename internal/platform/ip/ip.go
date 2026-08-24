@@ -17,7 +17,7 @@ var (
 
 const searcherPoolSize = 20
 
-// 初始化（程序启动时调用一次）
+// InitIPSearcher 初始化 IP 归属地离线查询器。
 func InitIPSearcher(dbPath string) error {
 	var err error
 
@@ -37,14 +37,14 @@ func InitIPSearcher(dbPath string) error {
 	return err
 }
 
-// 关闭资源（程序退出时调用）
+// Close 关闭 IP 归属地查询资源。
 func Close() {
 	if ip2Region != nil {
 		ip2Region.Close()
 	}
 }
 
-// IP 转属地
+// ConvertIPToRegion 将 IP 地址转换为地区文案。
 func ConvertIPToRegion(ip string) string {
 	if ip2Region == nil {
 		return "未知"

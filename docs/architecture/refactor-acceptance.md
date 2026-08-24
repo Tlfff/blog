@@ -22,9 +22,9 @@
 | Kafka Handler 注册 | `internal/platform/interfaces/mq/contract_test.go` |
 | User 用例和 Adapter | `internal/user/**/*_test.go` |
 | Article Domain/Application/Read Model | `internal/article/**/*_test.go` |
-| Comment 与 Article 同事务 | `internal/comment/infrastructure/transaction_test.go` |
-| Like 与目标计数同事务 | `internal/like/infrastructure/transaction_test.go` |
-| Notification Document Mapper | `internal/notification/infrastructure/mapper_test.go` |
+| Comment 与 Article 同事务 | `internal/comment/infra/transaction_test.go` |
+| Like 与目标计数同事务 | `internal/like/infra/transaction_test.go` |
+| Notification Document Mapper | `internal/notification/infra/mapper_test.go` |
 | Notification Kafka 契约 | `internal/notification/interfaces/kafka/handler_test.go` |
 | IP 资源定位 | `internal/platform/ip/ip_test.go` |
 | 全量编译和测试 | `go test ./...` |

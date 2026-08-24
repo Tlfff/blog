@@ -2,6 +2,7 @@ package auth
 
 import "testing"
 
+// TestHMACSignAndVerify 验证 HMAC 签名和篡改检测。
 func TestHMACSignAndVerify(t *testing.T) {
 	secretKey := "sk-partner-a-secret-key"
 	accessKeyID := "ak-partner-a"
@@ -33,6 +34,7 @@ func TestHMACSignAndVerify(t *testing.T) {
 	}
 }
 
+// TestBuildHMACStringToSign 验证 HMAC 待签名原文格式。
 func TestBuildHMACStringToSign(t *testing.T) {
 	bodyHash := BuildBodyHash([]byte{0x08, 0x01})
 	want := "ak-partner-a\n/blogopen.v1.UserService/GetPublicUserInfo\n1700000000\nabc123\n" + bodyHash
@@ -41,6 +43,7 @@ func TestBuildHMACStringToSign(t *testing.T) {
 	}
 }
 
+// TestBuildBodyHash 验证请求体哈希结果。
 func TestBuildBodyHash(t *testing.T) {
 	// 同一份请求体哈希应稳定一致
 	h1 := BuildBodyHash([]byte("hello"))

@@ -26,7 +26,7 @@ type identityHolderKey struct{}
 // 共享身份容器：unary拦截器的ctx是值传递，
 // 认证层写入的身份外层日志拦截器拿不到，通过指针holder跨层共享
 type identityHolder struct {
-	identity *Identity
+	identity *Identity // 当前调用方身份
 }
 
 // 把身份注入context：同时写入值
@@ -38,7 +38,7 @@ func withIdentity(ctx context.Context, identity *Identity) context.Context {
 	return context.WithValue(ctx, identityCtxKey{}, identity)
 }
 
-// 从context中取出调用方身份（认证拦截器注入，授权/业务层使用）
+// IdentityFromContext 从 Context 中读取调用方身份。
 func IdentityFromContext(ctx context.Context) (*Identity, bool) {
 	id, ok := ctx.Value(identityCtxKey{}).(*Identity)
 	return id, ok

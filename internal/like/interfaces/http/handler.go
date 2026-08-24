@@ -11,22 +11,29 @@ import (
 
 // ArticleLikeUsecase 是文章点赞应用用例接口。
 type ArticleLikeUsecase interface {
+	// ArticleLike 点赞文章。
 	ArticleLike(ctx context.Context, userID, articleID uint64) error
+	// ArticleCancelLike 取消文章点赞。
 	ArticleCancelLike(ctx context.Context, userID, articleID uint64) error
+	// IsUserLikedArticle 查询用户是否已点赞文章。
 	IsUserLikedArticle(ctx context.Context, userID, articleID uint64) (bool, error)
 }
 
 // CommentLikeUsecase 是评论点赞应用用例接口。
 type CommentLikeUsecase interface {
+	// CommentLike 点赞评论。
 	CommentLike(ctx context.Context, userID, commentID uint64) error
+	// CommentCancelLike 取消评论点赞。
 	CommentCancelLike(ctx context.Context, userID, commentID uint64) error
 }
 
+// LikeHandler 处理 Like 上下文的 HTTP 请求。
 type LikeHandler struct {
-	artLikeService ArticleLikeUsecase
-	comLikeService CommentLikeUsecase
+	artLikeService ArticleLikeUsecase // 文章点赞应用用例
+	comLikeService CommentLikeUsecase // 评论点赞应用用例
 }
 
+// NewLikeHandler 创建 Like HTTP Handler。
 func NewLikeHandler(artLikeService ArticleLikeUsecase, comLikeService CommentLikeUsecase) *LikeHandler {
 	return &LikeHandler{
 		artLikeService: artLikeService,
@@ -34,7 +41,7 @@ func NewLikeHandler(artLikeService ArticleLikeUsecase, comLikeService CommentLik
 	}
 }
 
-// 用户点赞文章接口
+// ArticleLikeHandler 处理文章点赞请求。
 func (h *LikeHandler) ArticleLikeHandler(c *gin.Context) {
 	// 1. 解析请求的文章 ID
 	var req ArticleIdRequest
@@ -55,7 +62,7 @@ func (h *LikeHandler) ArticleLikeHandler(c *gin.Context) {
 	response.OK(c, "点赞成功", nil)
 }
 
-// 用户取消文章点赞
+// ArticleCancelLikeHandler 处理取消文章点赞请求。
 func (h *LikeHandler) ArticleCancelLikeHandler(c *gin.Context) {
 	// 1. 解析请求的文章 ID
 	var req ArticleIdRequest
@@ -75,7 +82,7 @@ func (h *LikeHandler) ArticleCancelLikeHandler(c *gin.Context) {
 	response.OK(c, "取消点赞成功", nil)
 }
 
-// 用户点赞评论接口
+// CommentLikeHandler 处理评论点赞请求。
 func (h *LikeHandler) CommentLikeHandler(c *gin.Context) {
 	// 1. 解析请求的评论 ID
 	var req CommentIdRequest
@@ -96,7 +103,7 @@ func (h *LikeHandler) CommentLikeHandler(c *gin.Context) {
 	response.OK(c, "点赞评论成功", nil)
 }
 
-// 用户取消点赞评论接口
+// CommentCancelLikeHandler 处理取消评论点赞请求。
 func (h *LikeHandler) CommentCancelLikeHandler(c *gin.Context) {
 	// 1. 解析请求的评论 ID
 	var req CommentIdRequest

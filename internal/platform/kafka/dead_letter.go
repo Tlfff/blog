@@ -25,12 +25,19 @@ type DeadLetterMessage struct {
 	ConsumerGroup string `json:"consumer_group"` // 消费者组 ID
 }
 
-// 将死信消息序列化为 JSON 字节数组
+// ToJSON 将死信消息序列化为 JSON 字节数组。
 func (m *DeadLetterMessage) ToJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-// 创建死信消息
+// NewDeadLetterMessage 创建死信消息。
+//
+// 参数说明：
+//   - sourceTopic：原始 Topic 名称。
+//   - consumerGroup：原始消费者组 ID。
+//   - msg：处理失败的 Kafka 消息。
+//   - err：最后一次处理错误。
+//   - retries：已执行的重试次数。
 func NewDeadLetterMessage(sourceTopic string, consumerGroup string, msg kafka.Message, err error, retries int) *DeadLetterMessage {
 	return &DeadLetterMessage{
 		SourceTopic:   sourceTopic,

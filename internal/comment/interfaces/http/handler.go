@@ -1,7 +1,7 @@
 package http
 
 import (
-	commentresult "blog/internal/comment/application/dto"
+	commentresult "blog/internal/comment/app/dto"
 	"blog/internal/platform/interfaces/http/response"
 	"blog/internal/platform/security"
 	apperrors "blog/internal/shared/apperrors"
@@ -12,17 +12,24 @@ import (
 
 // CommentUsecase 是评论应用用例接口。
 type CommentUsecase interface {
+	// CreateComment 创建主评论或回复。
 	CreateComment(ctx context.Context, articleID, rootID, userID, replyToUserID uint64, content, ip string) (*commentresult.CreateCommentResponse, error)
+	// ListRootComments 查询主评论列表。
 	ListRootComments(ctx context.Context, articleID, lastID uint64, page, pageSize int, isDesc bool, authorID uint64) (*commentresult.RootCommentListResponse, error)
+	// ListReplies 查询回复列表。
 	ListReplies(ctx context.Context, rootID, lastID uint64, page, pageSize int) (*commentresult.ReplyListResponse, error)
+	// DeleteComment 删除评论。
 	DeleteComment(ctx context.Context, commentID, userID uint64, isAdmin bool) error
+	// GetCommentStats 查询评论热度和点赞数。
 	GetCommentStats(ctx context.Context, commentID uint64) (*commentresult.CommentStatsResponse, error)
 }
 
+// CommentHandler 处理 Comment 上下文的 HTTP 请求。
 type CommentHandler struct {
-	commentService CommentUsecase
+	commentService CommentUsecase // 评论应用用例
 }
 
+// NewCommentHandler 创建 Comment HTTP Handler。
 func NewCommentHandler(commentService CommentUsecase) *CommentHandler {
 	return &CommentHandler{commentService: commentService}
 }
@@ -57,10 +64,10 @@ func (h *CommentHandler) Create(c *gin.Context) {
 	response.OK(c, "评论成功", resp)
 }
 
-// 公开：查看主评论列表 (支持分流：游标与传统跳页)
+// ListRoots 查询主评论列表，支持游标和 Offset 分页。
 func (h *CommentHandler) ListRoots(c *gin.Context) {
 	var req GetRootListRequest
-	// 1. 自动拦截不满足 min=10, max=20 的 page_size 错误r
+	// 1. 解析并校验主评论分页参数
 	if err := c.ShouldBindQuery(&req); err != nil {
 		c.Error(apperrors.ErrInvalidRequestBody) //[cite: 5, 8]
 		return
@@ -94,7 +101,7 @@ func (h *CommentHandler) ListReplies(c *gin.Context) {
 	response.OK(c, "查询成功", res)
 }
 
-// 用户：删除自己的评论 (软删除)
+// DeleteMyComment 软删除当前用户自己的评论。
 func (h *CommentHandler) DeleteMyComment(c *gin.Context) {
 	var req DeleteCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -113,7 +120,7 @@ func (h *CommentHandler) DeleteMyComment(c *gin.Context) {
 	response.OK(c, "评论已成功删除", nil)
 }
 
-// 管理员：强制删除违规评论 (软删除)
+// DeleteAdminComment 软删除管理员指定的评论。
 func (h *CommentHandler) DeleteAdminComment(c *gin.Context) {
 	var req AdminDeleteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

@@ -1,7 +1,7 @@
 package http
 
 import (
-	articleresult "blog/internal/article/application/dto"
+	articleresult "blog/internal/article/app/dto"
 	"blog/internal/article/domain"
 	"blog/internal/platform/interfaces/http/response"
 	"blog/internal/platform/security"
@@ -13,30 +13,45 @@ import (
 
 // ArticleUsecase 是文章生命周期、查询和图片能力的应用用例接口。
 type ArticleUsecase interface {
+	// CreateArticle 创建文章。
 	CreateArticle(ctx context.Context, authorID uint64, title, content string, tags []string, status int8) error
+	// UpdateArticle 更新文章。
 	UpdateArticle(ctx context.Context, articleID, authorID uint64, title, content string, tags []string, status int8) error
+	// DeleteArticle 将文章移入垃圾箱。
 	DeleteArticle(ctx context.Context, articleID, userID uint64) error
+	// ClearArticle 彻底删除垃圾箱文章。
 	ClearArticle(ctx context.Context, articleID, userID uint64) error
+	// PublishArticle 发布文章。
 	PublishArticle(ctx context.Context, articleID, userID uint64) error
+	// RecoverArticle 恢复垃圾箱文章。
 	RecoverArticle(ctx context.Context, articleID, userID uint64) error
+	// GetPublishedArticle 查询公开文章详情。
 	GetPublishedArticle(ctx context.Context, articleID, userID uint64) (*articleresult.ArticleDetailResponse, error)
+	// GetArticle 查询作者文章详情。
 	GetArticle(ctx context.Context, articleID, userID uint64) (*articleresult.ArticleDetailResponse, error)
+	// GetPublishedList 查询公开文章列表。
 	GetPublishedList(ctx context.Context, page, pageSize, lastID uint64, isDesc bool) (*articleresult.ArticleListResponse, error)
+	// GetAdminList 查询后台文章列表。
 	GetAdminList(ctx context.Context, page, pageSize, lastID uint64, isDesc bool, status int8) (*articleresult.AdminListResponse, error)
+	// GetAvailableList 查询对外开放的文章列表。
 	GetAvailableList(ctx context.Context, page, pageSize uint64, isDesc bool) (*articleresult.ExternalListResponse, error)
+	// GetUploadURL 获取文章图片上传凭证。
 	GetUploadURL(ctx context.Context, fileExt string) (uploadURL, url string, err error)
 }
 
+// ArticleHandler 处理 Article 上下文的 HTTP 请求。
 type ArticleHandler struct {
-	article     ArticleUsecase
-	articleRank ArticleRankUsecase
+	article     ArticleUsecase     // 文章应用用例
+	articleRank ArticleRankUsecase // 文章热榜应用用例
 }
 
 // ArticleRankUsecase 是文章热榜查询接口。
 type ArticleRankUsecase interface {
+	// GetHotRank 查询文章热榜。
 	GetHotRank(ctx context.Context) (*articleresult.HotRankResponse, error)
 }
 
+// NewArticleHandler 创建 Article HTTP Handler。
 func NewArticleHandler(article ArticleUsecase, articleRank ArticleRankUsecase) *ArticleHandler {
 	return &ArticleHandler{
 		article:     article,
@@ -44,7 +59,7 @@ func NewArticleHandler(article ArticleUsecase, articleRank ArticleRankUsecase) *
 	}
 }
 
-// 获取文章图片上传凭证
+// GetImageUploadURL 获取文章图片上传凭证。
 func (h *ArticleHandler) GetImageUploadURL(c *gin.Context) {
 	// 1. 解析请求体并放进req
 	var req GetImageUploadURLRequest
@@ -65,7 +80,7 @@ func (h *ArticleHandler) GetImageUploadURL(c *gin.Context) {
 	})
 }
 
-// 创建文章
+// CreateArticle 创建文章。
 func (h *ArticleHandler) CreateArticle(c *gin.Context) {
 	var req CreateArticleRequest
 	// 1. 解析请求体并放进req
@@ -92,7 +107,7 @@ func (h *ArticleHandler) CreateArticle(c *gin.Context) {
 	response.OK(c, "文章创建成功", nil)
 }
 
-// 更新文章
+// UpdateArticle 更新文章。
 func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 	var req UpdateArticleRequest
 	// 1. 解析请求体并放进req
@@ -121,7 +136,7 @@ func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 	response.OK(c, "文章更新成功", nil)
 }
 
-// 删除文章(移去垃圾箱)
+// DeleteArticle 将文章移入垃圾箱。
 func (h *ArticleHandler) DeleteArticle(c *gin.Context) {
 	var req DeleteArticleRequest
 	// 1. 解析请求体并放进req
@@ -140,7 +155,7 @@ func (h *ArticleHandler) DeleteArticle(c *gin.Context) {
 	response.OK(c, "文章删除成功", nil)
 }
 
-// 发表文章
+// PublishArticle 发布文章。
 func (h *ArticleHandler) PublishArticle(c *gin.Context) {
 	var req PublishArticleRequest
 	// 1. 解析请求体并放进req
@@ -159,7 +174,7 @@ func (h *ArticleHandler) PublishArticle(c *gin.Context) {
 	response.OK(c, "文章发表成功", nil)
 }
 
-// 公开：查看文章详情
+// GetArticleDetail 查询公开文章详情。
 func (h *ArticleHandler) GetArticleDetail(c *gin.Context) {
 	var req GetDetailRequest
 	// 1. 自动去 Query 拿 ?id=xxx，自动转成 int64，自动校验 min=1
@@ -182,7 +197,7 @@ func (h *ArticleHandler) GetArticleDetail(c *gin.Context) {
 	response.OK(c, "查询成功", res)
 }
 
-// 管理者：查看文章详情
+// GetArticleDetailForMe 查询管理员文章详情。
 func (h *ArticleHandler) GetArticleDetailForMe(c *gin.Context) {
 	var req GetDetailRequest
 	// 1. 自动去 Query 拿 ?id=xxx，自动转成 int64，自动校验 min=1
@@ -202,7 +217,7 @@ func (h *ArticleHandler) GetArticleDetailForMe(c *gin.Context) {
 	response.OK(c, "查询成功", res)
 }
 
-// 获取用户已发表文章列表
+// GetPublishedList 查询已发表文章列表。
 func (h *ArticleHandler) GetPublishedList(c *gin.Context) {
 	var req GetPublishListRequest
 	// 1. 自动去 Query 拿 ?id=xxx，自动转成 int64，自动校验 min=1
@@ -219,7 +234,7 @@ func (h *ArticleHandler) GetPublishedList(c *gin.Context) {
 	response.OK(c, "获取发表列表成功", resList)
 }
 
-// 管理者：获取文章列表
+// GetAdminList 查询后台文章列表。
 func (h *ArticleHandler) GetAdminList(c *gin.Context) {
 	var req GetAdminListRequest
 	// 1. 校验参数
@@ -238,7 +253,7 @@ func (h *ArticleHandler) GetAdminList(c *gin.Context) {
 	response.OK(c, "获取文章列表成功", resList)
 }
 
-// 管理者：获取垃圾箱列表，不需要传状态，因为固定为0
+// GetTrashList 查询垃圾箱文章列表。
 func (h *ArticleHandler) GetTrashList(c *gin.Context) {
 	var req GetAdminListRequest
 	// 1. 校验参数
@@ -247,7 +262,7 @@ func (h *ArticleHandler) GetTrashList(c *gin.Context) {
 		return
 	}
 	// 2.获取已删除文章列表
-	resList, err := h.article.GetAdminList(c, req.Page, req.PageSize, req.LastID, req.IsDesc, domain.StatusDeleted)
+	resList, err := h.article.GetAdminList(c, req.Page, req.PageSize, req.LastID, req.IsDesc, domain.StatusDeleted.Int8())
 	if err != nil {
 		c.Error(err)
 		return
@@ -255,7 +270,7 @@ func (h *ArticleHandler) GetTrashList(c *gin.Context) {
 	response.OK(c, "获取垃圾箱列表成功", resList)
 }
 
-// 管理者：恢复垃圾箱中的文章
+// RecoverArticle 恢复垃圾箱中的文章。
 func (h *ArticleHandler) RecoverArticle(c *gin.Context) {
 	var req RecoverArticleRequest
 
@@ -274,7 +289,7 @@ func (h *ArticleHandler) RecoverArticle(c *gin.Context) {
 	response.OK(c, "恢复文章成功", nil)
 }
 
-// 管理者：硬删除垃圾箱中的文章
+// ClearArticle 彻底删除垃圾箱中的文章。
 func (h *ArticleHandler) ClearArticle(c *gin.Context) {
 	var req RecoverArticleRequest
 
@@ -293,7 +308,7 @@ func (h *ArticleHandler) ClearArticle(c *gin.Context) {
 	response.OK(c, "删除文章成功", nil)
 }
 
-// 获取文章排行榜
+// GetHotArticleRank 查询文章热榜。
 func (h *ArticleHandler) GetHotArticleRank(c *gin.Context) {
 	// 1. 获取文章排行榜
 	rankList, err := h.articleRank.GetHotRank(c.Request.Context())

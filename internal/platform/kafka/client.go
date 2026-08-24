@@ -44,7 +44,7 @@ func NewClient(cfg config.Kafka) (*Client, error) {
 	return client, nil
 }
 
-//	获取生产者
+// GetProducer 获取 Kafka Producer。
 //
 // 如果客户端已关闭，返回 nil
 func (c *Client) GetProducer() *Producer {
@@ -58,7 +58,7 @@ func (c *Client) GetProducer() *Producer {
 	return c.producer
 }
 
-// 初始化消费者
+// InitConsumer 初始化 Kafka Consumer。
 func (c *Client) InitConsumer(handlers map[string]MessageHandler) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -83,7 +83,7 @@ func (c *Client) InitConsumer(handlers map[string]MessageHandler) error {
 	return nil
 }
 
-// 启动消费者
+// StartConsumer 启动 Kafka Consumer。
 // 需要先调用 InitConsumer
 func (c *Client) StartConsumer(ctx context.Context) error {
 
@@ -103,7 +103,7 @@ func (c *Client) StartConsumer(ctx context.Context) error {
 	return consumer.Start(ctx)
 }
 
-// 关闭消费者
+// StopConsumer 停止 Kafka Consumer。
 func (c *Client) StopConsumer() error {
 	c.mu.RLock()
 	consumer := c.consumer
@@ -116,14 +116,14 @@ func (c *Client) StopConsumer() error {
 	return consumer.Close()
 }
 
-// 检查消费者是否已初始化
+// IsConsumerReady 检查 Consumer 是否已初始化。
 func (c *Client) IsConsumerReady() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.consumer != nil && !c.closed
 }
 
-// 检查消费者是否正在运行
+// IsConsumerRunning 检查 Consumer 是否正在运行。
 func (c *Client) IsConsumerRunning() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -135,7 +135,7 @@ func (c *Client) IsConsumerRunning() bool {
 	return c.consumer.IsRunning()
 }
 
-// 关闭客户端，释放所有资源
+// Close 关闭 Kafka 客户端并释放资源。
 func (c *Client) Close() error {
 	// 1. 检查客户端是否已关闭
 	c.mu.Lock()

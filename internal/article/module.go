@@ -2,8 +2,8 @@
 package article
 
 import (
-	articleapp "blog/internal/article/application"
-	articleinfra "blog/internal/article/infrastructure"
+	articleapp "blog/internal/article/app"
+	articleinfra "blog/internal/article/infra"
 	articlegrpc "blog/internal/article/interfaces/grpc"
 	articlehttp "blog/internal/article/interfaces/http"
 	articlekafka "blog/internal/article/interfaces/kafka"

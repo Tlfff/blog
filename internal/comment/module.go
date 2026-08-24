@@ -2,9 +2,9 @@
 package comment
 
 import (
-	commentapp "blog/internal/comment/application"
+	commentapp "blog/internal/comment/app"
 	commentdomain "blog/internal/comment/domain"
-	commentinfra "blog/internal/comment/infrastructure"
+	commentinfra "blog/internal/comment/infra"
 	commentgrpc "blog/internal/comment/interfaces/grpc"
 	commenthttp "blog/internal/comment/interfaces/http"
 

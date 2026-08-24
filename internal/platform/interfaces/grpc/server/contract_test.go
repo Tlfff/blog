@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// TestOpenGRPCServiceContract 验证开放 gRPC Service 和 Method 契约。
 func TestOpenGRPCServiceContract(t *testing.T) {
 	app := &AppHandler{
 		Article: articlegrpc.NewArticleHandler(nil),

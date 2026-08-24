@@ -5,8 +5,8 @@ import (
 	platformconfig "blog/internal/platform/config"
 	platformoss "blog/internal/platform/oss"
 	platformsecurity "blog/internal/platform/security"
-	userapp "blog/internal/user/application"
-	userinfra "blog/internal/user/infrastructure"
+	userapp "blog/internal/user/app"
+	userinfra "blog/internal/user/infra"
 	usergrpc "blog/internal/user/interfaces/grpc"
 	userhttp "blog/internal/user/interfaces/http"
 

@@ -14,8 +14,7 @@ type DuplicateChecker struct {
 // Duplicate 是全局共享的重复提交检查器实例
 var Duplicate = NewDuplicateChecker()
 
-// 防止内存积压
-// 创建重复提交检查器，并启动后台清理协程防止内存积压
+// NewDuplicateChecker 创建重复提交检查器并启动后台清理协程。
 func NewDuplicateChecker() *DuplicateChecker {
 	// 1. 初始化缓存字典
 	d := &DuplicateChecker{
@@ -28,9 +27,7 @@ func NewDuplicateChecker() *DuplicateChecker {
 	return d
 }
 
-// 检查是否重复提交
-// 检查指定 key 在 expire 时间内是否已提交过
-// 返回 true 表示属于重复提交
+// Check 检查指定 Key 在有效期内是否重复提交。
 func (d *DuplicateChecker) Check(key string, expire time.Duration) bool {
 	now := time.Now()
 

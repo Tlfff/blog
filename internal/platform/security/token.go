@@ -22,11 +22,17 @@ const (
 // SessionStore 是 TokenAuth 需要的 Redis 会话存储能力。
 // 使用窄接口而不是 *redis.Client，便于测试替换为内存实现。
 type SessionStore interface {
+	// Get 查询字符串值。
 	Get(ctx context.Context, key string) *redis.StringCmd
+	// Set 保存字符串值。
 	Set(ctx context.Context, key string, value any, expiration time.Duration) *redis.StatusCmd
+	// Del 删除指定键。
 	Del(ctx context.Context, keys ...string) *redis.IntCmd
+	// SAdd 向 Set 中添加成员。
 	SAdd(ctx context.Context, key string, members ...any) *redis.IntCmd
+	// SMembers 查询 Set 全部成员。
 	SMembers(ctx context.Context, key string) *redis.StringSliceCmd
+	// SRem 从 Set 中删除成员。
 	SRem(ctx context.Context, key string, members ...any) *redis.IntCmd
 }
 
@@ -46,7 +52,7 @@ type TokenAuth struct {
 	rdb SessionStore // Redis 会话存储，仅依赖窄接口便于测试替换
 }
 
-// 构造 Token 认证服务
+// NewTokenAuth 创建 Token 会话服务。
 func NewTokenAuth(rdb SessionStore) *TokenAuth {
 	return &TokenAuth{rdb: rdb}
 }
@@ -61,7 +67,16 @@ func generateToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// 创建登录会话，返回 token
+// CreateSession 创建登录会话并返回 Token。
+//
+// 参数说明：
+//   - ctx：请求上下文，用于传递链路信息和控制超时。
+//   - userID：会话所属用户唯一标识。
+//   - role：用户角色：1-普通用户；2-管理员。
+//   - ip：登录来源 IP。
+//   - device：登录设备标识。
+//   - rememberMe：是否延长 Token 有效期。
+//
 // 创建登录会话并返回 token
 // rememberMe 为 true 时使用更长的有效期
 func (t *TokenAuth) CreateSession(ctx context.Context, userID uint64, role int8, ip, device string, rememberMe bool) (string, error) {
@@ -108,7 +123,7 @@ func (t *TokenAuth) CreateSession(ctx context.Context, userID uint64, role int8,
 	return token, nil
 }
 
-// 根据 token 查询会话
+// GetSession 根据 Token 查询会话。
 // 根据 token 查询登录会话，token 不存在或已过期时返回错误
 func (t *TokenAuth) GetSession(ctx context.Context, token string) (*Session, error) {
 	// 1. 从 Redis 读取会话 JSON
@@ -128,7 +143,7 @@ func (t *TokenAuth) GetSession(ctx context.Context, token string) (*Session, err
 	return &session, nil
 }
 
-// 删除指定 token（登出）
+// DeleteSession 删除指定 Token 会话。
 // 删除指定 token，用于用户主动登出
 func (t *TokenAuth) DeleteSession(ctx context.Context, token string) error {
 	// 1. 先查询会话，拿到 user_id 用于清理集合
@@ -150,7 +165,7 @@ func (t *TokenAuth) DeleteSession(ctx context.Context, token string) error {
 	return t.rdb.SRem(ctx, userTokensKey, token).Err()
 }
 
-// 删除用户所有 token（强制下线）
+// DeleteAllSessions 删除用户全部 Token 会话。
 // 删除用户全部 token，用于强制下线
 func (t *TokenAuth) DeleteAllSessions(ctx context.Context, userID uint64) error {
 	// 1. 拼接用户 token 集合 Key
@@ -180,7 +195,7 @@ func (t *TokenAuth) DeleteAllSessions(ctx context.Context, userID uint64) error 
 	return t.rdb.Del(ctx, userTokensKey).Err()
 }
 
-// 删除用户所有 token，除了当前使用的（修改密码后保留当前设备）
+// DeleteOtherSessions 删除用户除当前 Token 外的其他会话。
 // 删除用户除当前 token 外的全部 token，用于改密后保留当前设备
 func (t *TokenAuth) DeleteOtherSessions(ctx context.Context, userID uint64, currentToken string) error {
 	userTokensKey := UserTokensPrefix + fmt.Sprint(userID)
@@ -210,7 +225,7 @@ func (t *TokenAuth) DeleteOtherSessions(ctx context.Context, userID uint64, curr
 	return t.rdb.SAdd(ctx, userTokensKey, currentToken).Err()
 }
 
-// 获取用户所有 token（用于后台管理）
+// GetUserTokens 查询用户全部有效 Token。
 // 获取用户全部 token，用于后台管理查看在线设备
 func (t *TokenAuth) GetUserTokens(ctx context.Context, userID uint64) ([]string, error) {
 	return t.rdb.SMembers(ctx, UserTokensPrefix+fmt.Sprint(userID)).Result()

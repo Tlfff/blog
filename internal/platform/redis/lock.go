@@ -16,6 +16,8 @@ import (
 //go:embed lua
 var luaFS embed.FS
 
+// RedisLock 表示基于 Redis 的分布式锁。
+// RedisLock 表示基于 Redis 的分布式锁。
 type RedisLock struct {
 	rdb        *redis.Client // 客户端
 	key        string        // 锁Key
@@ -26,6 +28,7 @@ type RedisLock struct {
 	locked     bool          // 是否成功持有锁
 }
 
+// NewRedisLock 创建 Redis 分布式锁。
 func NewRedisLock(rdb *redis.Client, key string, expireTime time.Duration) *RedisLock {
 	return &RedisLock{
 		rdb:        rdb,
@@ -48,6 +51,7 @@ func init() {
 	unlockScript = string(data)
 }
 
+// RetryLock 按配置重试获取 Redis 分布式锁。
 func (l *RedisLock) RetryLock(ctx context.Context) error {
 	for i := 0; i < l.retryCount; i++ {
 		// 检查上下文是否过期
@@ -72,6 +76,7 @@ func (l *RedisLock) RetryLock(ctx context.Context) error {
 	return apperrors.ErrLockFailed
 }
 
+// UnLock 释放当前实例持有的 Redis 分布式锁。
 func (l *RedisLock) UnLock(ctx context.Context) error {
 	// 1. 如果锁已经释放，则返回
 	if !l.locked {
@@ -90,7 +95,7 @@ func (l *RedisLock) UnLock(ctx context.Context) error {
 	return apperrors.ErrUnLockFailed
 }
 
-// 加锁,value为锁唯一标识，防止误删
+// TryLock 尝试获取 Redis 分布式锁。
 func (l *RedisLock) TryLock(ctx context.Context) (bool, error) {
 	if l.locked == true {
 		return true, nil

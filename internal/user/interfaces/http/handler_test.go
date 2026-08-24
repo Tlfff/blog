@@ -9,9 +9,9 @@ import (
 
 	"blog/internal/platform/security"
 	apperrors "blog/internal/shared/apperrors"
-	identityapp "blog/internal/user/application"
-	identityinfra "blog/internal/user/infrastructure"
-	"blog/internal/user/infrastructure/model"
+	identityapp "blog/internal/user/app"
+	identityinfra "blog/internal/user/infra"
+	"blog/internal/user/infra/model"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/sqlite"
@@ -46,6 +46,8 @@ func makeTestContext(method, path string, body interface{}, ctxUser *auth.UserCo
 
 	return c, w
 }
+
+// TestUserHandler_AllRoutes 验证用户资料 Handler 的主要场景。
 func TestUserHandler_AllRoutes(t *testing.T) {
 	// 1. 核心修复：创建一个临时的纯内存 SQLite 数据库，用来给测试代码发泄数据
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})

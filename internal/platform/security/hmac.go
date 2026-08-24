@@ -25,11 +25,26 @@ func BuildBodyHash(body []byte) string {
 //
 // request_body_hash 为请求体的 SHA256（如 SHA256(proto.Marshal(request))），
 // 防止请求参数被篡改。调用方与服务端必须使用相同的序列化规则。
+//
+// 参数说明：
+//   - accessKeyID：合作方访问密钥 ID。
+//   - methodName：完整 gRPC Method 名称。
+//   - timestamp：请求 Unix 时间戳。
+//   - nonce：请求随机数。
+//   - requestBodyHash：请求体 SHA256 哈希。
 func BuildHMACStringToSign(accessKeyID, methodName, timestamp, nonce, requestBodyHash string) string {
 	return strings.Join([]string{accessKeyID, methodName, timestamp, nonce, requestBodyHash}, HMACSignSeparator)
 }
 
-// HMACSign 用 secretKey 对签名原文做 HMAC-SHA256，返回十六进制签名
+// HMACSign 使用合作方密钥生成 HMAC-SHA256 签名。
+//
+// 参数说明：
+//   - secretKey：合作方共享密钥。
+//   - accessKeyID：合作方访问密钥 ID。
+//   - methodName：完整 gRPC Method 名称。
+//   - timestamp：请求 Unix 时间戳。
+//   - nonce：请求随机数。
+//   - requestBodyHash：请求体 SHA256 哈希。
 func HMACSign(secretKey, accessKeyID, methodName, timestamp, nonce, requestBodyHash string) string {
 	// 构建签名原文
 	stringToSign := BuildHMACStringToSign(accessKeyID, methodName, timestamp, nonce, requestBodyHash)
@@ -43,7 +58,16 @@ func HMACSign(secretKey, accessKeyID, methodName, timestamp, nonce, requestBodyH
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-// HMACVerify 恒定时间比较签名是否一致，防止时序攻击
+// HMACVerify 使用恒定时间比较校验 HMAC 签名。
+//
+// 参数说明：
+//   - secretKey：合作方共享密钥。
+//   - accessKeyID：合作方访问密钥 ID。
+//   - methodName：完整 gRPC Method 名称。
+//   - timestamp：请求 Unix 时间戳。
+//   - nonce：请求随机数。
+//   - requestBodyHash：请求体 SHA256 哈希。
+//   - signature：调用方提供的十六进制签名。
 func HMACVerify(secretKey, accessKeyID, methodName, timestamp, nonce, requestBodyHash, signature string) bool {
 	// 计算预期签名
 	expected := HMACSign(secretKey, accessKeyID, methodName, timestamp, nonce, requestBodyHash)

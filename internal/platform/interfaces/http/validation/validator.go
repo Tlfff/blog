@@ -26,7 +26,7 @@ func notOnlyNumber(fl validator.FieldLevel) bool {
 	return false
 }
 
-// 全局注册所有自定义校验规则
+// InitValidator 全局注册所有自定义校验规则。
 // 向 Gin 的校验引擎注册全部自定义校验规则
 // 需在路由注册前调用一次
 func InitValidator() {

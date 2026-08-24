@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 点赞路由
+// InitLikePrivateRoutes 注册点赞私有路由。
 func InitLikePrivateRoutes(r *gin.RouterGroup, LikeHandler *likehttp.LikeHandler) {
 	// 点赞文章
 	r.POST("/article/like", LikeHandler.ArticleLikeHandler)

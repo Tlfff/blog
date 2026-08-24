@@ -16,7 +16,7 @@ type ViewHistorySender interface {
 	SendViewHistory(ctx context.Context, userID, articleID uint64) error
 }
 
-// 浏览历史中间件：主流程成功返回后，异步发送浏览历史消息到 Kafka
+// ViewHistoryMiddleware 创建文章浏览历史中间件。
 func ViewHistoryMiddleware(historyService ViewHistorySender) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 1. 解析查询参数中的文章ID，解析失败直接放行，由 handler 统一返回参数错误

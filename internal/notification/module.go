@@ -2,8 +2,8 @@
 package notification
 
 import (
-	notificationapp "blog/internal/notification/application"
-	notificationinfra "blog/internal/notification/infrastructure"
+	notificationapp "blog/internal/notification/app"
+	notificationinfra "blog/internal/notification/infra"
 	notificationhttp "blog/internal/notification/interfaces/http"
 	notificationkafka "blog/internal/notification/interfaces/kafka"
 	platformkafka "blog/internal/platform/kafka"

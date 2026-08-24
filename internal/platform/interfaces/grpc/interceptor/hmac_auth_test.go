@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// TestCheckTimestamp 验证 HMAC 时间戳窗口校验。
 func TestCheckTimestamp(t *testing.T) {
 	now := time.Now()
 

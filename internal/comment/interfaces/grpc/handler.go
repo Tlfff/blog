@@ -1,7 +1,7 @@
 package grpc
 
 import (
-	commentdto "blog/internal/comment/application/dto"
+	commentdto "blog/internal/comment/app/dto"
 	grpcinterface "blog/internal/platform/interfaces/grpc"
 	"context"
 
@@ -13,20 +13,22 @@ import (
 
 // CommentQueryUsecase 是开放 gRPC 评论查询应用用例接口。
 type CommentQueryUsecase interface {
+	// GetCommentStats 查询评论热度和点赞数。
 	GetCommentStats(ctx context.Context, commentID uint64) (*commentdto.CommentStatsResponse, error)
 }
 
 // 实现二方服务的评论接口
 type CommentHandler struct {
-	commentv1.UnimplementedCommentServiceServer
-	commentService CommentQueryUsecase
+	commentv1.UnimplementedCommentServiceServer                     // 保持向前兼容的未实现方法
+	commentService                              CommentQueryUsecase // 评论查询应用用例
 }
 
+// NewCommentHandler 创建 Comment gRPC Handler。
 func NewCommentHandler(commentService CommentQueryUsecase) *CommentHandler {
 	return &CommentHandler{commentService: commentService}
 }
 
-// 获取评论的点赞数和热度值
+// GetCommentStats 获取评论点赞数和热度值。
 func (h *CommentHandler) GetCommentStats(ctx context.Context, req *commentv1.GetCommentStatsRequest) (*commentv1.GetCommentStatsResponse, error) {
 	// 1. 入参校验
 	if req.CommentId <= 0 {

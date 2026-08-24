@@ -114,6 +114,7 @@ func executeMultiSQL(db *sql.DB, sqlContent string) error {
 	return nil
 }
 
+// init 注册数据库迁移子命令。
 func init() {
 	rootCmd.AddCommand(migrateCmd)
 }

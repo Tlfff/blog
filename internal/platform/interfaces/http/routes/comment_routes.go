@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 公开评论路由 (游客可用)
+// InitCommentPublicRoutes 注册评论公开路由。
 func InitCommentPublicRoutes(r *gin.RouterGroup, commentHandler *commenthttp.CommentHandler) {
 	// 获取文章主评论列表
 	r.GET("/comment/list/roots", commentHandler.ListRoots)
@@ -16,7 +16,7 @@ func InitCommentPublicRoutes(r *gin.RouterGroup, commentHandler *commenthttp.Com
 	r.GET("/comment/list/replies", commentHandler.ListReplies)
 }
 
-// 登录用户路由
+// InitCommentPrivateRoutes 注册评论私有路由。
 func InitCommentPrivateRoutes(r *gin.RouterGroup, commentHandler *commenthttp.CommentHandler) {
 	// 创建评论
 	r.POST("/comment/create",
@@ -28,7 +28,7 @@ func InitCommentPrivateRoutes(r *gin.RouterGroup, commentHandler *commenthttp.Co
 	r.POST("/comment/delete", commentHandler.DeleteMyComment)
 }
 
-// 管理员专属路由
+// InitCommentAdminRoutes 注册评论管理员路由。
 func InitCommentAdminRoutes(r *gin.RouterGroup, commentHandler *commenthttp.CommentHandler) {
 	// 管理员强制后台处理/删除违规评论
 	r.POST("/comment/delete", commentHandler.DeleteAdminComment)

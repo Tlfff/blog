@@ -14,12 +14,13 @@ import (
 	"github.com/segmentio/kafka-go/compress"
 )
 
+// Producer 管理各业务 Topic 的 Kafka Writer。
 type Producer struct {
-	writers map[string]*kafka.Writer
-	config  config.Kafka
+	writers map[string]*kafka.Writer // 业务 Topic Key 到 Writer 的映射
+	config  config.Kafka             // Kafka 生产者配置
 }
 
-// 创建 Kafka 生产者。
+// NewProducer 创建 Kafka Producer。
 func NewProducer(cfg config.Kafka) (*Producer, error) {
 	// 1. 获取配置信息
 	// 1.1 验证 broker 地址列表是否为空
@@ -69,6 +70,8 @@ func NewProducer(cfg config.Kafka) (*Producer, error) {
 		config:  cfg,
 	}, nil
 }
+
+// getBalancer 根据业务 Topic 选择分区均衡策略。
 func getBalancer(topicKey string) kafka.Balancer {
 	switch topicKey {
 	case "notification":
@@ -80,13 +83,13 @@ func getBalancer(topicKey string) kafka.Balancer {
 	}
 }
 
-// 发送浏览历史消息（使用 UserID 作为 Key，保证同一用户的消息有序）
+// SendViewHistory 发送浏览历史消息。
 func (p *Producer) SendViewHistory(ctx context.Context, msg *message.ViewHistoryMsg) error {
 	key := fmt.Sprintf("%d", msg.UserID)
 	return p.sendMessage(ctx, "view_history", []byte(key), msg)
 }
 
-// 发送通知消息（无 Key，使用轮询分区）
+// SendNotificationAsync 异步发送通知消息。
 func (p *Producer) SendNotificationAsync(msg *message.NotificationMsg) {
 	go func() {
 		// 1. 捕获异常，防止 goroutine 崩溃影响主流程
@@ -132,7 +135,7 @@ func (p *Producer) sendMessage(ctx context.Context, topicKey string, key []byte,
 	return writer.WriteMessages(ctx, msg)
 }
 
-// 关闭所有 writer
+// Close 关闭全部 Kafka Writer。
 func (p *Producer) Close() error {
 	var errs []error
 	// 1. 关闭所有 writer

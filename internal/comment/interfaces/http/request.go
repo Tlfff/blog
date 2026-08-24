@@ -17,7 +17,7 @@ type DeleteCommentRequest struct {
 type GetRootListRequest struct {
 	ArticleID uint64 `form:"article_id" binding:"required,min=1"` // 文章ID
 	Page      int    `form:"page" binding:"min=0"`                // 传统页码（跳页用）
-	PageSize  int    `form:"page_size" binding:"min=10,max=20"`   // 每页条数(可以调整范围，默认10)
+	PageSize  int    `form:"page_size" binding:"min=10,max=20"`   // 每页条数，取值范围 10~20
 	LastID    uint64 `form:"last_id" binding:"min=0"`             // 游标ID
 	IsDesc    bool   `form:"is_desc"`                             // 是否按时间倒序（默认false正序）
 	AuthorID  uint64 `form:"author_id" binding:"min=0"`           // 只看楼主的用户ID（可选）
@@ -27,11 +27,11 @@ type GetRootListRequest struct {
 type GetReplyListRequest struct {
 	RootID   uint64 `form:"root_id" binding:"required,min=1"`  // 对应的主评论/楼层ID
 	Page     int    `form:"page" binding:"min=0"`              // 传统页码（跳页用）
-	PageSize int    `form:"page_size" binding:"min=10,max=20"` // 每页条数(可以调整范围，默认10)
+	PageSize int    `form:"page_size" binding:"min=10,max=20"` // 每页条数，取值范围 10~20
 	LastID   uint64 `form:"last_id" binding:"min=0"`           // 游标ID
 }
 
+// AdminDeleteRequest 是管理员强制删除评论的请求 DTO。
 type AdminDeleteRequest struct {
-	// AdminDeleteRequest 是管理员强制删除评论的请求 DTO。
-	ID uint64 `json:"id" binding:"required,min=1"` //
+	ID uint64 `json:"id" binding:"required,min=1"` // 评论唯一标识
 }

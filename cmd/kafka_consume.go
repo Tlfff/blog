@@ -72,6 +72,7 @@ var kafkaConsumeCmd = &cobra.Command{
 	},
 }
 
+// init 注册 Kafka Consumer 子命令及端口参数。
 func init() {
 	rootCmd.AddCommand(kafkaConsumeCmd)
 	kafkaConsumeCmd.Flags().StringVarP(&port, "port", "p", "9090", "指定消费者监听端口")

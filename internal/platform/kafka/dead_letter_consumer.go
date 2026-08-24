@@ -23,13 +23,13 @@ type DeadLetterHandler func(ctx context.Context, dlMsg *DeadLetterMessage) error
 // DeadLetterConsumer 死信队列消费者
 // 独立的消费者组，消费 dead_letter topic 的消息
 type DeadLetterConsumer struct {
-	reader  *kafka.Reader     // 死信队列的 Reader
-	config  config.Kafka      // Kafka 配置
-	handler DeadLetterHandler // 死信消息处理器
-	mu      sync.RWMutex
+	reader  *kafka.Reader      // 死信队列的 Reader
+	config  config.Kafka       // Kafka 配置
+	handler DeadLetterHandler  // 死信消息处理器
+	mu      sync.RWMutex       // 保护运行状态和取消函数
 	cancel  context.CancelFunc // 取消函数
-	wg      sync.WaitGroup
-	running bool // 是否正在运行
+	wg      sync.WaitGroup     // 等待消费协程退出
+	running bool               // 是否正在运行
 }
 
 // NewDeadLetterConsumer 创建死信队列消费者
@@ -68,7 +68,7 @@ func NewDeadLetterConsumer(cfg config.Kafka, handler DeadLetterHandler) (*DeadLe
 	}, nil
 }
 
-// 启动死信队列消费者（阻塞）
+// Start 启动死信队列消费者并阻塞等待退出。
 func (c *DeadLetterConsumer) Start(ctx context.Context) error {
 	// 1. 检查是否已启用
 	if c == nil {

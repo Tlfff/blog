@@ -2,7 +2,7 @@ package response
 
 import apperrors "blog/internal/shared/apperrors"
 
-// 把统一业务错误映射为对外业务响应码，未登记的错误统一按系统异常处理
+// CodeByError 把统一业务错误映射为对外业务响应码。
 func CodeByError(err error) int {
 
 	// 1. 按错误值逐类匹配，命中则返回对应业务码

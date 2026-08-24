@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// TestHTTPRouteContract 验证 HTTP 路由和 Method 契约。
 func TestHTTPRouteContract(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

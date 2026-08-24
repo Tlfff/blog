@@ -9,14 +9,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 注册文章公开路由（游客可访问，无需登录）
+// InitArticlePublicRoutes 注册文章公开路由。
 func InitArticlePublicRoutes(r *gin.RouterGroup, articleHandler *articlehttp.ArticleHandler) {
 	// 获取已发表文章列表
 	r.GET("/article/list", articleHandler.GetPublishedList)
 	r.GET("/article/hot-rank", articleHandler.GetHotArticleRank)
 }
 
-// 注册文章可选登录路由，登录与未登录都能访问但返回内容有差异
+// InitArticleOptionalRoutes 注册文章可选登录路由。
 func InitArticleOptionalRoutes(r *gin.RouterGroup, articleHandler *articlehttp.ArticleHandler, historyService middleware.ViewHistorySender) {
 	// 获取已发表文章详情，浏览历史由中间件异步发送到 Kafka
 	r.GET("/article/detail",
@@ -25,7 +25,7 @@ func InitArticleOptionalRoutes(r *gin.RouterGroup, articleHandler *articlehttp.A
 	)
 }
 
-// 注册文章管理路由（需要登录且具备管理员权限）
+// InitArticlePrivateRoutes 注册文章管理路由。
 func InitArticlePrivateRoutes(r *gin.RouterGroup, articleHandler *articlehttp.ArticleHandler) {
 	//  创建文章,需要防重复
 	r.POST("/article/create",

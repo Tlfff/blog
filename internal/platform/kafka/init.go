@@ -11,7 +11,7 @@ var (
 	initErr      error
 )
 
-// 初始化全局 Kafka 客户端
+// InitGlobalClient 初始化全局 Kafka 客户端。
 func InitGlobalClient(cfg config.Kafka) error {
 	// sync.Once 确保只初始化一次 Kafka 客户端
 	once.Do(func() {
@@ -20,13 +20,13 @@ func InitGlobalClient(cfg config.Kafka) error {
 	return initErr
 }
 
-// 获取全局 Kafka 客户端
+// GetGlobalClient 获取全局 Kafka 客户端。
 // 如果未初始化，返回 nil
 func GetGlobalClient() *Client {
 	return globalClient
 }
 
-// 关闭全局 Kafka 客户端
+// CloseGlobalClient 关闭全局 Kafka 客户端。
 // 如果未初始化，返回 nil
 func CloseGlobalClient() error {
 	if globalClient != nil {

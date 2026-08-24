@@ -2,8 +2,8 @@ package bootstrap
 
 import (
 	article "blog/internal/article"
-	articleapp "blog/internal/article/application"
-	articleinfra "blog/internal/article/infrastructure"
+	articleapp "blog/internal/article/app"
+	articleinfra "blog/internal/article/infra"
 	comment "blog/internal/comment"
 	like "blog/internal/like"
 	notification "blog/internal/notification"

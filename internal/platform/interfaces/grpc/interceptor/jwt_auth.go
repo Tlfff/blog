@@ -14,17 +14,17 @@ import (
 // 认证拦截器（二方）：校验内部服务的JWT
 type JwtInterceptor struct{}
 
-// 构建二方JWT认证拦截器
+// NewJwtInterceptor 创建二方 JWT 认证拦截器。
 func NewJwtInterceptor() *JwtInterceptor {
 	return &JwtInterceptor{}
 }
 
-// 返回 gRPC 一元拦截器函数
+// Unary 返回 gRPC 一元拦截器函数。
 func (j *JwtInterceptor) Unary() grpc.UnaryServerInterceptor {
 	return j.Intercept
 }
 
-// 从metadata的authorization字段取 "Bearer <token>"，校验通过后把调用方身份注入context
+// Intercept 校验 Metadata 中的二方 JWT 并注入调用方身份。
 func (j *JwtInterceptor) Intercept(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	// 1. 从metadata中取出authorization字段
 	md, ok := metadata.FromIncomingContext(ctx)
