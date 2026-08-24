@@ -3,8 +3,8 @@
 package main
 
 import (
-	"blog/config"
-	"blog/internal/auth"
+	"blog/internal/platform/config"
+	"blog/internal/platform/security"
 	"context"
 	"fmt"
 	"strconv"

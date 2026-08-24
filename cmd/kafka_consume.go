@@ -1,15 +1,11 @@
 package cmd
 
 import (
-	"blog/config"
-	"blog/internal/common"
-	"blog/internal/mq"
-	"blog/internal/repository"
-	"blog/internal/service"
-	"blog/pkg/database"
-	"blog/pkg/kafka"
+	"blog/internal/platform/bootstrap"
+	"blog/internal/platform/config"
+	"blog/internal/platform/interfaces/http/validation"
+	platformmq "blog/internal/platform/interfaces/mq"
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -23,97 +19,54 @@ var kafkaConsumeCmd = &cobra.Command{
 	Short: "启动 Kafka 消费者进程",
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Printf("Kafka 消费者进程开始运行,监听窗口：%s...\n", port)
-		// 1. 加载配置
+
+		// 1. 加载配置并初始化校验器
 		cfg, err := config.LoadConfig("config/config.yaml")
 		if err != nil {
 			log.Fatalf("加载配置失败: %v", err)
-			return
 		}
-		// 1.1 初始化自定义验证器
-		common.InitValidator()
-		// 2. 初始化 MySQL
-		db, err := database.NewMySQLClient(
-			cfg.Database.Username,
-			cfg.Database.Password,
-			cfg.Database.Host,
-			cfg.Database.Port,
-			cfg.Database.DBName,
+		validation.InitValidator()
+
+		// 2. 初始化消费者入口需要的技术资源和业务模块
+		resources, err := bootstrap.NewResources(cfg, bootstrap.ResourceOptions{
+			MySQL: true, MongoDB: true, Redis: true, Kafka: true,
+		})
+		if err != nil {
+			log.Fatalf("初始化平台资源失败: %v", err)
+		}
+		defer closeResources(resources)
+		application, err := bootstrap.NewApplication(resources, cfg)
+		if err != nil {
+			log.Fatalf("初始化业务模块失败: %v", err)
+		}
+
+		// 3. 注册当前基线已接线的通知和浏览历史 Handler
+		handlers := platformmq.RegisterHandlers(
+			application.Notification.Kafka,
+			application.Article.Kafka,
 		)
-		if err != nil {
-			log.Fatalf("初始化 MySQL 失败: %v", err)
-		}
-		// 安全防御打印
-		if db == nil {
-			fmt.Println("[error]: NewMySQLClient 返回的 db 对象居然是空的，请检查 pkg/database 里的内部实现！")
-			return
-		}
-		// 3. 初始化 MongoDB
-		mongodb, err := database.NewMongoDBClient(
-			cfg.Mongodb.Username,
-			cfg.Mongodb.Password,
-			cfg.Mongodb.Host,
-			cfg.Mongodb.DBName,
-			cfg.Mongodb.Port,
-		)
-		if err != nil {
-			log.Fatalf("初始化 MongoDB 失败: %v", err)
-		}
-
-		// 4. 初始化 Redis
-		rdb, err := database.NewRedisClient(cfg.Redis)
-		if err != nil {
-			log.Fatalf("初始化 Redis 失败: %v", err)
-		}
-		defer rdb.Close()
-
-		// 5. 初始化 Repository
-		userRepo := repository.NewUserRepository(db)
-		artRepo := repository.NewArticleRepository(db)
-		artLikeRepo := repository.NewArticleLikeRepository(db)
-		ntfRepo := repository.NewNotificationRepository(mongodb)
-		historyRepo := repository.NewArticleViewHistoryRepository(db)
-
-		// 6. 初始化 Service
-		ntfService := service.NewNotificationService(ntfRepo)
-		artLikeService := service.NewArticleLikeService(artLikeRepo, artRepo, rdb, ntfService, userRepo, nil)
-		historyService := service.NewArticleViewHistoryService(historyRepo, nil)
-
-		// 7. 创建 Kafka 客户端（只用于消费）
-		kafkaClient, err := kafka.NewClient(cfg.Kafka)
-		if err != nil {
-			log.Fatalf("创建 Kafka 客户端失败: %v", err)
-		}
-		defer kafkaClient.Close()
-
-		// 8. 注册消息处理器
-		handlers := mq.RegisterHandlers(artLikeService, historyService)
-
-		// 9. 初始化消费者
-		if err := kafkaClient.InitConsumer(handlers); err != nil {
+		if err := resources.Kafka.InitConsumer(handlers); err != nil {
 			log.Fatalf("初始化消费者失败: %v", err)
 		}
 
-		// 10. 如果要关闭 Kafka 客户端
+		// 4. 监听退出信号并停止 Consumer
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		// 10.1 signal.Notify 捕获操作系统退出信号
-		// syscall.SIGINT：按下键盘 Ctrl + C 触发，syscall.SIGTERM：docker/k8s 容器、systemd、运维脚本正常 kill 进程发送的终止信号
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		// 10.2 开启独立后台监听信号通道，关闭客户端资源
+		signalChannel := make(chan os.Signal, 1)
+		signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM)
+		defer signal.Stop(signalChannel)
 		go func() {
-			//用户按下 Ctrl+C / 容器 kill时触发
-			<-sigChan
+			<-signalChannel
 			log.Println("收到退出信号，正在停止消费者...")
 			cancel()
-			if err := kafkaClient.StopConsumer(); err != nil {
+			if err := resources.Kafka.StopConsumer(); err != nil {
 				log.Printf("停止消费者失败: %v", err)
 			}
 		}()
 
-		// 11. 启动消费者（阻塞）
+		// 5. 阻塞运行消费者
 		log.Println("Kafka 消费者已启动，等待消息...")
-		if err := kafkaClient.StartConsumer(ctx); err != nil {
+		if err := resources.Kafka.StartConsumer(ctx); err != nil {
 			log.Fatalf("消费者运行异常: %v", err)
 		}
 	},
@@ -121,7 +74,5 @@ var kafkaConsumeCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(kafkaConsumeCmd)
-	// 2. 绑定端口参数，默认8080
-	// 参数含义：1、变量指针：命令行传入的值存在这，2、长选项名，3、短选项名，4、默认值，5、帮助描述
 	kafkaConsumeCmd.Flags().StringVarP(&port, "port", "p", "9090", "指定消费者监听端口")
 }

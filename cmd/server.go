@@ -1,18 +1,12 @@
 package cmd
 
 import (
-	"blog/config"
-	"blog/internal/auth"
-	"blog/internal/common"
-	"blog/internal/cron"
-	"blog/internal/handler"
-	"blog/internal/repository"
-	"blog/internal/routes"
-	"blog/internal/service"
-	"blog/pkg/database"
-	"blog/pkg/kafka"
-	"blog/pkg/oss"
-	iputil "blog/pkg/util/ip"
+	"blog/internal/platform/bootstrap"
+	"blog/internal/platform/config"
+	platformcron "blog/internal/platform/cron"
+	"blog/internal/platform/interfaces/http/routes"
+	"blog/internal/platform/interfaces/http/validation"
+	iputil "blog/internal/platform/ip"
 	"context"
 	"fmt"
 	"log"
@@ -25,150 +19,87 @@ import (
 )
 
 var port string
+
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "启动博客系统web服务",
-	// Long:  `blog server --port 9000`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("博客系统后端服务正在启动,监听窗口：%s...\n", port)
-		// 1. 加载配置文件
-		config, err := config.LoadConfig("config/config.yaml")
+
+		// 1. 加载配置并初始化协议级公共能力
+		cfg, err := config.LoadConfig("config/config.yaml")
 		if err != nil {
 			fmt.Printf("[error]:加载配置文件失败：%v\n", err)
 			return
 		}
-		// 1.1 初始化自定义验证器
-		common.InitValidator()
-		// 1.2 初始化ip工具类
-		dir, _ := os.Getwd() // 获取当前程序运行的绝对路径
-		dbPath := filepath.Join(dir, "pkg/resource/ip2region.xdb")
-		if err := iputil.InitIPSearcher(dbPath); err != nil {
+		validation.InitValidator()
+		dir, _ := os.Getwd()
+		if err := iputil.InitIPSearcher(filepath.Join(dir, "internal/platform/ip/resource/ip2region.xdb")); err != nil {
 			log.Fatalf("[error]:初始化 IP 解析器失败: %v", err)
 		}
-		// 在程序退出时，释放内存
 		defer iputil.Close()
 
-		// 2 初始化数据库连接
-		// 2.1 初始化mysql
-		db, err := database.NewMySQLClient(config.Database.Username, config.Database.Password, config.Database.Host, config.Database.Port, config.Database.DBName)
+		// 2. 初始化 HTTP 入口需要的技术资源
+		resources, err := bootstrap.NewResources(cfg, bootstrap.ResourceOptions{
+			MySQL:                 true,
+			MongoDB:               true,
+			Redis:                 true,
+			Kafka:                 true,
+			OSS:                   true,
+			AllowMongoDBInitError: true,
+		})
 		if err != nil {
-			fmt.Printf("[error]:数据库连接初始化失败：%v\n", err)
-			return // 连接失败必须立刻拦截并退出，不能往下传 nil！
-		}
-
-		// 安全防御打印
-		if db == nil {
-			fmt.Println("[error]: NewMySQLClient 返回的 db 对象居然是空的，请检查 pkg/database 里的内部实现！")
+			fmt.Printf("[error]:平台资源初始化失败：%v\n", err)
 			return
 		}
-		// 2.2 初始化mongodb
-		mongodb, err := database.NewMongoDBClient(config.Mongodb.Username, config.Mongodb.Password, config.Mongodb.Host, config.Mongodb.DBName, config.Mongodb.Port)
+		defer closeResources(resources)
 
-		// 3. 初始化redis连接
-		rdb, err := database.NewRedisClient(config.Redis)
+		// 3. 按上下文依赖顺序组装模块化单体
+		application, err := bootstrap.NewApplication(resources, cfg)
 		if err != nil {
-			fmt.Printf("[error]:Redis连接初始化失败:%v\n", err)
-			return
-		}
-		defer rdb.Close()
-		// 3.1 初始化Kafka客户端
-		kafkaClient, err := kafka.NewClient(config.Kafka)
-		if err != nil {
-			fmt.Printf("[error]:Kafka客户端初始化失败:%v\n", err)
-			return
-		}
-		// 如果初始化成功，在程序退出时关闭
-		if kafkaClient != nil {
-			defer kafkaClient.Close()
-		}
-
-		// 4. 初始化模块
-		// 4.1  初始化基础 Repository
-		userRepo := repository.NewUserRepository(db)
-		historyRepo := repository.NewArticleViewHistoryRepository(db)
-		artRepo := repository.NewArticleRepository(db)
-		commentRepo := repository.NewCommentRepository(db)
-		artLikeRepo := repository.NewArticleLikeRepository(db)
-		commentLikeRepo := repository.NewCommentLikeRepository(db)
-		ntfRepo := repository.NewNotificationRepository(mongodb)
-
-		// 4.1.1 初始化 MinIO 客户端
-		ossClient, err := oss.NewMinioClient(
-			config.OSS.Endpoint,
-			config.OSS.AccessKeyID,
-			config.OSS.SecretAccessKey,
-			config.OSS.Bucket,
-			config.OSS.UseSSL,
-		)
-		if err != nil {
-			fmt.Printf("[error]:MinIO客户端初始化失败:%v\n", err)
+			fmt.Printf("[error]:业务模块初始化失败：%v\n", err)
 			return
 		}
 
-		// 4.2 初始化service
-		ntfService := service.NewNotificationService(ntfRepo)
-		artLikeService := service.NewArticleLikeService(artLikeRepo, artRepo, rdb, ntfService, userRepo, kafkaClient)
-		comLikeService := service.NewCommentLikeService(commentLikeRepo, commentRepo, rdb)
-		tokenAuth := auth.NewTokenAuth(rdb)
-		userAuthService := service.NewUserAuthService(userRepo, tokenAuth)
-		userService := service.NewUserService(userRepo, rdb)
-		userService.SetOSS(ossClient, config.OSS.PublicDomain, config.OSS.AllowedExts)
-		historyService := service.NewArticleViewHistoryService(historyRepo, kafkaClient)
-		artService := service.NewArticleService(artRepo, artLikeService, rdb)
-		artService.SetOSS(ossClient, config.OSS.PublicDomain)
-		artRankService := service.NewArticleRankService(artRepo, rdb)
-		commentService := service.NewCommentService(commentRepo, artRepo, rdb)
-		articleImageService := service.NewArticleImageService(ossClient, config.OSS.PublicDomain, config.OSS.AllowedExts)
-
-		// 初始化排行榜
+		// 4. 保持启动时热榜初始化和 Cron 行为
 		initCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		if err := artRankService.RebuildHotRank(initCtx); err != nil {
+		if err := application.Article.Engagement.RebuildHotRank(initCtx); err != nil {
 			log.Printf("[WARN] 热门文章排行榜初始化失败或超时, err: %v", err)
 		}
-		cancel() //释放定时器资源
+		cancel()
+		rankJob := platformcron.NewRankSyncJob(application.Article.Engagement)
+		cronManager := platformcron.NewCronManager(rankJob)
+		cronManager.Start()
+		defer cronManager.Stop()
 
-		// 4.3 初始化handler
-		userAuthHandler := handler.NewUserAuthHandler(userAuthService)
-		userHandler := handler.NewUserHandler(userService, userAuthService)
-		articleHandler := handler.NewArticleHandler(artService, artRankService, articleImageService)
-		commentHandler := handler.NewCommentHandler(commentService)
-		likeHandler := handler.NewLikeHandler(artLikeService, comLikeService)
-		ntfHandler := handler.NewNotificationHandler(ntfService)
+		// 5. 注册各上下文 Module 暴露的 HTTP Adapter
+		router := gin.New()
+		routes.InitRoute(router, &routes.AppHandler{
+			UserAuth:    application.User.HTTPAuth,
+			User:        application.User.HTTP,
+			Article:     application.Article.HTTP,
+			Comment:     application.Comment.HTTP,
+			Like:        application.Like.HTTP,
+			Notify:      application.Notification.HTTP,
+			ViewHistory: application.Article.Engagement,
+			Redis:       resources.Redis,
+		})
 
-		// 4.4 初始化定时器
-		// likeSyncJob := cron.NewLikeSyncJob(likeService)
-		rankJob := cron.NewRankSyncJob(artRankService)
-		// 传入所有定时任务，由全局管理器统一调度
-		cronMgr := cron.NewCronManager(rankJob)
-		cronMgr.Start()
-		defer cronMgr.Stop()
-
-		// 5. 组装成统一的路由容器
-		appHandler := &routes.AppHandler{
-			UserAuth:    userAuthHandler,
-			User:        userHandler,
-			Article:     articleHandler,
-			Comment:     commentHandler,
-			Like:        likeHandler,
-			Notify:      ntfHandler,
-			ViewHistory: historyService,
-			Redis:       rdb,
-		}
-
-		// 6. 创建路由引擎
-		r := gin.New()
-		routes.InitRoute(r, appHandler)
-
-		if err := r.Run(":" + port); err != nil {
+		// 6. 启动 HTTP 服务
+		if err := router.Run(":" + port); err != nil {
 			fmt.Printf("服务器启动失败：%v\n", err)
 		}
 	},
 }
 
+// closeResources 关闭进程持有的平台资源。
+func closeResources(resources *bootstrap.Resources) {
+	if err := resources.Close(); err != nil {
+		log.Printf("[WARN] 平台资源关闭失败: %v", err)
+	}
+}
+
 func init() {
-	// 1. 将server注册到root下
 	rootCmd.AddCommand(serverCmd)
-	// 2. 绑定端口参数，默认8080
-	// 参数含义：1、变量指针：命令行传入的值存在这，2、长选项名，3、短选项名，4、默认值，5、帮助描述
 	serverCmd.Flags().StringVarP(&port, "port", "p", "8080", "指定服务器监听端口")
 }

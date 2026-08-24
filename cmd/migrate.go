@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"blog/config"
-	"blog/pkg/database"
+	"blog/internal/platform/config"
+	"blog/internal/platform/database"
 	"database/sql"
 	"fmt"
 	"os"
