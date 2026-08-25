@@ -117,7 +117,7 @@ services:
       - "8080:8080"
     volumes:
       - ./config/config.docker.yaml:/app/config/config.yaml:ro  # 用 docker 专用配置覆盖容器内默认的 config.yaml
-      - ./pkg/resource:/app/pkg/resource:ro  # IP 地理位置数据库（只读挂载，方便更新）
+      - ./internal/platform/ip/resource:/app/internal/platform/ip/resource:ro  # Platform IP 地理位置数据库（只读挂载，方便更新）
     depends_on:   # 依赖的其他服务
       mysql:
         condition: service_healthy    # 等待 MySQL 服务健康

@@ -37,8 +37,8 @@ WORKDIR /app
 COPY --from=builder /build/blog ./blog
 # 从 builder 镜像复制 config.docker.yaml 到 /app/config/ 目录
 COPY --from=builder /build/config/config.docker.yaml ./config/config.yaml
-# 从 builder 镜像复制 pkg/resource 目录到 /app/pkg/resource/ 目录
-COPY --from=builder /build/pkg/resource ./pkg/resource/
+# 从 builder 镜像复制 Platform IP 离线数据库
+COPY --from=builder /build/internal/platform/ip/resource ./internal/platform/ip/resource/
 
 # 设置入口点为 blog 可执行文件
 ENTRYPOINT [ "./blog" ]

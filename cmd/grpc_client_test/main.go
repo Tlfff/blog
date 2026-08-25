@@ -3,8 +3,8 @@
 package main
 
 import (
-	"blog/config"
-	"blog/internal/auth"
+	"blog/internal/platform/config"
+	"blog/internal/platform/security"
 	"context"
 	"fmt"
 	"strconv"
@@ -21,6 +21,7 @@ import (
 
 const addr = "127.0.0.1:9100"
 
+// main 演示调用开放 gRPC 接口。
 func main() {
 	// 初始化二方JWT密钥（与服务端同一份配置）
 	cfg, err := config.LoadConfig("config/config.yaml")

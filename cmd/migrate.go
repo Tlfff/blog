@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"blog/config"
-	"blog/pkg/database"
+	"blog/internal/platform/config"
+	"blog/internal/platform/database"
 	"database/sql"
 	"fmt"
 	"os"
@@ -114,6 +114,7 @@ func executeMultiSQL(db *sql.DB, sqlContent string) error {
 	return nil
 }
 
+// init 注册数据库迁移子命令。
 func init() {
 	rootCmd.AddCommand(migrateCmd)
 }
