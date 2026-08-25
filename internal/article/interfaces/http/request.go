@@ -56,8 +56,8 @@ type RecoverArticleRequest struct {
 
 // GetImageUploadURLsRequest 是批量获取文章图片上传凭证的请求 DTO。
 type GetImageUploadURLsRequest struct {
-	ArticleID uint64                      `json:"article_id" binding:"required,min=1"` // 图片所属文章唯一标识
-	Files     []ImageUploadFileRequestDTO `json:"files" binding:"required,min=1,dive"` // 待上传图片列表，不能为空
+	ArticleID uint64                      `json:"article_id" binding:"required,min=1"`         // 图片所属文章唯一标识
+	Files     []ImageUploadFileRequestDTO `json:"files" binding:"required,min=1,max=100,dive"` // 待上传图片列表，不能为空
 }
 
 // ImageUploadFileRequestDTO 是单张文章图片上传凭证请求项。

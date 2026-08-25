@@ -112,7 +112,8 @@ services:
     restart: always                                                     # 异常退出自动重启
     environment:
       - discovery.type=single-node                                      # 单节点模式，不需要搭建集群
-      - xpack.security.enabled=false                                    # 关闭安全认证，开发环境http明文访问
+      - xpack.security.enabled=false                                    #关闭账号密码校验
+      - xpack.security.enrollment.enabled=false                         #关掉token注册功能
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"                                # JVM堆内存，最大最小数值保持一致
       - TZ=Asia/Shanghai                                                # 设置容器时区
     ulimits:
@@ -144,6 +145,7 @@ services:
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200                   # 通过内网服务名访问ES
       - TZ=Asia/Shanghai
+      - I18N_LOCALE=zh-CN                                          # 设置Kibana界面语言为中文
     ports:
       - "5601:5601"                                                     # Kibana网页控制台端口
     healthcheck:
