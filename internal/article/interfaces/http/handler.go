@@ -1,6 +1,7 @@
 package http
 
 import (
+	articleapp "blog/internal/article/app"
 	articleresult "blog/internal/article/app/dto"
 	"blog/internal/article/domain"
 	"blog/internal/platform/interfaces/http/response"
@@ -13,6 +14,8 @@ import (
 
 // ArticleUsecase 是文章生命周期、查询和图片能力的应用用例接口。
 type ArticleUsecase interface {
+	// InitializeArticle 初始化空内容文章草稿。
+	InitializeArticle(ctx context.Context, authorID uint64) (*articleresult.InitializeArticleResponse, error)
 	// CreateArticle 创建文章。
 	CreateArticle(ctx context.Context, authorID uint64, title, content string, tags []string, status int8) error
 	// UpdateArticle 更新文章。
@@ -35,8 +38,22 @@ type ArticleUsecase interface {
 	GetAdminList(ctx context.Context, page, pageSize, lastID uint64, isDesc bool, status int8) (*articleresult.AdminListResponse, error)
 	// GetAvailableList 查询对外开放的文章列表。
 	GetAvailableList(ctx context.Context, page, pageSize uint64, isDesc bool) (*articleresult.ExternalListResponse, error)
-	// GetUploadURL 获取文章图片上传凭证。
-	GetUploadURL(ctx context.Context, fileExt string) (uploadURL, url string, err error)
+	// GetImageUploadURLs 批量获取文章图片上传凭证。
+	GetImageUploadURLs(ctx context.Context, command articleapp.GetImageUploadURLsCommand) (*articleresult.ImageUploadCredentialsResponse, error)
+}
+
+// InitializeArticle 初始化空内容文章草稿。
+func (h *ArticleHandler) InitializeArticle(c *gin.Context) {
+	// 1. 获取当前管理员作者身份
+	user := c.MustGet("currentUser").(*auth.UserContext)
+
+	// 2. 初始化草稿并返回文章唯一标识
+	result, err := h.article.InitializeArticle(c, uint64(user.UserID))
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	response.OK(c, "文章初始化成功", result)
 }
 
 // ArticleHandler 处理 Article 上下文的 HTTP 请求。
@@ -59,25 +76,36 @@ func NewArticleHandler(article ArticleUsecase, articleRank ArticleRankUsecase) *
 	}
 }
 
-// GetImageUploadURL 获取文章图片上传凭证。
-func (h *ArticleHandler) GetImageUploadURL(c *gin.Context) {
-	// 1. 解析请求体并放进req
-	var req GetImageUploadURLRequest
+// GetImageUploadURLs 批量获取直接写入文章正式目录的图片上传凭证。
+func (h *ArticleHandler) GetImageUploadURLs(c *gin.Context) {
+	// 1. 解析并校验批量上传凭证请求
+	var req GetImageUploadURLsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.Error(apperrors.ErrInvalidRequestBody)
 		return
 	}
-	// 2. 获取凭证
-	uploadURL, url, err := h.article.GetUploadURL(c, req.FileExt)
+
+	// 2. 组装 Application 命令并传递当前作者身份
+	user := c.MustGet("currentUser").(*auth.UserContext)
+	files := make([]articleapp.ImageUploadFileCommand, 0, len(req.Files))
+	for _, file := range req.Files {
+		files = append(files, articleapp.ImageUploadFileCommand{
+			ClientID: file.ClientID,
+			FileExt:  file.FileExt,
+		})
+	}
+	result, err := h.article.GetImageUploadURLs(c, articleapp.GetImageUploadURLsCommand{
+		ArticleID: req.ArticleID,
+		AuthorID:  uint64(user.UserID),
+		Files:     files,
+	})
 	if err != nil {
 		c.Error(err)
 		return
 	}
-	// 3. 返回凭证
-	response.OK(c, "获取成功", gin.H{
-		"upload_url": uploadURL,
-		"url":        url,
-	})
+
+	// 3. 返回与请求图片标识对应的凭证列表
+	response.OK(c, "获取成功", result)
 }
 
 // CreateArticle 创建文章。

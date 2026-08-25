@@ -87,6 +87,7 @@ Handler
 
 | Method | Path | Handler | 请求参数/DTO | 成功响应 |
 | --- | --- | --- | --- | --- |
+| POST | `/admin/article/init` | `ArticleHandler.InitializeArticle` | 无请求体；挂载 2 秒防重复 | `article_id`，消息“文章初始化成功” |
 | POST | `/admin/article/create` | `ArticleHandler.CreateArticle` | JSON：`title`、`content`、`tags`、`status`；挂载 2 秒防重复 | 空 Data，消息“文章创建成功” |
 | POST | `/admin/article/update` | `ArticleHandler.UpdateArticle` | JSON：`id`、`title`、`content`、`tags`、`status` | 空 Data，消息“文章更新成功” |
 | POST | `/admin/article/delete` | `ArticleHandler.DeleteArticle` | JSON：`id` | 空 Data，消息“文章删除成功” |
@@ -96,7 +97,7 @@ Handler
 | GET | `/admin/article/trash/list` | `ArticleHandler.GetTrashList` | Query：分页/游标参数 | `AdminListResponse` |
 | POST | `/admin/article/trash/recover` | `ArticleHandler.RecoverArticle` | JSON：`id` | 空 Data，消息“恢复文章成功” |
 | POST | `/admin/article/trash/clear` | `ArticleHandler.ClearArticle` | JSON：`id` | 空 Data，消息“删除文章成功” |
-| POST | `/admin/article/image/upload-url` | `ArticleHandler.GetImageUploadURL` | JSON：`file_ext` | `upload_url`、`url`，消息“获取成功” |
+| POST | `/admin/article/image/upload-urls` | `ArticleHandler.GetImageUploadURLs` | JSON：`article_id`、`files[].client_id`、`files[].file_ext` | 批量 `client_id`、`upload_url`、`url`，消息“获取成功” |
 | POST | `/admin/comment/delete` | `CommentHandler.DeleteAdminComment` | JSON：评论 ID | 空 Data，消息“管理员已成功处理违规评论” |
 
 ### 3.5 可选认证路由
@@ -303,11 +304,14 @@ view_history → 解析 ViewHistoryMsg → 登录用户写浏览历史 → 原�
 
 ### 6.4 MinIO 对象路径
 
-- 文章图片上传凭证生成：`article/temp/<uuid>.<ext>`，预签名 PUT URL 有效期 10 分钟。
-- 保存或发布文章时，将正文中本站公开域名下的 `article/temp/` URL 移动到 `article/<article_id>/<原文件名>`，Copy 成功后删除源对象，并替换正文 URL。
+- 新文章先通过初始化接口创建空内容草稿并取得文章 ID；初始化不新增数据库字段或文章状态。
+- 新批量上传凭证接口为每张图片生成 `article/<article_id>/<uuid>.<ext>` 正式对象路径，每个文件可以携带不同扩展名，预签名 PUT URL 有效期 10 分钟。
+- 前端并发上传图片并等待全部成功后，使用正式 URL 替换正文占位符，再调用文章更新接口保存草稿或发表文章。
+- 草稿、已发表、软删除和正文更新移除引用时均不删除文章图片；硬删除时先清理 `article/<article_id>/` 前缀下的全部对象，再物理删除文章记录。
+- 旧单张临时上传接口、`article/temp/` 路径和图片转正逻辑已移除，文章创建和更新只接受前端替换完成的正式图片 URL。
 - 用户头像上传凭证生成：`avatar/<user_id>/<uuid>.<ext>`，预签名 PUT URL 有效期 10 分钟。
 - 确认头像时只接受当前用户目录前缀 `avatar/<user_id>/`，数据库保存对象 Key，响应返回公开域名拼接后的完整 URL。
-- MinIO 失败时沿用当前 Service 的错误处理和回滚/清理行为，不新增对象迁移或清理策略。
+- 硬删除清理 MinIO 失败时保留垃圾箱文章记录并返回错误，后续重试可继续完成清理和物理删除。
 
 ### 6.5 Cron
 

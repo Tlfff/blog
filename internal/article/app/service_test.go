@@ -12,8 +12,11 @@ import (
 
 // fakeArticleRepo 是 Article Application 测试使用的内存 Repository。
 type fakeArticleRepo struct {
-	articles map[uint64]*domaincontent.Article // 文章唯一标识到文章聚合的映射
-	nextID   uint64                            // 下一条文章记录的自增标识
+	articles  map[uint64]*domaincontent.Article // 文章唯一标识到文章聚合的映射
+	nextID    uint64                            // 下一条文章记录的自增标识
+	createErr error                             // 创建文章时返回的测试错误
+	clearErr  error                             // 物理删除文章时返回的测试错误
+	clearCall int                               // 物理删除调用次数
 }
 
 // newFakeArticleRepo 创建内存文章 Repository。
@@ -23,6 +26,9 @@ func newFakeArticleRepo() *fakeArticleRepo {
 
 // Create 保存文章并回填唯一标识与时间。
 func (f *fakeArticleRepo) Create(_ context.Context, article *domaincontent.Article) error {
+	if f.createErr != nil {
+		return f.createErr
+	}
 	article.ID = f.nextID
 	f.nextID++
 	now := time.Now()
@@ -73,6 +79,10 @@ func (f *fakeArticleRepo) SoftDelete(_ context.Context, articleID uint64) error 
 
 // Clear 物理删除文章记录。
 func (f *fakeArticleRepo) Clear(_ context.Context, articleID uint64) error {
+	f.clearCall++
+	if f.clearErr != nil {
+		return f.clearErr
+	}
 	delete(f.articles, articleID)
 	return nil
 }
@@ -150,11 +160,18 @@ func (f *fakeArticleRepo) CountByStatus(_ context.Context, status int8) (int64, 
 
 // fakeImageStorage 是 Article Application 测试使用的对象存储。
 type fakeImageStorage struct {
-	moved []string // 已执行的对象移动记录
+	presignedKeys   []string // 已签发上传凭证的对象 Key
+	deletedPrefixes []string // 已执行的对象前缀删除记录
+	presignErr      error    // 生成上传凭证时返回的测试错误
+	deleteErr       error    // 删除对象前缀时返回的测试错误
 }
 
 // PresignedPutURL 返回测试上传地址。
 func (f *fakeImageStorage) PresignedPutURL(_ context.Context, objectKey string, _ time.Duration) (string, error) {
+	if f.presignErr != nil {
+		return "", f.presignErr
+	}
+	f.presignedKeys = append(f.presignedKeys, objectKey)
 	return "https://upload.example/" + objectKey, nil
 }
 
@@ -163,10 +180,36 @@ func (f *fakeImageStorage) GetObjectURL(publicDomain, objectKey string) string {
 	return publicDomain + "/" + objectKey
 }
 
-// MoveObject 记录对象移动操作。
-func (f *fakeImageStorage) MoveObject(_ context.Context, srcKey, dstKey string) error {
-	f.moved = append(f.moved, srcKey+"->"+dstKey)
-	return nil
+// DeleteObjectsByPrefix 记录对象前缀删除操作。
+func (f *fakeImageStorage) DeleteObjectsByPrefix(_ context.Context, prefix string) error {
+	// 1. 记录前缀并返回预设测试错误
+	f.deletedPrefixes = append(f.deletedPrefixes, prefix)
+	return f.deleteErr
+}
+
+// TestContentService_InitializeArticle 验证初始化空草稿和 Repository 失败路径。
+func TestContentService_InitializeArticle(t *testing.T) {
+	// 1. 验证初始化文章保存空内容草稿并返回 ID
+	repo := newFakeArticleRepo()
+	service := NewService(repo, nil, &fakeImageStorage{}, nil, "https://cdn.example", nil)
+
+	result, err := service.InitializeArticle(context.Background(), 100)
+	if err != nil {
+		t.Fatalf("初始化文章失败: %v", err)
+	}
+	article, err := repo.FindByID(context.Background(), result.ArticleID)
+	if err != nil {
+		t.Fatalf("查询初始化文章失败: %v", err)
+	}
+	if article.AuthorID != 100 || !article.IsDraft() || article.Title != "" || article.Content != "" {
+		t.Fatalf("初始化文章字段错误: %+v", article)
+	}
+
+	// 2. 验证 Repository 创建错误原样返回
+	repo.createErr = errors.New("create failed")
+	if _, err := service.InitializeArticle(context.Background(), 100); !errors.Is(err, repo.createErr) {
+		t.Fatalf("创建失败错误未透传: %v", err)
+	}
 }
 
 // TestContentService_ArticleLifecycle 验证文章创建、发布、权限和软删除流程。
@@ -272,33 +315,180 @@ func TestContentService_PublishedListAndAvailable(t *testing.T) {
 	}
 }
 
-// TestContentService_ImageContract 验证文章图片上传和转正契约。
-func TestContentService_ImageContract(t *testing.T) {
-	storage := &fakeImageStorage{}
-	s := NewService(newFakeArticleRepo(), nil, storage, nil, "https://cdn.example", []string{"png", "jpg"})
+// TestContentService_BatchImageUploadURLs 验证批量凭证、权限和正式对象路径规则。
+func TestContentService_BatchImageUploadURLs(t *testing.T) {
+	// 1. 初始化文章并为不同扩展名图片获取正式路径凭证
 	ctx := context.Background()
-
-	if _, _, err := s.GetUploadURL(ctx, "exe"); !errors.Is(err, apperrors.ErrInvalidRequestBody) {
-		t.Fatalf("非法扩展名应被拒绝, got %v", err)
+	repo := newFakeArticleRepo()
+	storage := &fakeImageStorage{}
+	service := NewService(repo, nil, storage, nil, "https://cdn.example", []string{"png", "jpg"})
+	initialized, err := service.InitializeArticle(ctx, 100)
+	if err != nil {
+		t.Fatalf("初始化文章失败: %v", err)
 	}
-	uploadURL, url, err := s.GetUploadURL(ctx, "png")
+
+	result, err := service.GetImageUploadURLs(ctx, GetImageUploadURLsCommand{
+		ArticleID: initialized.ArticleID,
+		AuthorID:  100,
+		Files: []ImageUploadFileCommand{
+			{ClientID: "image-1", FileExt: "png"},
+			{ClientID: "image-2", FileExt: ".JPG"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("批量获取上传凭证失败: %v", err)
+	}
+	if len(result.Files) != 2 || result.Files[0].ClientID != "image-1" || result.Files[1].ClientID != "image-2" {
+		t.Fatalf("批量凭证对应关系错误: %+v", result.Files)
+	}
+	for index, key := range storage.presignedKeys {
+		if !strings.HasPrefix(key, "article/1/") || strings.Contains(key, "/temp/") {
+			t.Fatalf("第 %d 个对象 Key 不是文章正式路径: %s", index, key)
+		}
+	}
+	if !strings.HasSuffix(storage.presignedKeys[0], ".png") || !strings.HasSuffix(storage.presignedKeys[1], ".jpg") {
+		t.Fatalf("不同扩展名未分别保留: %v", storage.presignedKeys)
+	}
+
+	// 2. 验证非法扩展名导致整批失败且不签发部分凭证
+	storage.presignedKeys = nil
+	if _, err := service.GetImageUploadURLs(ctx, GetImageUploadURLsCommand{
+		ArticleID: initialized.ArticleID,
+		AuthorID:  100,
+		Files: []ImageUploadFileCommand{
+			{ClientID: "valid", FileExt: "png"},
+			{ClientID: "invalid", FileExt: "exe"},
+		},
+	}); !errors.Is(err, apperrors.ErrInvalidRequestBody) {
+		t.Fatalf("非法扩展名错误不正确: %v", err)
+	}
+	if len(storage.presignedKeys) != 0 {
+		t.Fatalf("非法批量请求不应签发部分凭证: %v", storage.presignedKeys)
+	}
+
+	// 3. 验证非作者和已删除文章均不能获取凭证
+	validFiles := []ImageUploadFileCommand{{ClientID: "image", FileExt: "png"}}
+	if _, err := service.GetImageUploadURLs(ctx, GetImageUploadURLsCommand{
+		ArticleID: initialized.ArticleID,
+		AuthorID:  200,
+		Files:     validFiles,
+	}); !errors.Is(err, apperrors.ErrArticlePermissionDenied) {
+		t.Fatalf("非作者上传错误不正确: %v", err)
+	}
+	repo.articles[initialized.ArticleID].Status = domaincontent.StatusDeleted
+	if _, err := service.GetImageUploadURLs(ctx, GetImageUploadURLsCommand{
+		ArticleID: initialized.ArticleID,
+		AuthorID:  100,
+		Files:     validFiles,
+	}); !errors.Is(err, apperrors.ErrArticleDeleted) {
+		t.Fatalf("已删除文章上传错误不正确: %v", err)
+	}
+}
+
+// TestContentService_BatchImageUploadStorageError 验证对象存储错误不会返回批量结果。
+func TestContentService_BatchImageUploadStorageError(t *testing.T) {
+	// 1. 初始化文章并配置对象存储签名错误
+	ctx := context.Background()
+	repo := newFakeArticleRepo()
+	storageErr := errors.New("presign failed")
+	storage := &fakeImageStorage{presignErr: storageErr}
+	service := NewService(repo, nil, storage, nil, "https://cdn.example", []string{"png"})
+	initialized, err := service.InitializeArticle(ctx, 100)
+	if err != nil {
+		t.Fatalf("初始化文章失败: %v", err)
+	}
+
+	// 2. 验证对象存储错误透传且不返回部分结果
+	result, err := service.GetImageUploadURLs(ctx, GetImageUploadURLsCommand{
+		ArticleID: initialized.ArticleID,
+		AuthorID:  100,
+		Files:     []ImageUploadFileCommand{{ClientID: "image", FileExt: "png"}},
+	})
+	if !errors.Is(err, storageErr) || result != nil {
+		t.Fatalf("对象存储错误处理不正确: result=%+v err=%v", result, err)
+	}
+}
+
+// TestContentService_NewImageFlowSavesFinalURL 验证新上传流程直接保存正式图片 URL。
+func TestContentService_NewImageFlowSavesFinalURL(t *testing.T) {
+	// 1. 初始化文章并获取直接写入正式目录的凭证
+	ctx := context.Background()
+	repo := newFakeArticleRepo()
+	storage := &fakeImageStorage{}
+	service := NewService(repo, nil, storage, nil, "https://cdn.example", []string{"png"})
+	initialized, err := service.InitializeArticle(ctx, 100)
+	if err != nil {
+		t.Fatalf("初始化文章失败: %v", err)
+	}
+	credentials, err := service.GetImageUploadURLs(ctx, GetImageUploadURLsCommand{
+		ArticleID: initialized.ArticleID,
+		AuthorID:  100,
+		Files:     []ImageUploadFileCommand{{ClientID: "image", FileExt: "png"}},
+	})
 	if err != nil {
 		t.Fatalf("获取上传凭证失败: %v", err)
 	}
-	if !strings.HasPrefix(uploadURL, "https://upload.example/article/temp/") || !strings.HasSuffix(url, ".png") {
-		t.Fatalf("上传凭证契约被改变: %s %s", uploadURL, url)
+
+	// 2. 使用正式 URL 更新文章并确认正文直接保存
+	content := "![image](" + credentials.Files[0].URL + ")"
+	if err := service.UpdateArticle(ctx, initialized.ArticleID, 100, "标题", content, nil, domaincontent.StatusDraft.Int8()); err != nil {
+		t.Fatalf("完成初始化文章失败: %v", err)
+	}
+	article, err := repo.FindByID(ctx, initialized.ArticleID)
+	if err != nil {
+		t.Fatalf("查询更新后文章失败: %v", err)
+	}
+	if article.Content != content {
+		t.Fatalf("文章未直接保存正式图片 URL: %s", article.Content)
+	}
+}
+
+// TestContentService_ClearArticleImageCleanup 验证硬删除的图片清理顺序和重试语义。
+func TestContentService_ClearArticleImageCleanup(t *testing.T) {
+	// 1. 创建文章并移入垃圾箱
+	ctx := context.Background()
+	repo := newFakeArticleRepo()
+	storage := &fakeImageStorage{}
+	service := NewService(repo, nil, storage, nil, "https://cdn.example", nil)
+	if err := service.CreateArticle(ctx, 100, "文章", "内容", nil, domaincontent.StatusDraft.Int8()); err != nil {
+		t.Fatalf("创建文章失败: %v", err)
+	}
+	if err := service.DeleteArticle(ctx, 1, 100); err != nil {
+		t.Fatalf("移入垃圾箱失败: %v", err)
 	}
 
-	content := "![img](https://cdn.example/article/temp/abc.png)"
-	promoted, err := s.PromoteImages(ctx, 7, content)
-	if err != nil {
-		t.Fatalf("图片转正失败: %v", err)
+	// 2. 验证图片清理失败时不调用数据库物理删除
+	storage.deleteErr = errors.New("delete images failed")
+	if err := service.ClearArticle(ctx, 1, 100); !errors.Is(err, storage.deleteErr) {
+		t.Fatalf("图片清理失败错误不正确: %v", err)
 	}
-	if !strings.Contains(promoted, "https://cdn.example/article/7/abc.png") || strings.Contains(promoted, "/temp/") {
-		t.Fatalf("图片转正 URL 错误: %s", promoted)
+	if repo.clearCall != 0 {
+		t.Fatalf("图片清理失败时不应删除数据库记录: %d", repo.clearCall)
 	}
-	if len(storage.moved) != 1 || storage.moved[0] != "article/temp/abc.png->article/7/abc.png" {
-		t.Fatalf("对象移动记录错误: %v", storage.moved)
+	if _, err := repo.FindByID(ctx, 1); err != nil {
+		t.Fatalf("图片清理失败后文章应保留: %v", err)
+	}
+
+	// 3. 验证图片清理成功但数据库删除失败时文章仍可重试
+	storage.deleteErr = nil
+	repo.clearErr = errors.New("clear article failed")
+	if err := service.ClearArticle(ctx, 1, 100); !errors.Is(err, repo.clearErr) {
+		t.Fatalf("数据库删除失败错误不正确: %v", err)
+	}
+	if len(storage.deletedPrefixes) != 2 || storage.deletedPrefixes[0] != "article/1/" {
+		t.Fatalf("文章图片前缀清理记录错误: %v", storage.deletedPrefixes)
+	}
+	if _, err := repo.FindByID(ctx, 1); err != nil {
+		t.Fatalf("数据库删除失败后文章应保留: %v", err)
+	}
+
+	// 4. 验证空目录重试可以最终删除文章
+	repo.clearErr = nil
+	if err := service.ClearArticle(ctx, 1, 100); err != nil {
+		t.Fatalf("重试硬删除失败: %v", err)
+	}
+	if _, err := repo.FindByID(ctx, 1); !errors.Is(err, domaincontent.ErrArticleNotFound) {
+		t.Fatalf("重试后文章仍存在: %v", err)
 	}
 }
 

@@ -6,6 +6,23 @@ import (
 	"strings"
 )
 
+// InitializeArticleResponse 是初始化文章草稿的响应 DTO。
+type InitializeArticleResponse struct {
+	ArticleID uint64 `json:"article_id"` // 初始化生成的文章唯一标识
+}
+
+// ImageUploadCredential 是单张文章图片的上传凭证 DTO。
+type ImageUploadCredential struct {
+	ClientID  string `json:"client_id"`  // 前端图片标识，用于匹配原始文件
+	UploadURL string `json:"upload_url"` // 图片预签名 PUT 地址
+	URL       string `json:"url"`        // 图片上传后的公开访问地址
+}
+
+// ImageUploadCredentialsResponse 是批量文章图片上传凭证响应 DTO。
+type ImageUploadCredentialsResponse struct {
+	Files []ImageUploadCredential `json:"files"` // 与请求图片对应的上传凭证列表
+}
+
 // ArticleDetailResponse 是文章详情响应 DTO。
 type ArticleDetailResponse struct {
 	ID           uint64   `json:"id"`            // 文章唯一标识

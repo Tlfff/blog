@@ -103,6 +103,59 @@ services:
       start_period: 30s    # 容器启动后等待 30 秒，确保Kafka初始化完成
     networks:
       - blog-net
+
+
+  # Elasticsearch搜索引擎
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.20       # ES镜像版本，8.x稳定分支
+    container_name: blog-es                                             # ES容器名称
+    restart: always                                                     # 异常退出自动重启
+    environment:
+      - discovery.type=single-node                                      # 单节点模式，不需要搭建集群
+      - xpack.security.enabled=false                                    # 关闭安全认证，开发环境http明文访问
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"                                # JVM堆内存，最大最小数值保持一致
+      - TZ=Asia/Shanghai                                                # 设置容器时区
+    ulimits:
+      memlock:
+        soft: -1                                                        # 内存锁定软限制
+        hard: -1                                                        # 内存锁定硬限制，ES运行必需
+    ports:
+      - "9200:9200"                                                     # ES REST接口端口，业务调用
+      - "9300:9300"                                                     # ES集群内部通信端口
+    volumes:
+      - es_data:/usr/share/elasticsearch/data                           # ES索引数据持久化卷
+    healthcheck:
+      test: ["CMD-SHELL","curl -s http://127.0.0.1:9200/_cluster/health | grep -q 'status'"] # ES健康检测
+      interval: 10s
+      timeout: 10s
+      retries: 8
+      start_period: 60s                                                 # ES初始化等待宽限期
+    networks:
+      - blog-net
+
+  # Kibana可视化控制台
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.19.20                     # Kibana版本，必须与ES版本完全一致
+    container_name: blog-kibana                                         # Kibana容器名
+    restart: always
+    depends_on:
+      elasticsearch:
+        condition: service_healthy                                      # ES健康之后才启动Kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200                   # 通过内网服务名访问ES
+      - TZ=Asia/Shanghai
+    ports:
+      - "5601:5601"                                                     # Kibana网页控制台端口
+    healthcheck:
+      test: ["CMD-SHELL","curl -s http://127.0.0.1:5601/api/status | grep -q 'success'"]
+      interval: 10s
+      timeout: 10s
+      retries: 8
+      start_period: 90s                                                 # Kibana启动较慢，预留更长时间
+    networks:
+      - blog-net
+
+  
   # 后端服务
   blog-server:
     image: blog-server:latest
@@ -172,6 +225,8 @@ volumes:
   redis_data:
   mongo_data:
   kafka_data:
+  es_data:
+  kibana_data:
 
 # 网络定义
 networks:

@@ -22,7 +22,7 @@ type ArticleRepository interface {
 type ArticleImageStorage interface {
 	PresignedPutURL(ctx context.Context, objectKey string, ttl time.Duration) (string, error) // 生成带有效期的预签名上传URL
 	GetObjectURL(publicDomain, objectKey string) string                                       // 拼装对象的对外访问URL
-	MoveObject(ctx context.Context, srcKey, dstKey string) error                              // 移动对象，用于草稿图片转正式目录
+	DeleteObjectsByPrefix(ctx context.Context, prefix string) error                           // 删除指定对象前缀下的全部图片
 }
 
 // ArticleInteractionQuery 是文章互动统计查询 Port，由 Community 侧提供。

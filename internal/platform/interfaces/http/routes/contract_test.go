@@ -61,6 +61,7 @@ func TestHTTPRouteContract(t *testing.T) {
 		"GET /auth/ntf/list",
 		"POST /auth/ntf/clear-unread",
 		"POST /admin/article/create",
+		"POST /admin/article/init",
 		"POST /admin/article/update",
 		"POST /admin/article/delete",
 		"POST /admin/article/publish",
@@ -69,7 +70,7 @@ func TestHTTPRouteContract(t *testing.T) {
 		"GET /admin/article/trash/list",
 		"POST /admin/article/trash/recover",
 		"POST /admin/article/trash/clear",
-		"POST /admin/article/image/upload-url",
+		"POST /admin/article/image/upload-urls",
 		"POST /admin/comment/delete",
 	}
 

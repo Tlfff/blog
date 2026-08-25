@@ -10,15 +10,13 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-// 文章正文中的图片 URL 匹配规则，用于把临时图片转正
-var articleImageURLRe = regexp.MustCompile(`https?://[^\s"'<>()]+`)
+const articleImageUploadURLTTL = 10 * time.Minute
 
 // Service 编排文章生命周期、查询与图片用例。
 type Service struct {
@@ -63,7 +61,22 @@ func NewService(
 	}
 }
 
-// CreateArticle 创建文章，并把正文里的临时图片转正到文章正式目录。
+// InitializeArticle 初始化空内容文章草稿并返回文章唯一标识。
+func (s *Service) InitializeArticle(ctx context.Context, authorID uint64) (*articledto.InitializeArticleResponse, error) {
+	// 1. 创建仅用于取得文章 ID 的初始化草稿
+	article, err := domaincontent.NewDraftArticle(authorID)
+	if err != nil {
+		return nil, mapArticleError(err)
+	}
+
+	// 2. 保存草稿并返回 Repository 回填的文章 ID
+	if err := s.repo.Create(ctx, article); err != nil {
+		return nil, err
+	}
+	return &articledto.InitializeArticleResponse{ArticleID: article.ID}, nil
+}
+
+// CreateArticle 创建文章。
 //
 // 参数说明：
 //   - ctx：请求上下文，用于传递链路信息和控制超时。
@@ -78,23 +91,8 @@ func (s *Service) CreateArticle(ctx context.Context, authorID uint64, title, con
 	if err != nil {
 		return mapArticleError(err)
 	}
-	// 2. 先落库拿到文章ID，图片转正需要用它作为目录名
-	if err := s.repo.Create(ctx, art); err != nil {
-		return err
-	}
-
-	// 3. 把正文中的临时图片迁移到文章正式目录，失败则清除刚创建的文章
-	newContent, err := s.PromoteImages(ctx, art.ID, art.Content)
-	if err != nil {
-		_ = s.repo.Clear(ctx, art.ID)
-		return err
-	}
-	// 4. 正文有变化时回写数据库
-	if newContent != art.Content {
-		art.ReplacePromotedContent(newContent)
-		return s.repo.Update(ctx, art)
-	}
-	return nil
+	// 2. 保存已经包含正式图片 URL 的文章正文
+	return s.repo.Create(ctx, art)
 }
 
 // UpdateArticle 更新文章内容，仅作者本人可编辑且已删除文章不可编辑。
@@ -108,7 +106,7 @@ func (s *Service) CreateArticle(ctx context.Context, authorID uint64, title, con
 //   - tags：新文章标签列表。
 //   - status：新文章状态：0-未指定；1-已删除；2-草稿；3-已发表。
 func (s *Service) UpdateArticle(ctx context.Context, articleID, authorID uint64, title, content string, tags []string, status int8) error {
-	// 1. 查询文章，并在执行 MinIO 前完成领域校验和内存状态更新
+	// 1. 查询文章并完成领域校验和内存状态更新
 	article, err := s.findArticle(ctx, articleID)
 	if err != nil {
 		return err
@@ -117,14 +115,7 @@ func (s *Service) UpdateArticle(ctx context.Context, articleID, authorID uint64,
 		return mapArticleError(err)
 	}
 
-	// 2. 把正文中新增的临时图片转正
-	promotedContent, err := s.PromoteImages(ctx, articleID, article.Content)
-	if err != nil {
-		return err
-	}
-	article.ReplacePromotedContent(promotedContent)
-
-	// 3. 保存已经通过领域规则校验的聚合
+	// 2. 保存已经包含正式图片 URL 的文章正文
 	return s.repo.Update(ctx, article)
 }
 
@@ -154,7 +145,15 @@ func (s *Service) ClearArticle(ctx context.Context, articleID, userID uint64) er
 		return mapArticleError(err)
 	}
 
-	// 2. 校验通过后执行现有物理删除
+	// 2. 先清理文章正式目录，失败时保留数据库记录以便重试
+	if s.images == nil {
+		return apperrors.ErrSystem
+	}
+	if err := s.images.DeleteObjectsByPrefix(ctx, articleImageObjectPrefix(articleID)); err != nil {
+		return err
+	}
+
+	// 3. 图片清理成功后物理删除文章记录
 	return s.repo.Clear(ctx, articleID)
 }
 
@@ -309,59 +308,63 @@ func (s *Service) GetArticleInfo(ctx context.Context, articleID uint64) (*domain
 	return s.findArticle(ctx, articleID)
 }
 
-// GetUploadURL 生成文章图片的预签名上传地址与访问地址。
-func (s *Service) GetUploadURL(ctx context.Context, fileExt string) (uploadURL, url string, err error) {
-	// 1. 校验对象存储是否可用
+// GetImageUploadURLs 批量生成直接写入文章正式目录的图片上传凭证。
+func (s *Service) GetImageUploadURLs(ctx context.Context, command GetImageUploadURLsCommand) (*articledto.ImageUploadCredentialsResponse, error) {
+	// 1. 校验对象存储与待上传文件列表
 	if s.images == nil {
-		return "", "", apperrors.ErrSystem
+		return nil, apperrors.ErrSystem
 	}
-	// 2. 校验扩展名是否在白名单内
-	ext := strings.ToLower(strings.TrimPrefix(fileExt, "."))
-	if !s.allowedExts[ext] {
-		return "", "", apperrors.ErrInvalidRequestBody
+	if len(command.Files) == 0 {
+		return nil, apperrors.ErrInvalidRequestBody
 	}
-	// 3. 生成临时目录下的对象名并签发上传地址
-	objectKey := path.Join("article", "temp", uuid.NewString()+"."+ext)
-	uploadURL, err = s.images.PresignedPutURL(ctx, objectKey, 10*time.Minute)
+
+	// 2. 加载文章并执行 作者及删除状态校验
+	article, err := s.findArticle(ctx, command.ArticleID)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
-	return uploadURL, s.images.GetObjectURL(s.publicDomain, objectKey), nil
+	if err := article.EnsureCanUploadImageBy(command.AuthorID); err != nil {
+		return nil, mapArticleError(err)
+	}
+
+	// 3. 在签发任何凭证前整体校验客户端标识和扩展名
+	extensions := make([]string, len(command.Files))
+	for index, file := range command.Files {
+		// 校验客户端标识是否为空
+		if strings.TrimSpace(file.ClientID) == "" {
+			return nil, apperrors.ErrInvalidRequestBody
+		}
+		// 检查扩展名是否在白名单内
+		extension := strings.ToLower(strings.TrimPrefix(file.FileExt, "."))
+		if !s.allowedExts[extension] {
+			return nil, apperrors.ErrInvalidRequestBody
+		}
+		extensions[index] = extension
+	}
+
+	// 4. 为每张图片生成正式对象 Key 和预签名上传地址
+	credentials := make([]articledto.ImageUploadCredential, 0, len(command.Files))
+	for index, file := range command.Files {
+		objectKey := path.Join(articleImageObjectPrefix(command.ArticleID), uuid.NewString()+"."+extensions[index])
+		uploadURL, err := s.images.PresignedPutURL(ctx, objectKey, articleImageUploadURLTTL)
+		if err != nil {
+			return nil, err
+		}
+		credentials = append(credentials, articledto.ImageUploadCredential{
+			ClientID:  file.ClientID,
+			UploadURL: uploadURL,
+			URL:       s.images.GetObjectURL(s.publicDomain, objectKey),
+		})
+	}
+
+	// 5. 返回与请求顺序一致的批量上传凭证
+	return &articledto.ImageUploadCredentialsResponse{Files: credentials}, nil
 }
 
-// PromoteImages 把正文中的临时图片转正到文章正式目录。
-func (s *Service) PromoteImages(ctx context.Context, articleID uint64, content string) (string, error) {
-	if s.images == nil || content == "" {
-		return content, nil
-	}
-	seen := make(map[string]bool)
-	var promoteErr error
-	for _, rawURL := range articleImageURLRe.FindAllString(content, -1) {
-		if !strings.HasPrefix(rawURL, s.publicDomain) {
-			continue
-		}
-		u := strings.SplitN(rawURL, "?", 2)[0]
-		srcKey := strings.TrimPrefix(u, s.publicDomain+"/")
-		if !strings.HasPrefix(srcKey, "article/temp/") {
-			continue
-		}
-		if seen[srcKey] {
-			continue
-		}
-		seen[srcKey] = true
-
-		dstKey := "article/" + fmt.Sprint(articleID) + "/" + strings.TrimPrefix(srcKey, "article/temp/")
-		if err := s.images.MoveObject(ctx, srcKey, dstKey); err != nil {
-			if promoteErr == nil {
-				promoteErr = err
-			}
-			continue
-		}
-		srcURL := s.publicDomain + "/" + srcKey
-		dstURL := s.publicDomain + "/" + dstKey
-		content = strings.ReplaceAll(content, srcURL, dstURL)
-	}
-	return content, promoteErr
+// articleImageObjectPrefix 返回文章图片正式目录前缀。
+func articleImageObjectPrefix(articleID uint64) string {
+	// 1. 使用尾部斜杠限制前缀只匹配目标文章目录
+	return path.Join("article", fmt.Sprint(articleID)) + "/"
 }
 
 // 组装文章详情响应，补齐作者信息与当前用户点赞状态

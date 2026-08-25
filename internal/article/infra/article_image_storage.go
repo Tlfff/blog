@@ -27,7 +27,8 @@ func (a *articleImageStorageAdapter) GetObjectURL(publicDomain, objectKey string
 	return a.oss.GetObjectURL(publicDomain, objectKey)
 }
 
-// MoveObject 把临时图片移动到正式路径。
-func (a *articleImageStorageAdapter) MoveObject(ctx context.Context, srcKey, dstKey string) error {
-	return a.oss.MoveObject(ctx, srcKey, dstKey)
+// DeleteObjectsByPrefix 删除指定对象前缀下的全部文章图片。
+func (a *articleImageStorageAdapter) DeleteObjectsByPrefix(ctx context.Context, prefix string) error {
+	// 1. 委托平台对象存储删除指定前缀下的全部对象
+	return a.oss.DeleteObjectsByPrefix(ctx, prefix)
 }

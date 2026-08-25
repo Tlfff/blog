@@ -27,6 +27,11 @@ func InitArticleOptionalRoutes(r *gin.RouterGroup, articleHandler *articlehttp.A
 
 // InitArticlePrivateRoutes 注册文章管理路由。
 func InitArticlePrivateRoutes(r *gin.RouterGroup, articleHandler *articlehttp.ArticleHandler) {
+	// 初始化空内容文章草稿，用于提前取得文章 ID
+	r.POST("/article/init",
+		middleware.DuplicateMitigation(2*time.Second),
+		articleHandler.InitializeArticle,
+	)
 	//  创建文章,需要防重复
 	r.POST("/article/create",
 		middleware.DuplicateMitigation(2*time.Second),
@@ -51,6 +56,6 @@ func InitArticlePrivateRoutes(r *gin.RouterGroup, articleHandler *articlehttp.Ar
 	r.POST("/article/trash/recover", articleHandler.RecoverArticle)
 	// 硬删除文章
 	r.POST("/article/trash/clear", articleHandler.ClearArticle)
-	// 获取文章图片上传凭证
-	r.POST("/article/image/upload-url", articleHandler.GetImageUploadURL)
+	// 批量获取直接写入文章正式目录的图片上传凭证
+	r.POST("/article/image/upload-urls", articleHandler.GetImageUploadURLs)
 }
