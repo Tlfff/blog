@@ -205,33 +205,20 @@ gRPC 服务（默认端口 `9100`，定义见 `proto/blogopen/v1`）：
 
 ```text
 .
-├── cmd/                    # Cobra 命令：server / grpc / kafka-consume / migrate
-├── config/                 # YAML 配置结构与加载（含 Kafka 配置）
-├── deploy/k8s/             # Kubernetes 清单（命名空间、配置、中间件、三个工作负载）
-├── gen/                    # protoc 生成的 gRPC 代码
-├── proto/blogopen/v1/      # 开放 API 的 proto 定义
+├── cmd/                         # Cobra 组合根入口
+├── config/                      # YAML 运行配置
+├── gen/                         # protoc 生成代码
+├── proto/blogopen/v1/           # 对外 gRPC 契约
 ├── internal/
-│   ├── auth/               # Token 会话、JWT、HMAC、密码哈希
-│   ├── common/             # 统一响应、错误码、校验器、防重、浏览窗口
-│   ├── consts/             # Redis key 与锁常量
-│   ├── cron/               # 定时任务管理器与热榜校准
-│   ├── dto/                # 各模块请求 / 响应模型
-│   ├── grpc/               # gRPC server、handler、认证拦截器
-│   ├── handler/            # HTTP 处理器
-│   ├── message/            # Kafka 消息体定义
-│   ├── middleware/         # 认证、管理员校验、日志、异常、防重、浏览历史
-│   ├── model/              # 持久化模型与状态 / 角色枚举
-│   ├── mq/                 # Kafka 消息处理器与注册表
-│   ├── repository/         # MySQL / MongoDB 数据访问
-│   ├── routes/             # 公开 / 登录 / 管理员 / 可选登录路由
-│   └── service/            # 业务规则、事务、缓存、异步投递
-├── pkg/
-│   ├── database/           # MySQL、MongoDB、Redis 客户端
-│   ├── kafka/              # 客户端、生产者、消费者、死信队列
-│   ├── oss/                # MinIO 客户端
-│   ├── resource/           # ip2region 离线库
-│   └── util/               # 缓存、IP、Redis 锁工具
-└── scripts/                # MySQL 建库建表脚本、MongoDB 初始化脚本
+│   ├── user/                    # User 限界上下文
+│   ├── article/                 # Article 限界上下文
+│   ├── comment/                 # Comment 限界上下文
+│   ├── like/                    # Like 限界上下文
+│   ├── notification/            # Notification 限界上下文
+│   ├── platform/                # 配置、数据库、事务、Kafka、Redis、OSS、安全与统一入口
+│   └── shared/apperrors/        # 跨协议复用的稳定应用错误值
+├── docs/architecture/           # 架构、行为基线和验收说明
+└── scripts/                     # 数据初始化与架构检查脚本
 ```
 
 ## 快速开始
@@ -275,4 +262,22 @@ kubectl apply -f deploy/k8s/
 ```bash
 go test ./...
 go test ./... -cover
+```
+
+## 模块化单体 DDD 架构
+
+当前代码按 User、Article、Comment、Like、Notification 五个限界上下文组织。技术资源、事务、认证、HTTP/gRPC/Kafka 统一入口位于 `internal/platform`。
+
+详细说明：
+
+- `docs/architecture/compatibility-baseline.md`
+- `docs/architecture/module-construction.md`
+- `docs/architecture/ddd-architecture.md`
+- `docs/architecture/refactor-acceptance.md`
+
+验证命令：
+
+```bash
+go test ./...
+./scripts/check_architecture.sh
 ```

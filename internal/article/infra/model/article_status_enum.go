@@ -1,0 +1,48 @@
+package model
+
+import "errors"
+
+// Status 是文章状态枚举类型。
+type Status int8
+
+// 文章状态取值与查询过滤值
+const (
+	All              = -2 // 全部（含删除）
+	AllExceptDeleted = -1 // 全部（不含删除）
+	Deleted          = 1  // 已删除
+	Draft            = 2  // 草稿
+	Published        = 3  // 已发表
+
+)
+
+// String 返回文章状态中文描述。
+func (r Status) String() string {
+	// 1. 按状态值返回对应中文描述
+	switch r {
+	case Deleted:
+		return "已删除"
+	case All:
+		return "全部"
+	case Draft:
+		return "草稿"
+	case Published:
+		return "已发表"
+	// 2. 未登记的状态值统一返回未知状态
+	default:
+		return "未知状态"
+	}
+}
+
+// FindStatusByID 校验状态 ID 是否合法。
+func FindStatusByID(statusID int) error {
+	// 1. 转换为状态枚举类型
+	r := Status(statusID)
+	// 2. 仅允许已删除、草稿、已发表三种实体状态
+	switch r {
+	case Deleted, Draft, Published:
+		return nil
+	// 3. 其余取值视为非法状态
+	default:
+		return errors.New("不存在该状态")
+	}
+}

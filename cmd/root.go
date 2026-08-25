@@ -16,12 +16,15 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+// Execute 执行博客系统根命令。
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 }
+
+// init 注册根命令配置。
 func init() {
 
 }
