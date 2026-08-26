@@ -61,6 +61,9 @@ spec:
         - name: tencent-ccr # 私有仓库拉取凭据
       containers:
         - name: blog-server
+          envFrom:
+            - secretRef:
+                name: blog-app-env # 应用运行环境变量，敏感值由 Secret 注入
           image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0 # 博客应用镜像
           imagePullPolicy: IfNotPresent
           args:

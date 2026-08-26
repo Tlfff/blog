@@ -19,3 +19,11 @@ scripts/
 
 # 临时测试客户端
 cmd/grpc_client_test/
+
+# 本地环境变量和敏感配置
+.env
+.env.*
+!.env.example
+
+# Go 本地构建缓存
+.go-build/

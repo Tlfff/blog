@@ -8,10 +8,10 @@ services:
     container_name: blog-mysql # 容器名字
     restart: always # 重启策略，容器异常退出时总是自动重启
     environment:
-      MYSQL_ROOT_PASSWORD: "Tlf0614"            # root 超级管理员密码
-      MYSQL_DATABASE: "blog"                    # 容器启动时自动创建的数据库名
-      MYSQL_USER: "bloguser"                    # 额外创建的应用专用用户
-      MYSQL_PASSWORD: "20040614"                # 应用用户的密码
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"            # root 超级管理员密码
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"                    # 容器启动时自动创建的数据库名
+      MYSQL_USER: "${MYSQL_USER}"                    # 额外创建的应用专用用户
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                # 应用用户的密码
       TZ: Asia/Shanghai                         # 容器时区设置，影响时间函数
     ports:
       - "3306:3306" # 映射端口，外部访问端口：容器端口
@@ -55,9 +55,9 @@ services:
     container_name: blog-mongodb
     restart: always
     environment:  # 环境变量配置
-      MONGO_INITDB_ROOT_USERNAME: "bloguser" # 初始化 MongoDB 的 root 用户名
-      MONGO_INITDB_ROOT_PASSWORD: "20040614" # 初始化 MongoDB 的 root 密码
-      MONGO_INITDB_DATABASE: "blog" # 初始化 MongoDB 的数据库名
+      MONGO_INITDB_ROOT_USERNAME: "${MONGODB_ROOT_USERNAME}" # 初始化 MongoDB 的 root 用户名
+      MONGO_INITDB_ROOT_PASSWORD: "${MONGODB_ROOT_PASSWORD}" # 初始化 MongoDB 的 root 密码
+      MONGO_INITDB_DATABASE: "${MONGODB_DATABASE}" # 初始化 MongoDB 的数据库名
       TZ: Asia/Shanghai # 容器时区设置，影响时间函数
     ports:
       - "27017:27017"
@@ -109,6 +109,20 @@ services:
 
   # 后端服务（HTTP）
   blog-server:
+    environment:
+      MYSQL_USER: "${MYSQL_USER}"                                      # MySQL 应用账号
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                              # MySQL 应用密码
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"                              # MySQL 数据库名
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"                              # Redis 密码
+      MONGODB_ROOT_USERNAME: "${MONGODB_ROOT_USERNAME}"                # MongoDB 账号
+      MONGODB_ROOT_PASSWORD: "${MONGODB_ROOT_PASSWORD}"                # MongoDB 密码
+      MONGODB_DATABASE: "${MONGODB_DATABASE}"                          # MongoDB 数据库名
+      JWT_SECRET: "${JWT_SECRET}"                                      # 用户 JWT 签名密钥
+      OPENJWT_SECRET: "${OPENJWT_SECRET}"                              # 开放 gRPC JWT 签名密钥
+      PARTNER_A_ACCESS_KEY_ID: "${PARTNER_A_ACCESS_KEY_ID}"            # 三方合作方访问凭证
+      PARTNER_A_SECRET_KEY: "${PARTNER_A_SECRET_KEY}"                  # 三方合作方共享密钥
+      OSS_ACCESS_KEY_ID: "${OSS_ACCESS_KEY_ID}"                        # OSS 访问凭证
+      OSS_SECRET_ACCESS_KEY: "${OSS_SECRET_ACCESS_KEY}"                # OSS 访问密钥
     image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0 # 用腾讯云仓库的镜像
     container_name: blog-server
     restart: always
@@ -132,6 +146,20 @@ services:
 
   # 对外服务（gRPC，二方/三方）
   blog-grpc:
+    environment:
+      MYSQL_USER: "${MYSQL_USER}"                                      # MySQL 应用账号
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                              # MySQL 应用密码
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"                              # MySQL 数据库名
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"                              # Redis 密码
+      MONGODB_ROOT_USERNAME: "${MONGODB_ROOT_USERNAME}"                # MongoDB 账号
+      MONGODB_ROOT_PASSWORD: "${MONGODB_ROOT_PASSWORD}"                # MongoDB 密码
+      MONGODB_DATABASE: "${MONGODB_DATABASE}"                          # MongoDB 数据库名
+      JWT_SECRET: "${JWT_SECRET}"                                      # 用户 JWT 签名密钥
+      OPENJWT_SECRET: "${OPENJWT_SECRET}"                              # 开放 gRPC JWT 签名密钥
+      PARTNER_A_ACCESS_KEY_ID: "${PARTNER_A_ACCESS_KEY_ID}"            # 三方合作方访问凭证
+      PARTNER_A_SECRET_KEY: "${PARTNER_A_SECRET_KEY}"                  # 三方合作方共享密钥
+      OSS_ACCESS_KEY_ID: "${OSS_ACCESS_KEY_ID}"                        # OSS 访问凭证
+      OSS_SECRET_ACCESS_KEY: "${OSS_SECRET_ACCESS_KEY}"                # OSS 访问密钥
     image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0
     container_name: blog-grpc
     restart: always
@@ -150,6 +178,20 @@ services:
 
   # Kafka 消费者
   blog-consumer:
+    environment:
+      MYSQL_USER: "${MYSQL_USER}"                                      # MySQL 应用账号
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                              # MySQL 应用密码
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"                              # MySQL 数据库名
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"                              # Redis 密码
+      MONGODB_ROOT_USERNAME: "${MONGODB_ROOT_USERNAME}"                # MongoDB 账号
+      MONGODB_ROOT_PASSWORD: "${MONGODB_ROOT_PASSWORD}"                # MongoDB 密码
+      MONGODB_DATABASE: "${MONGODB_DATABASE}"                          # MongoDB 数据库名
+      JWT_SECRET: "${JWT_SECRET}"                                      # 用户 JWT 签名密钥
+      OPENJWT_SECRET: "${OPENJWT_SECRET}"                              # 开放 gRPC JWT 签名密钥
+      PARTNER_A_ACCESS_KEY_ID: "${PARTNER_A_ACCESS_KEY_ID}"            # 三方合作方访问凭证
+      PARTNER_A_SECRET_KEY: "${PARTNER_A_SECRET_KEY}"                  # 三方合作方共享密钥
+      OSS_ACCESS_KEY_ID: "${OSS_ACCESS_KEY_ID}"                        # OSS 访问凭证
+      OSS_SECRET_ACCESS_KEY: "${OSS_SECRET_ACCESS_KEY}"                # OSS 访问密钥
     image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0
     container_name: blog-consumer
     restart: always

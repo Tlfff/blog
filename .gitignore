@@ -1,0 +1,10 @@
+# 本地环境变量和敏感配置
+.env
+.env.*
+!.env.example
+
+# Go 本地构建缓存
+.go-build/
+
+# 本地构建产物
+blog
