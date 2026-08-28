@@ -9,16 +9,18 @@ import (
 	notification "blog/internal/notification"
 	platformconfig "blog/internal/platform/config"
 	platformtransaction "blog/internal/platform/transaction"
+	search "blog/internal/search"
 	user "blog/internal/user"
 )
 
-// Application 汇总模块化单体的五个业务上下文。
+// Application 汇总模块化单体的六个业务上下文。
 type Application struct {
 	User         *user.Module         // User 上下文模块
 	Article      *article.Module      // Article 上下文模块
 	Comment      *comment.Module      // Comment 上下文模块
 	Like         *like.Module         // Like 上下文模块
 	Notification *notification.Module // Notification 上下文模块
+	Search       *search.Module       // Search 上下文模块，当前入口未初始化 ES 时为空
 }
 
 // NewApplication 按上下文依赖顺序组装模块化单体。
@@ -65,8 +67,14 @@ func NewApplication(resources *Resources, cfg *platformconfig.Config) (*Applicat
 		userModule.Application,
 	)
 
+	// 7. 当前入口需要 Elasticsearch 时创建 Search 在线查询上下文
+	var searchModule *search.Module
+	if resources.Elasticsearch != nil {
+		searchModule = search.NewModule(resources.Elasticsearch, cfg.Elasticsearch)
+	}
+
 	return &Application{
 		User: userModule, Article: articleModule, Comment: commentModule,
-		Like: likeModule, Notification: notificationModule,
+		Like: likeModule, Notification: notificationModule, Search: searchModule,
 	}, nil
 }

@@ -45,6 +45,8 @@ var (
 	ErrArticleContentEmpty     = errors.New("文章内容不能为空") // 创建或更新时正文为空
 	ErrArticleIDInvalid        = errors.New("文章ID非法")   // 文章ID为0或非法值
 	ErrArticleStatusInvalid    = errors.New("文章状态非法")   // 文章状态取值不在允许范围内
+	//------------------------- 搜索模块 ---------------------------------
+	ErrSearchUnavailable = errors.New("文章搜索服务暂不可用") // Elasticsearch 查询服务不可用
 	//------------------------- 评论模块 ---------------------------------
 	ErrCommentNotFound    = errors.New("评论不存在")         // 按ID查询评论未命中
 	ErrCommentDeleted     = errors.New("评论已被删除")        // 评论处于已删除状态

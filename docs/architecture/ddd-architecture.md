@@ -2,16 +2,18 @@
 
 ## 1. 运行形态
 
-项目仍然构建为一个 `blog` 二进制，通过 Cobra 提供四个子命令：
+项目仍然构建为一个 `blog` 二进制，通过 Cobra 提供六个主要子命令：
 
 ```text
 blog server          HTTP 服务与 Cron
 blog grpc            对外 gRPC 服务
 blog kafka-consume   Kafka Consumer
 blog migrate         MySQL 建库建表
+blog search-sync     Canal 到 Elasticsearch 的文章搜索增量同步
+blog search-rebuild  MySQL 到 Elasticsearch 的文章搜索全量重建
 ```
 
-五个上下文是代码和业务边界，不是五个进程或五套数据库。
+六个上下文是代码和业务边界，不是六个微服务或六套数据库。
 
 ## 2. 目录结构
 
@@ -22,6 +24,7 @@ internal/
 ├── comment/
 ├── like/
 ├── notification/
+├── search/
 ├── platform/
 │   ├── bootstrap/
 │   ├── config/
@@ -33,6 +36,8 @@ internal/
 │   ├── ip/
 │   ├── security/
 │   ├── cron/
+│   ├── canal/
+│   ├── elasticsearch/
 │   └── interfaces/
 └── shared/
     └── apperrors/
@@ -65,6 +70,9 @@ Comment ◄──── Like ───┘
 - Comment 拥有评论、回复、删除规则和根评论回复数。
 - Like 拥有文章/评论点赞关系和点赞状态缓存。
 - Notification 拥有 MongoDB 通知文档及当前文章点赞通知消费。
+- Search 拥有可重建的 Elasticsearch 文章搜索投影、查询语义、增量同步和全量重建编排；Article 仍是文章业务数据真相。
+
+Search 不调用 Article Repository 或写入文章表。文章写入只提交 MySQL，随后由 `MySQL binlog → Canal → search-sync → Elasticsearch` 异步维护投影，因此允许数秒级最终一致性延迟。
 
 跨上下文不导入对方 Infrastructure、Interfaces 或 Repository。调用方依赖最小 Application Facade；复杂展示查询由调用方拥有只读 Read Model JOIN。
 

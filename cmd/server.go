@@ -46,6 +46,7 @@ var serverCmd = &cobra.Command{
 			Redis:                 true,
 			Kafka:                 true,
 			OSS:                   true,
+			Elasticsearch:         true,
 			AllowMongoDBInitError: true,
 		})
 		if err != nil {
@@ -81,6 +82,7 @@ var serverCmd = &cobra.Command{
 			Comment:     application.Comment.HTTP,
 			Like:        application.Like.HTTP,
 			Notify:      application.Notification.HTTP,
+			Search:      application.Search.HTTP,
 			ViewHistory: application.Article.Engagement,
 			Redis:       resources.Redis,
 		})

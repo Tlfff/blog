@@ -6,6 +6,7 @@ import (
 	likehttp "blog/internal/like/interfaces/http"
 	notificationhttp "blog/internal/notification/interfaces/http"
 	"blog/internal/platform/interfaces/http/middleware"
+	searchhttp "blog/internal/search/interfaces/http"
 	userhttp "blog/internal/user/interfaces/http"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,7 @@ type AppHandler struct {
 	Comment  *commenthttp.CommentHandler           // 评论 Handler
 	Like     *likehttp.LikeHandler                 // 点赞 Handler
 	Notify   *notificationhttp.NotificationHandler // 通知 Handler
+	Search   *searchhttp.Handler                   // 文章搜索 Handler
 	// 浏览历史服务，路由级中间件使用（不经过 handler）
 	ViewHistory middleware.ViewHistorySender // 浏览历史发送器，供浏览历史中间件异步投递事件
 	Redis       *redis.Client                // Redis 客户端，供鉴权中间件校验会话
@@ -33,7 +35,7 @@ func InitRoute(r *gin.Engine, appHandler *AppHandler) {
 	// 2.不需要登录的接口（/r/xxx）
 	publicGroup := r.Group("")
 	{
-		InitArticlePublicRoutes(publicGroup, appHandler.Article)
+		InitArticlePublicRoutes(publicGroup, appHandler.Article, appHandler.Search)
 		InitUserPublicRoutes(publicGroup, appHandler.UserAuth, appHandler.User)
 		InitCommentPublicRoutes(publicGroup, appHandler.Comment)
 	}

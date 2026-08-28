@@ -21,6 +21,11 @@ services:
     command:
       - "--character-set-server=utf8mb4"  # 设置字符集为 utf8mb4
       - "--collation-server=utf8mb4_unicode_ci"  # 设置排序规则为 utf8mb4_unicode_ci
+      - "--server-id=1"                     # Canal 读取 binlog 所需的唯一服务器 ID
+      - "--log-bin=mysql-bin"               # 开启 MySQL binlog
+      - "--binlog-format=ROW"                # Canal 需要行级变更事件
+      - "--binlog-row-image=FULL"            # 记录完整前后行，便于搜索文档转换
+      - "--binlog-expire-logs-seconds=604800" # binlog 保留 7 天
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"] # 健康检查
       interval: 10s # 检查间隔，10 秒
@@ -107,8 +112,88 @@ services:
     networks:
       - blog-net
 
+  # Elasticsearch 搜索引擎，仅通过容器内网络访问
+  elasticsearch:
+    build:
+      context: .
+      dockerfile: docker/es/Dockerfile
+    image: blog-elasticsearch:8.19.20-ik-pinyin
+    container_name: blog-es
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - TZ=Asia/Shanghai
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -u elastic:$$ELASTIC_PASSWORD http://127.0.0.1:9200/_cluster/health | grep -q status"]
+      interval: 10s
+      timeout: 10s
+      retries: 8
+      start_period: 60s
+    networks:
+      - blog-net
+
+  # Canal 复制账号初始化任务
+  canal-init:
+    image: mysql:8.0
+    container_name: blog-canal-init
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      MYSQL_HOST: "mysql"
+    entrypoint: ["/bin/bash", "/usr/local/bin/canal_user.sh"]
+    volumes:
+      - ./scripts/mysql/canal_user.sh:/usr/local/bin/canal_user.sh:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - blog-net
+
+  # Canal binlog 订阅服务，仅通过容器内网络访问
+  canal:
+    image: canal/canal-server:v1.1.8
+    container_name: blog-canal
+    restart: unless-stopped
+    environment:
+      JAVA_OPTS: "-Xms256m -Xmx512m -Xmn128m"
+      canal.auto.scan: "false"
+      canal.destinations: "article_search"
+      canal.instance.master.address: "mysql:3306"
+      canal.instance.mysql.slaveId: "1234"
+      canal.instance.dbUsername: "${CANAL_DB_USERNAME}"
+      canal.instance.dbPassword: "${CANAL_DB_PASSWORD}"
+      canal.instance.connectionCharset: "UTF-8"
+      canal.instance.gtidon: "false"
+      canal.instance.tsdb.enable: "true"
+      canal.instance.parser.parallel: "false"
+      canal.instance.filter.regex: 'blog\.articles'
+    volumes:
+      - canal_conf:/home/admin/canal-server/conf
+      - canal_logs:/home/admin/canal-server/logs
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 11111 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    depends_on:
+      canal-init:
+        condition: service_completed_successfully
+    networks:
+      - blog-net
+
   # 后端服务（HTTP）
   blog-server:
+    env_file:
+      - .env
     environment:
       MYSQL_USER: "${MYSQL_USER}"                                      # MySQL 应用账号
       MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                              # MySQL 应用密码
@@ -123,6 +208,10 @@ services:
       PARTNER_A_SECRET_KEY: "${PARTNER_A_SECRET_KEY}"                  # 三方合作方共享密钥
       OSS_ACCESS_KEY_ID: "${OSS_ACCESS_KEY_ID}"                        # OSS 访问凭证
       OSS_SECRET_ACCESS_KEY: "${OSS_SECRET_ACCESS_KEY}"                # OSS 访问密钥
+      ELASTICSEARCH_USERNAME: "${ELASTICSEARCH_USERNAME:-elastic}"
+      ELASTICSEARCH_PASSWORD: "${ELASTICSEARCH_PASSWORD}"
+      CANAL_SERVER_USERNAME: "${CANAL_SERVER_USERNAME:-}"
+      CANAL_SERVER_PASSWORD: "${CANAL_SERVER_PASSWORD:-}"
     image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0 # 用腾讯云仓库的镜像
     container_name: blog-server
     restart: always
@@ -146,6 +235,8 @@ services:
 
   # 对外服务（gRPC，二方/三方）
   blog-grpc:
+    env_file:
+      - .env
     environment:
       MYSQL_USER: "${MYSQL_USER}"                                      # MySQL 应用账号
       MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                              # MySQL 应用密码
@@ -160,6 +251,10 @@ services:
       PARTNER_A_SECRET_KEY: "${PARTNER_A_SECRET_KEY}"                  # 三方合作方共享密钥
       OSS_ACCESS_KEY_ID: "${OSS_ACCESS_KEY_ID}"                        # OSS 访问凭证
       OSS_SECRET_ACCESS_KEY: "${OSS_SECRET_ACCESS_KEY}"                # OSS 访问密钥
+      ELASTICSEARCH_USERNAME: "${ELASTICSEARCH_USERNAME:-elastic}"
+      ELASTICSEARCH_PASSWORD: "${ELASTICSEARCH_PASSWORD}"
+      CANAL_SERVER_USERNAME: "${CANAL_SERVER_USERNAME:-}"
+      CANAL_SERVER_PASSWORD: "${CANAL_SERVER_PASSWORD:-}"
     image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0
     container_name: blog-grpc
     restart: always
@@ -178,6 +273,8 @@ services:
 
   # Kafka 消费者
   blog-consumer:
+    env_file:
+      - .env
     environment:
       MYSQL_USER: "${MYSQL_USER}"                                      # MySQL 应用账号
       MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                              # MySQL 应用密码
@@ -192,6 +289,10 @@ services:
       PARTNER_A_SECRET_KEY: "${PARTNER_A_SECRET_KEY}"                  # 三方合作方共享密钥
       OSS_ACCESS_KEY_ID: "${OSS_ACCESS_KEY_ID}"                        # OSS 访问凭证
       OSS_SECRET_ACCESS_KEY: "${OSS_SECRET_ACCESS_KEY}"                # OSS 访问密钥
+      ELASTICSEARCH_USERNAME: "${ELASTICSEARCH_USERNAME:-elastic}"
+      ELASTICSEARCH_PASSWORD: "${ELASTICSEARCH_PASSWORD}"
+      CANAL_SERVER_USERNAME: "${CANAL_SERVER_USERNAME:-}"
+      CANAL_SERVER_PASSWORD: "${CANAL_SERVER_PASSWORD:-}"
     image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0
     container_name: blog-consumer
     restart: always
@@ -210,12 +311,38 @@ services:
     networks:
       - blog-net
 
+  # 文章搜索增量同步进程，保持单副本运行
+  search-sync:
+    image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0
+    container_name: blog-search-sync
+    restart: always
+    env_file:
+      - .env
+    environment:
+      ELASTICSEARCH_USERNAME: "${ELASTICSEARCH_USERNAME:-elastic}"
+      ELASTICSEARCH_PASSWORD: "${ELASTICSEARCH_PASSWORD}"
+      CANAL_SERVER_USERNAME: "${CANAL_SERVER_USERNAME:-}"
+      CANAL_SERVER_PASSWORD: "${CANAL_SERVER_PASSWORD:-}"
+    command: ["search-sync"]
+    volumes:
+      - ./config/config.docker.yaml:/app/config/config.yaml:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      canal:
+        condition: service_healthy
+    networks:
+      - blog-net
+
 # 数据卷定义，把容器内部的数据目录，挂载到 Docker 管理的外部存储空间，这样数据就和容器本身分离了
 volumes:
   mysql_data:   # 创建一个名为 "mysql_data" 的数据卷
   redis_data:
   mongo_data:
   kafka_data:
+  es_data:
+  canal_conf:
+  canal_logs:
 
 # 网络定义
 networks:

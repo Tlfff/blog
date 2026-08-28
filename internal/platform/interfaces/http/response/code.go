@@ -49,4 +49,6 @@ const (
 	CodeKafkaConsumerRunning  = 1607 // Kafka 消费者已运行
 	CodeKafkaClientClosed     = 1608 // Kafka 客户端已关闭
 	CodeKafkaPingFailed       = 1609 // Kafka 预热连接失败
+	//------------------------- 搜索模块 ---------------------------------
+	CodeSearchUnavailable = 1700 // 文章搜索服务暂不可用
 )

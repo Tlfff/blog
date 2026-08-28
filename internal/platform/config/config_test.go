@@ -99,3 +99,89 @@ database:
 		t.Fatalf("数据库环境变量未正确加载: %+v", cfg.Database)
 	}
 }
+
+// TestSearchConfigDefaults 验证搜索相关配置的默认值和边界修正。
+func TestSearchConfigDefaults(t *testing.T) {
+	// 1. 验证 Elasticsearch 默认配置
+	var elasticsearch Elasticsearch
+	if elasticsearch.GetIndexAlias() != "article_search" {
+		t.Fatalf("默认索引别名不符合预期: %q", elasticsearch.GetIndexAlias())
+	}
+	if elasticsearch.GetRequestTimeoutMS() != 3000 {
+		t.Fatalf("默认 Elasticsearch 超时时间不符合预期: %d", elasticsearch.GetRequestTimeoutMS())
+	}
+
+	// 2. 验证 Canal 默认配置和最大退避边界
+	canal := Canal{ReconnectMinWaitMS: 20000, ReconnectMaxWaitMS: 1000}
+	if canal.GetBatchSize() != 100 || canal.GetEmptyWaitMS() != 500 {
+		t.Fatalf("默认 Canal 批次配置不符合预期: batch=%d wait=%d", canal.GetBatchSize(), canal.GetEmptyWaitMS())
+	}
+	if canal.GetReconnectMaxWaitMS() != defaultCanalReconnectMaxWaitMS {
+		t.Fatalf("非法最大重连等待时间未回退默认值: %d", canal.GetReconnectMaxWaitMS())
+	}
+}
+
+// TestSearchConfigValidate 验证搜索连接必填配置检查。
+func TestSearchConfigValidate(t *testing.T) {
+	// 1. 验证 Elasticsearch 缺少地址时拒绝启动
+	if err := (Elasticsearch{}).Validate(); err == nil || !strings.Contains(err.Error(), "地址") {
+		t.Fatalf("Elasticsearch 缺少地址时错误不符合预期: %v", err)
+	}
+
+	// 2. 验证 Canal 缺少主机、端口或 destination 时拒绝启动
+	invalidConfigs := []Canal{
+		{Port: 11111, Destination: "article_search"},
+		{Host: "127.0.0.1", Destination: "article_search"},
+		{Host: "127.0.0.1", Port: 11111},
+	}
+	for _, config := range invalidConfigs {
+		if err := config.Validate(); err == nil {
+			t.Fatalf("非法 Canal 配置未被拒绝: %+v", config)
+		}
+	}
+	if err := (Canal{Host: "127.0.0.1", Port: 11111, Destination: "article_search"}).Validate(); err != nil {
+		t.Fatalf("合法 Canal 配置被拒绝: %v", err)
+	}
+}
+
+// TestLoadSearchConfig 验证搜索配置能够从 YAML 和环境变量正确加载。
+func TestLoadSearchConfig(t *testing.T) {
+	// 1. 准备搜索服务配置和敏感环境变量
+	t.Setenv("BLOG_CONFIG_TEST_ES_USER", "search-user")
+	t.Setenv("BLOG_CONFIG_TEST_ES_PASSWORD", "search-password")
+	t.Setenv("BLOG_CONFIG_TEST_CANAL_PASSWORD", "canal-password")
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	configContent := `
+elasticsearch:
+  addr: "http://127.0.0.1:9200"
+  username: "${BLOG_CONFIG_TEST_ES_USER}"
+  password: "${BLOG_CONFIG_TEST_ES_PASSWORD}"
+  index_alias: "article_search_test"
+  request_timeout_ms: 2500
+canal:
+  host: "127.0.0.1"
+  port: 11111
+  username: "canal"
+  password: "${BLOG_CONFIG_TEST_CANAL_PASSWORD}"
+  destination: "article_search"
+  batch_size: 50
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatalf("写入搜索配置失败: %v", err)
+	}
+
+	// 2. 加载并核对连接、认证和批次配置
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("加载搜索配置失败: %v", err)
+	}
+	if cfg.Elasticsearch.Username != "search-user" || cfg.Elasticsearch.Password != "search-password" {
+		t.Fatalf("Elasticsearch 认证配置未正确加载: %+v", cfg.Elasticsearch)
+	}
+	if cfg.Elasticsearch.GetIndexAlias() != "article_search_test" || cfg.Elasticsearch.GetRequestTimeoutMS() != 2500 {
+		t.Fatalf("Elasticsearch 索引配置不符合预期: %+v", cfg.Elasticsearch)
+	}
+	if cfg.Canal.Password != "canal-password" || cfg.Canal.GetBatchSize() != 50 {
+		t.Fatalf("Canal 配置未正确加载: %+v", cfg.Canal)
+	}
+}

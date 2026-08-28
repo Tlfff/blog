@@ -43,6 +43,11 @@ spec:
           args: # 等价于 docker-compose 里的 command，MySQL 服务端启动参数
             - --character-set-server=utf8mb4 # 设置字符集为 utf8mb4
             - --collation-server=utf8mb4_unicode_ci # 设置排序规则为 utf8mb4_unicode_ci
+            - --server-id=1 # Canal 模拟从库读取 binlog 所需的服务器 ID
+            - --log-bin=mysql-bin # 开启 MySQL binlog
+            - --binlog-format=ROW # Canal 需要行级变更事件
+            - --binlog-row-image=FULL # 记录完整前后行，供搜索同步转换文档
+            - --binlog-expire-logs-seconds=604800 # binlog 保留 7 天
           env:
             # 密码等敏感信息不写死在 YAML，从 Secret 读取（kubectl 创建 Secret 时注入）
             - name: MYSQL_ROOT_PASSWORD # root 超级管理员密码

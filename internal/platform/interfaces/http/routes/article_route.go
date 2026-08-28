@@ -4,16 +4,20 @@ package routes
 import (
 	articlehttp "blog/internal/article/interfaces/http"
 	"blog/internal/platform/interfaces/http/middleware"
+	searchhttp "blog/internal/search/interfaces/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 // InitArticlePublicRoutes 注册文章公开路由。
-func InitArticlePublicRoutes(r *gin.RouterGroup, articleHandler *articlehttp.ArticleHandler) {
+func InitArticlePublicRoutes(r *gin.RouterGroup, articleHandler *articlehttp.ArticleHandler, searchHandler *searchhttp.Handler) {
 	// 获取已发表文章列表
 	r.GET("/article/list", articleHandler.GetPublishedList)
 	r.GET("/article/hot-rank", articleHandler.GetHotArticleRank)
+
+	// 搜索文章
+	r.GET("/article/search", searchHandler.SearchArticles)
 }
 
 // InitArticleOptionalRoutes 注册文章可选登录路由。

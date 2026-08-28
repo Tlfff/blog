@@ -17,7 +17,24 @@ mongodb:
 
 elasticsearch:
   addr: "http://elasticsearch:9200"
-
+  username: "${ELASTICSEARCH_USERNAME}"
+  password: "${ELASTICSEARCH_PASSWORD}"
+  index_alias: "article_search"
+  request_timeout_ms: 3000
+canal:
+  host: "canal"
+  port: 11111
+  username: "${CANAL_SERVER_USERNAME}"
+  password: "${CANAL_SERVER_PASSWORD}"
+  destination: "article_search"
+  filter: "blog\\.articles"
+  batch_size: 100
+  empty_wait_ms: 500
+  socket_timeout_ms: 60000
+  idle_timeout_ms: 3600000
+  reconnect_min_wait_ms: 500
+  reconnect_max_wait_ms: 10000
+  process_retry_max_wait_ms: 10000
 
 jwt:
   secret: "${JWT_SECRET}"  # JWT签名密钥

@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: lf-blog
+spec:
+  selector:
+    app: elasticsearch
+  ports:
+    - name: http
+      port: 9200
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: lf-blog
+spec:
+  serviceName: elasticsearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: k8s-node1
+      securityContext:
+        fsGroup: 1000
+      imagePullSecrets:
+        - name: tencent-ccr
+      containers:
+        - name: elasticsearch
+          image: ccr.ccs.tencentyun.com/lf-blog/blog-elasticsearch:8.19.20-ik-pinyin
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: discovery.type
+              value: single-node
+            - name: xpack.security.enabled
+              value: "true"
+            - name: xpack.security.http.ssl.enabled
+              value: "false"
+            - name: ELASTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: infra-secrets
+                  key: elasticsearch-password
+            - name: ES_JAVA_OPTS
+              value: "-Xms512m -Xmx512m"
+          ports:
+            - name: http
+              containerPort: 9200
+          readinessProbe:
+            exec:
+              command: ["sh", "-ec", "curl -fsS -u elastic:$ELASTIC_PASSWORD http://127.0.0.1:9200/_cluster/health >/dev/null"]
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests:
+              cpu: 250m
+              memory: 768Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: elasticsearch-data

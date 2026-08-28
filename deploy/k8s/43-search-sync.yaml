@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-sync
+  namespace: lf-blog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: search-sync
+  template:
+    metadata:
+      labels:
+        app: search-sync
+    spec:
+      imagePullSecrets:
+        - name: tencent-ccr
+      containers:
+        - name: search-sync
+          image: ccr.ccs.tencentyun.com/lf-blog/blog-web:v1.0.0
+          imagePullPolicy: IfNotPresent
+          args: ["search-sync"]
+          envFrom:
+            - secretRef:
+                name: blog-app-env
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /app/config/config.yaml
+              subPath: config.yaml
+              readOnly: true
+      volumes:
+        - name: config
+          secret:
+            secretName: blog-config
+            items:
+              - key: config.yaml
+                path: config.yaml

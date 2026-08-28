@@ -2,6 +2,7 @@ package config
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -13,15 +14,163 @@ import (
 
 // Config 表示博客系统完整运行配置。
 type Config struct {
-	Database   Database  `yaml:"database"`   // MySQL 配置
-	Redis      Redis     `yaml:"redis"`      // Redis 配置
-	Mongodb    Mongodb   `yaml:"mongodb"`    // MongoDB 配置
-	Kafka      Kafka     `yaml:"kafka"`      // Kafka 配置
-	JWT        JWT       `yaml:"jwt"`        // 用户 JWT 配置
-	OpenJWT    OpenJWT   `yaml:"openjwt"`    // 开放 gRPC JWT 配置
-	GRPC       GRPC      `yaml:"grpc"`       // gRPC Server 配置
-	ThirdParty []Partner `yaml:"thirdparty"` // 三方合作方配置
-	OSS        OSS       `yaml:"oss"`        // MinIO 对象存储配置
+	Database      Database      `yaml:"database"`      // MySQL 配置
+	Redis         Redis         `yaml:"redis"`         // Redis 配置
+	Mongodb       Mongodb       `yaml:"mongodb"`       // MongoDB 配置
+	Elasticsearch Elasticsearch `yaml:"elasticsearch"` // Elasticsearch 搜索引擎配置
+	Canal         Canal         `yaml:"canal"`         // Canal binlog 订阅配置
+	Kafka         Kafka         `yaml:"kafka"`         // Kafka 配置
+	JWT           JWT           `yaml:"jwt"`           // 用户 JWT 配置
+	OpenJWT       OpenJWT       `yaml:"openjwt"`       // 开放 gRPC JWT 配置
+	GRPC          GRPC          `yaml:"grpc"`          // gRPC Server 配置
+	ThirdParty    []Partner     `yaml:"thirdparty"`    // 三方合作方配置
+	OSS           OSS           `yaml:"oss"`           // MinIO 对象存储配置
+}
+
+// Elasticsearch 表示搜索引擎连接和索引配置。
+type Elasticsearch struct {
+	Addr             string `yaml:"addr"`               // Elasticsearch HTTP 访问地址
+	Username         string `yaml:"username"`           // Basic Auth 用户名，未启用认证时为空
+	Password         string `yaml:"password"`           // Basic Auth 密码，未启用认证时为空
+	IndexAlias       string `yaml:"index_alias"`        // 文章搜索稳定索引别名
+	RequestTimeoutMS int    `yaml:"request_timeout_ms"` // 单次 Elasticsearch 请求超时时间（毫秒）
+}
+
+// Canal 表示 Canal Server 连接和批次消费配置。
+type Canal struct {
+	Host                  string `yaml:"host"`                      // Canal Server 主机地址
+	Port                  int    `yaml:"port"`                      // Canal Client TCP 端口
+	Username              string `yaml:"username"`                  // Canal Server 认证用户名
+	Password              string `yaml:"password"`                  // Canal Server 认证密码
+	Destination           string `yaml:"destination"`               // 文章搜索订阅 destination
+	Filter                string `yaml:"filter"`                    // Canal 订阅过滤表达式
+	BatchSize             int32  `yaml:"batch_size"`                // 单次拉取最大事件数量
+	EmptyWaitMS           int    `yaml:"empty_wait_ms"`             // 空批次后的等待时间（毫秒）
+	SocketTimeoutMS       int32  `yaml:"socket_timeout_ms"`         // Canal 连接建立超时时间（毫秒）
+	IdleTimeoutMS         int32  `yaml:"idle_timeout_ms"`           // Canal 连接读写空闲超时时间（毫秒）
+	ReconnectMinWaitMS    int    `yaml:"reconnect_min_wait_ms"`     // 首次重连等待时间（毫秒）
+	ReconnectMaxWaitMS    int    `yaml:"reconnect_max_wait_ms"`     // 最大重连等待时间（毫秒）
+	ProcessRetryMaxWaitMS int    `yaml:"process_retry_max_wait_ms"` // 批次处理失败后的最大重试等待时间（毫秒）
+}
+
+const (
+	defaultSearchIndexAlias         = "article_search" // 默认文章搜索索引别名
+	defaultSearchRequestTimeoutMS   = 3000             // 默认搜索请求超时时间（毫秒）
+	defaultCanalBatchSize           = 100              // 默认 Canal 批次大小
+	defaultCanalEmptyWaitMS         = 500              // 默认 Canal 空批次等待时间（毫秒）
+	defaultCanalSocketTimeoutMS     = 60000            // 默认 Canal 建连超时时间（毫秒）
+	defaultCanalIdleTimeoutMS       = 3600000          // 默认 Canal 空闲超时时间（毫秒）
+	defaultCanalReconnectMinWaitMS  = 500              // 默认 Canal 首次重连等待时间（毫秒）
+	defaultCanalReconnectMaxWaitMS  = 10000            // 默认 Canal 最大重连等待时间（毫秒）
+	defaultCanalProcessRetryMaxWait = 10000            // 默认批次处理最大重试等待时间（毫秒）
+)
+
+// GetIndexAlias 获取文章搜索索引别名，未配置时返回默认值。
+func (e Elasticsearch) GetIndexAlias() string {
+	// 1. 优先使用显式配置的索引别名
+	if strings.TrimSpace(e.IndexAlias) != "" {
+		return strings.TrimSpace(e.IndexAlias)
+	}
+	// 2. 未配置时使用稳定默认别名
+	return defaultSearchIndexAlias
+}
+
+// GetRequestTimeoutMS 获取 Elasticsearch 请求超时时间，未配置时返回默认值。
+func (e Elasticsearch) GetRequestTimeoutMS() int {
+	// 1. 返回显式配置或默认超时时间
+	if e.RequestTimeoutMS > 0 {
+		return e.RequestTimeoutMS
+	}
+	return defaultSearchRequestTimeoutMS
+}
+
+// Validate 校验 Elasticsearch 必填连接配置。
+func (e Elasticsearch) Validate() error {
+	// 1. 校验搜索服务地址
+	if strings.TrimSpace(e.Addr) == "" {
+		return errors.New("Elasticsearch 地址不能为空")
+	}
+	return nil
+}
+
+// GetBatchSize 获取 Canal 单批次事件数量，未配置时返回默认值。
+func (c Canal) GetBatchSize() int32 {
+	// 1. 返回显式配置或默认批次大小
+	if c.BatchSize > 0 {
+		return c.BatchSize
+	}
+	return defaultCanalBatchSize
+}
+
+// GetEmptyWaitMS 获取 Canal 空批次等待时间，未配置时返回默认值。
+func (c Canal) GetEmptyWaitMS() int {
+	// 1. 返回显式配置或默认等待时间
+	if c.EmptyWaitMS > 0 {
+		return c.EmptyWaitMS
+	}
+	return defaultCanalEmptyWaitMS
+}
+
+// GetSocketTimeoutMS 获取 Canal 建连超时时间，未配置时返回默认值。
+func (c Canal) GetSocketTimeoutMS() int32 {
+	// 1. 返回显式配置或默认建连超时时间
+	if c.SocketTimeoutMS > 0 {
+		return c.SocketTimeoutMS
+	}
+	return defaultCanalSocketTimeoutMS
+}
+
+// GetIdleTimeoutMS 获取 Canal 连接空闲超时时间，未配置时返回默认值。
+func (c Canal) GetIdleTimeoutMS() int32 {
+	// 1. 返回显式配置或默认空闲超时时间
+	if c.IdleTimeoutMS > 0 {
+		return c.IdleTimeoutMS
+	}
+	return defaultCanalIdleTimeoutMS
+}
+
+// GetReconnectMinWaitMS 获取 Canal 首次重连等待时间，未配置时返回默认值。
+func (c Canal) GetReconnectMinWaitMS() int {
+	// 1. 返回显式配置或默认等待时间
+	if c.ReconnectMinWaitMS > 0 {
+		return c.ReconnectMinWaitMS
+	}
+	return defaultCanalReconnectMinWaitMS
+}
+
+// GetReconnectMaxWaitMS 获取 Canal 最大重连等待时间，未配置时返回默认值。
+func (c Canal) GetReconnectMaxWaitMS() int {
+	// 1. 返回不小于首次重连等待时间的最大值
+	if c.ReconnectMaxWaitMS >= c.GetReconnectMinWaitMS() {
+		return c.ReconnectMaxWaitMS
+	}
+	return defaultCanalReconnectMaxWaitMS
+}
+
+// GetProcessRetryMaxWaitMS 获取批次处理最大重试等待时间，未配置时返回默认值。
+func (c Canal) GetProcessRetryMaxWaitMS() int {
+	// 1. 返回显式配置或默认最大等待时间
+	if c.ProcessRetryMaxWaitMS > 0 {
+		return c.ProcessRetryMaxWaitMS
+	}
+	return defaultCanalProcessRetryMaxWait
+}
+
+// Validate 校验 Canal 必填连接和订阅配置。
+func (c Canal) Validate() error {
+	// 1. 校验连接地址与端口
+	if strings.TrimSpace(c.Host) == "" {
+		return errors.New("Canal 主机地址不能为空")
+	}
+	if c.Port <= 0 {
+		return errors.New("Canal 端口必须大于 0")
+	}
+
+	// 2. 校验订阅 destination
+	if strings.TrimSpace(c.Destination) == "" {
+		return errors.New("Canal destination 不能为空")
+	}
+	return nil
 }
 
 // JWT 表示用户 JWT 配置。

@@ -14,6 +14,27 @@ mongodb:
   dbname: "${MONGODB_DATABASE}"
   username: "${MONGODB_ROOT_USERNAME}"
   password: "${MONGODB_ROOT_PASSWORD}"
+elasticsearch:
+  addr: "http://127.0.0.1:9200"
+  username: ""
+  password: ""
+  index_alias: "article_search"
+  request_timeout_ms: 3000
+canal:
+  host: "127.0.0.1"                # Canal服务地址
+  port: 11111                       # Canal端口号，默认11111
+  username: ""                      # Canal连接账号
+  password: ""                      # Canal连接密码
+  destination: "article_search"    # 实例名称，对应Canal后台创建的instance
+  filter: "blog\\.articles"         # 监听数据表，格式：数据库名.表名；\为yaml转义符
+  batch_size: 100                   # 单次从canal拉取的最大变更消息条数
+  empty_wait_ms: 500                # 无数据时休眠等待时长(毫秒)
+  socket_timeout_ms: 60000          # Socket网络读写超时时间(毫秒)
+  idle_timeout_ms: 3600000         # 空闲超时，长时间无消息自动断开重连(1小时)
+  reconnect_min_wait_ms: 500        # 重连失败，最短等待间隔(毫秒)
+  reconnect_max_wait_ms: 10000      # 重连失败，最长退避等待间隔(毫秒)
+  process_retry_max_wait_ms: 10000  # 业务处理失败，重试最长等待间隔(毫秒)
+
 jwt:
   secret: "${JWT_SECRET}"  # JWT签名密钥
 openjwt:

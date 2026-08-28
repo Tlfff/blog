@@ -222,6 +222,8 @@ services:
 
   # 后端服务
   blog-server:
+    env_file:
+      - .env
     environment:
       MYSQL_USER: "${MYSQL_USER}"                                      # MySQL 应用账号
       MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                              # MySQL 应用密码
@@ -236,6 +238,10 @@ services:
       PARTNER_A_SECRET_KEY: "${PARTNER_A_SECRET_KEY}"                  # 三方合作方共享密钥
       OSS_ACCESS_KEY_ID: "${OSS_ACCESS_KEY_ID}"                        # OSS 访问凭证
       OSS_SECRET_ACCESS_KEY: "${OSS_SECRET_ACCESS_KEY}"                # OSS 访问密钥
+      ELASTICSEARCH_USERNAME: "${ELASTICSEARCH_USERNAME:-}"             # 本地 ES 默认关闭认证
+      ELASTICSEARCH_PASSWORD: "${ELASTICSEARCH_PASSWORD:-}"             # 本地 ES 默认关闭认证
+      CANAL_SERVER_USERNAME: "${CANAL_SERVER_USERNAME:-}"               # Canal Server 默认不启用客户端认证
+      CANAL_SERVER_PASSWORD: "${CANAL_SERVER_PASSWORD:-}"               # Canal Server 默认不启用客户端认证
     image: blog-server:latest
     container_name: blog-server
     restart: always
@@ -262,6 +268,8 @@ services:
 
   # 对外服务（gRPC，二方/三方）
   blog-grpc:
+    env_file:
+      - .env
     environment:
       MYSQL_USER: "${MYSQL_USER}"                                      # MySQL 应用账号
       MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                              # MySQL 应用密码
@@ -276,6 +284,10 @@ services:
       PARTNER_A_SECRET_KEY: "${PARTNER_A_SECRET_KEY}"                  # 三方合作方共享密钥
       OSS_ACCESS_KEY_ID: "${OSS_ACCESS_KEY_ID}"                        # OSS 访问凭证
       OSS_SECRET_ACCESS_KEY: "${OSS_SECRET_ACCESS_KEY}"                # OSS 访问密钥
+      ELASTICSEARCH_USERNAME: "${ELASTICSEARCH_USERNAME:-}"
+      ELASTICSEARCH_PASSWORD: "${ELASTICSEARCH_PASSWORD:-}"
+      CANAL_SERVER_USERNAME: "${CANAL_SERVER_USERNAME:-}"
+      CANAL_SERVER_PASSWORD: "${CANAL_SERVER_PASSWORD:-}"
     image: blog-server:latest
     container_name: blog-grpc
     restart: always
@@ -294,6 +306,8 @@ services:
 
   # Kafka 消费者
   blog-consumer:
+    env_file:
+      - .env
     environment:
       MYSQL_USER: "${MYSQL_USER}"                                      # MySQL 应用账号
       MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                              # MySQL 应用密码
@@ -308,6 +322,10 @@ services:
       PARTNER_A_SECRET_KEY: "${PARTNER_A_SECRET_KEY}"                  # 三方合作方共享密钥
       OSS_ACCESS_KEY_ID: "${OSS_ACCESS_KEY_ID}"                        # OSS 访问凭证
       OSS_SECRET_ACCESS_KEY: "${OSS_SECRET_ACCESS_KEY}"                # OSS 访问密钥
+      ELASTICSEARCH_USERNAME: "${ELASTICSEARCH_USERNAME:-}"
+      ELASTICSEARCH_PASSWORD: "${ELASTICSEARCH_PASSWORD:-}"
+      CANAL_SERVER_USERNAME: "${CANAL_SERVER_USERNAME:-}"
+      CANAL_SERVER_PASSWORD: "${CANAL_SERVER_PASSWORD:-}"
     image: blog-server:latest
     container_name: blog-consumer
     restart: always
@@ -322,6 +340,32 @@ services:
       mongodb:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+    networks:
+      - blog-net
+
+  # 文章搜索增量同步进程
+  search-sync:
+    image: blog-server:latest
+    container_name: blog-search-sync
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      ELASTICSEARCH_USERNAME: "${ELASTICSEARCH_USERNAME:-}"
+      ELASTICSEARCH_PASSWORD: "${ELASTICSEARCH_PASSWORD:-}"
+      CANAL_SERVER_USERNAME: "${CANAL_SERVER_USERNAME:-}"
+      CANAL_SERVER_PASSWORD: "${CANAL_SERVER_PASSWORD:-}"
+    command: ["search-sync"]
+    volumes:
+      - ./config/config.docker.yaml:/app/config/config.yaml:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      canal:
         condition: service_healthy
     networks:
       - blog-net
