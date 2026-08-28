@@ -1,10 +1,4 @@
-# Article Image Management Specification
-
-## Purpose
-
-定义文章图片在提交阶段批量获取上传凭证、直接写入文章正式目录、等待上传完成后保存正文，以及文章硬删除时统一清理对象的可验证行为。
-
-## Requirements
+## ADDED Requirements
 
 ### Requirement: 单图片实时获取上传凭证
 系统 SHALL 允许唯一管理员在不提供文章 ID 的情况下为单张合法图片申请上传凭证，并 SHALL 返回图片 ID、预签名上传 URL 和当前公开访问 URL。
@@ -91,18 +85,6 @@
 - **THEN** 系统仍返回原始文章详情
 - **AND** 图片映射不包含该无效关系
 
-### Requirement: 非硬删除阶段保留文章图片
-系统 SHALL 在图片未绑定、文章为草稿、已发表或软删除状态时保留图片对象，并 SHALL NOT 因正文更新移除图片引用而立即删除对象。
-
-#### Scenario: 更新正文移除图片
-- **WHEN** 作者更新正文并删除对某张已绑定图片的引用
-- **THEN** 系统保存新正文并将图片 `article_id` 更新为空
-- **AND** 保留原图片对象和图片记录
-
-#### Scenario: 文章软删除
-- **WHEN** 作者将文章移入垃圾箱
-- **THEN** 系统保留该文章的图片绑定关系和全部图片对象，以支持恢复
-
 ### Requirement: 硬删除时清理已绑定图片
 系统 SHALL 在物理删除垃圾箱文章前查询该文章已绑定的图片，删除对应对象和图片记录；任一图片清理失败时 SHALL 保留文章及图片记录以允许重试。
 
@@ -120,3 +102,39 @@
 - **WHEN** 管理员彻底删除没有已绑定图片的垃圾箱文章
 - **THEN** 系统将图片清理视为成功
 - **AND** 物理删除文章记录
+
+## MODIFIED Requirements
+
+### Requirement: 非硬删除阶段保留文章图片
+系统 SHALL 在图片未绑定、文章为草稿、已发表或软删除状态时保留图片对象，并 SHALL NOT 因正文更新移除图片引用而立即删除对象。
+
+#### Scenario: 更新正文移除图片
+- **WHEN** 作者更新正文并删除对某张已绑定图片的引用
+- **THEN** 系统保存新正文并将图片 `article_id` 更新为空
+- **AND** 保留原图片对象和图片记录
+
+#### Scenario: 文章软删除
+- **WHEN** 作者将文章移入垃圾箱
+- **THEN** 系统保留该文章的图片绑定关系和全部图片对象，以支持恢复
+
+## REMOVED Requirements
+
+### Requirement: 批量获取文章图片上传凭证
+**Reason**: 编辑器按单张图片实时上传，批量接口及文章 ID 参数增加了不必要的耦合。
+
+**Migration**: 调用方改用 `POST /article/image/upload-url`，每次为一张图片申请凭证。
+
+### Requirement: 图片直接上传到文章正式目录
+**Reason**: 图片对象改为独立资源，对象路径不再表达文章归属。
+
+**Migration**: 新上传图片统一使用 `article/img/<year>/<month>/<uuid>.<ext>`；文章归属由图片记录的 `article_id` 表达，历史对象和正文 URL 保持不变。
+
+### Requirement: 保存文章前等待图片上传完成
+**Reason**: 单图片实时上传后，正文改为持久化图片 ID 占位符，不再在提交前批量替换为正式 URL。
+
+**Migration**: 单张图片上传成功后在正文插入 `image://<image_id>`，文章保存时由系统同步图片归属。
+
+### Requirement: 硬删除时清理文章目录
+**Reason**: 新图片对象不再按文章 ID 分目录，硬删除改为根据图片记录中的 `article_id` 精确清理。
+
+**Migration**: 使用“硬删除时清理已绑定图片”要求替代按对象前缀清理。

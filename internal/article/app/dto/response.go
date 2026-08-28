@@ -6,37 +6,34 @@ import (
 	"strings"
 )
 
-// InitializeArticleResponse 是初始化文章草稿的响应 DTO。
-type InitializeArticleResponse struct {
-	ArticleID uint64 `json:"article_id"` // 初始化生成的文章唯一标识
-}
-
-// ImageUploadCredential 是单张文章图片的上传凭证 DTO。
-type ImageUploadCredential struct {
-	ClientID  string `json:"client_id"`  // 前端图片标识，用于匹配原始文件
+// ImageUploadCredentialResponse 是单张文章图片上传凭证响应 DTO。
+type ImageUploadCredentialResponse struct {
+	ImageID   uint64 `json:"image_id"`   // 图片唯一标识，用于写入正文占位符
 	UploadURL string `json:"upload_url"` // 图片预签名 PUT 地址
-	URL       string `json:"url"`        // 图片上传后的公开访问地址
+	URL       string `json:"url"`        // 图片当前公开访问地址
 }
 
-// ImageUploadCredentialsResponse 是批量文章图片上传凭证响应 DTO。
-type ImageUploadCredentialsResponse struct {
-	Files []ImageUploadCredential `json:"files"` // 与请求图片对应的上传凭证列表
+// ArticleImageResponse 是文章详情中的图片访问映射。
+type ArticleImageResponse struct {
+	ID  uint64 `json:"id"`  // 图片唯一标识
+	URL string `json:"url"` // 基于当前公开域名生成的图片地址
 }
 
 // ArticleDetailResponse 是文章详情响应 DTO。
 type ArticleDetailResponse struct {
-	ID           uint64   `json:"id"`            // 文章唯一标识
-	Title        string   `json:"title"`         // 文章标题
-	Content      string   `json:"content"`       // 文章正文内容（支持Markdown）
-	Tags         []string `json:"tags"`          // 文章标签列表
-	Status       int8     `json:"status"`        // 文章状态：1-已删除 2-草稿 3-已发表
-	AuthorNick   string   `json:"author_nick"`   // 作者昵称
-	AuthorAvatar string   `json:"author_avatar"` // 作者头像URL
-	IP           string   `json:"ip"`            // 作者IP归属地（已由IP转换为地区文案）
-	CreatedTime  int64    `json:"created_time"`  // 创建时间（Unix 秒）
-	UpdatedTime  int64    `json:"updated_time"`  // 最后更新时间（Unix 秒）
-	IsLiked      bool     `json:"is_liked"`      // 当前登录用户是否已点赞
-	LikeCount    uint64   `json:"like_count"`    // 点赞数
+	ID           uint64                 `json:"id"`            // 文章唯一标识
+	Title        string                 `json:"title"`         // 文章标题
+	Content      string                 `json:"content"`       // 文章正文内容（支持Markdown）
+	Tags         []string               `json:"tags"`          // 文章标签列表
+	Status       int8                   `json:"status"`        // 文章状态：1-已删除 2-草稿 3-已发表
+	AuthorNick   string                 `json:"author_nick"`   // 作者昵称
+	AuthorAvatar string                 `json:"author_avatar"` // 作者头像URL
+	IP           string                 `json:"ip"`            // 作者IP归属地（已由IP转换为地区文案）
+	CreatedTime  int64                  `json:"created_time"`  // 创建时间（Unix 秒）
+	UpdatedTime  int64                  `json:"updated_time"`  // 最后更新时间（Unix 秒）
+	IsLiked      bool                   `json:"is_liked"`      // 当前登录用户是否已点赞
+	LikeCount    uint64                 `json:"like_count"`    // 点赞数
+	Images       []ArticleImageResponse `json:"images"`        // 正文引用且属于当前文章的图片映射
 }
 
 // NewArticleDetailResponse 构造文章详情响应。
@@ -71,6 +68,7 @@ func NewArticleDetailResponse(article *domain.Article, nickname, avatar, authorI
 		UpdatedTime:  article.UpdatedTime.Unix(),
 		IsLiked:      isLiked,
 		LikeCount:    uint64(article.LikeCount),
+		Images:       []ArticleImageResponse{},
 	}
 }
 

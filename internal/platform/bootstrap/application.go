@@ -58,6 +58,7 @@ func NewApplication(resources *Resources, cfg *platformconfig.Config) (*Applicat
 		userModule.Application,
 		likeModule.Application,
 		articleStatistics,
+		tx,
 	)
 
 	// 6. 创建 Notification 上下文，并注入 Article/User 本地 Facade

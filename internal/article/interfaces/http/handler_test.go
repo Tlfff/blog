@@ -3,7 +3,6 @@ package http
 import (
 	articleapp "blog/internal/article/app"
 	articledto "blog/internal/article/app/dto"
-	"blog/internal/platform/security"
 	apperrors "blog/internal/shared/apperrors"
 	"bytes"
 	"context"
@@ -18,94 +17,61 @@ import (
 
 // fakeArticleUsecase 是 Article HTTP Handler 测试使用的应用用例。
 type fakeArticleUsecase struct {
-	ArticleUsecase                                              // 未使用方法通过嵌入接口保留
-	initializeResult *articledto.InitializeArticleResponse      // 初始化文章返回结果
-	initializeErr    error                                      // 初始化文章返回错误
-	uploadResult     *articledto.ImageUploadCredentialsResponse // 批量凭证返回结果
-	uploadErr        error                                      // 批量凭证返回错误
-	receivedCommand  articleapp.GetImageUploadURLsCommand       // Handler 传入的批量凭证命令
+	ArticleUsecase                                            // 未使用方法通过嵌入接口保留
+	uploadResult    *articledto.ImageUploadCredentialResponse // 单图片凭证返回结果
+	uploadErr       error                                     // 单图片凭证返回错误
+	receivedCommand articleapp.GetImageUploadURLCommand       // Handler 传入的上传凭证命令
 }
 
-// InitializeArticle 返回测试初始化结果。
-func (f *fakeArticleUsecase) InitializeArticle(context.Context, uint64) (*articledto.InitializeArticleResponse, error) {
-	// 1. 返回预设初始化结果
-	return f.initializeResult, f.initializeErr
-}
-
-// GetImageUploadURLs 记录批量凭证命令并返回测试结果。
-func (f *fakeArticleUsecase) GetImageUploadURLs(_ context.Context, command articleapp.GetImageUploadURLsCommand) (*articledto.ImageUploadCredentialsResponse, error) {
-	// 1. 记录命令并返回预设批量凭证结果
+// GetImageUploadURL 记录单图片凭证命令并返回测试结果。
+func (f *fakeArticleUsecase) GetImageUploadURL(_ context.Context, command articleapp.GetImageUploadURLCommand) (*articledto.ImageUploadCredentialResponse, error) {
+	// 1. 记录命令并返回预设凭证结果
 	f.receivedCommand = command
 	return f.uploadResult, f.uploadErr
 }
 
-// TestArticleHandlerInitializeArticle 验证初始化文章响应映射。
-func TestArticleHandlerInitializeArticle(t *testing.T) {
-	// 1. 准备初始化成功的 Handler 测试上下文
+// TestArticleHandlerGetImageUploadURL 验证单图片凭证请求和响应字段映射。
+func TestArticleHandlerGetImageUploadURL(t *testing.T) {
+	// 1. 准备单图片凭证成功响应和请求上下文
 	gin.SetMode(gin.TestMode)
-	usecase := &fakeArticleUsecase{initializeResult: &articledto.InitializeArticleResponse{ArticleID: 7}}
-	handler := NewArticleHandler(usecase, nil)
-	ctx, recorder := newArticleHandlerContext(nethttp.MethodPost, "/article/init", "")
-	ctx.Set("currentUser", &auth.UserContext{UserID: 100})
-
-	// 2. 执行请求并校验文章 ID 响应
-	handler.InitializeArticle(ctx)
-
-	if recorder.Code != nethttp.StatusOK || !strings.Contains(recorder.Body.String(), `"article_id":7`) {
-		t.Fatalf("初始化文章响应错误: code=%d body=%s", recorder.Code, recorder.Body.String())
-	}
-}
-
-// TestArticleHandlerGetImageUploadURLs 验证批量凭证请求和响应字段映射。
-func TestArticleHandlerGetImageUploadURLs(t *testing.T) {
-	// 1. 准备批量凭证成功响应和请求上下文
-	gin.SetMode(gin.TestMode)
-	usecase := &fakeArticleUsecase{uploadResult: &articledto.ImageUploadCredentialsResponse{
-		Files: []articledto.ImageUploadCredential{{
-			ClientID:  "image-1",
-			UploadURL: "https://upload.example/article/7/a.png",
-			URL:       "https://cdn.example/article/7/a.png",
-		}},
+	usecase := &fakeArticleUsecase{uploadResult: &articledto.ImageUploadCredentialResponse{
+		ImageID: 7, UploadURL: "https://upload.example/article/img/a.png", URL: "https://cdn.example/article/img/a.png",
 	}}
 	handler := NewArticleHandler(usecase, nil)
-	body := `{"article_id":7,"files":[{"client_id":"image-1","file_ext":"png"}]}`
-	ctx, recorder := newArticleHandlerContext(nethttp.MethodPost, "/article/image/upload-urls", body)
-	ctx.Set("currentUser", &auth.UserContext{UserID: 100})
+	ctx, recorder := newArticleHandlerContext(nethttp.MethodPost, "/article/image/upload-url", `{"file_ext":"png"}`)
 
-	// 2. 执行请求并校验命令及响应字段映射
-	handler.GetImageUploadURLs(ctx)
-
+	// 2. 执行请求并校验命令及响应字段
+	handler.GetImageUploadURL(ctx)
 	if len(ctx.Errors) != 0 {
-		t.Fatalf("批量凭证请求不应返回错误: %v", ctx.Errors)
+		t.Fatalf("单图片凭证请求不应返回错误: %v", ctx.Errors)
 	}
-	if usecase.receivedCommand.ArticleID != 7 || usecase.receivedCommand.AuthorID != 100 || len(usecase.receivedCommand.Files) != 1 {
-		t.Fatalf("批量凭证命令映射错误: %+v", usecase.receivedCommand)
+	if usecase.receivedCommand.FileExt != "png" {
+		t.Fatalf("单图片凭证命令映射错误: %+v", usecase.receivedCommand)
 	}
-	if !strings.Contains(recorder.Body.String(), `"client_id":"image-1"`) || !strings.Contains(recorder.Body.String(), `"upload_url":`) {
-		t.Fatalf("批量凭证响应字段错误: %s", recorder.Body.String())
+	body := recorder.Body.String()
+	if !strings.Contains(body, `"image_id":7`) || !strings.Contains(body, `"upload_url":`) || !strings.Contains(body, `"url":`) {
+		t.Fatalf("单图片凭证响应字段错误: %s", body)
 	}
 }
 
-// TestArticleHandlerGetImageUploadURLsErrors 验证请求校验和应用错误传递。
-func TestArticleHandlerGetImageUploadURLsErrors(t *testing.T) {
-	// 1. 验证空文件列表被 HTTP 参数校验拒绝
+// TestArticleHandlerGetImageUploadURLErrors 验证请求校验和应用错误传递。
+func TestArticleHandlerGetImageUploadURLErrors(t *testing.T) {
+	// 1. 验证缺少扩展名被 HTTP 参数校验拒绝
 	gin.SetMode(gin.TestMode)
-	invalidUsecase := &fakeArticleUsecase{}
-	invalidHandler := NewArticleHandler(invalidUsecase, nil)
-	invalidCtx, _ := newArticleHandlerContext(nethttp.MethodPost, "/article/image/upload-urls", `{"article_id":7,"files":[]}`)
-	invalidHandler.GetImageUploadURLs(invalidCtx)
+	invalidHandler := NewArticleHandler(&fakeArticleUsecase{}, nil)
+	invalidCtx, _ := newArticleHandlerContext(nethttp.MethodPost, "/article/image/upload-url", `{}`)
+	invalidHandler.GetImageUploadURL(invalidCtx)
 	if len(invalidCtx.Errors) == 0 || !errors.Is(invalidCtx.Errors.Last().Err, apperrors.ErrInvalidRequestBody) {
-		t.Fatalf("空文件列表错误不正确: %v", invalidCtx.Errors)
+		t.Fatalf("缺少扩展名错误不正确: %v", invalidCtx.Errors)
 	}
 
-	// 2. 验证 Application 权限错误由 Handler 原样传递
-	permissionUsecase := &fakeArticleUsecase{uploadErr: apperrors.ErrArticlePermissionDenied}
-	permissionHandler := NewArticleHandler(permissionUsecase, nil)
-	permissionCtx, _ := newArticleHandlerContext(nethttp.MethodPost, "/article/image/upload-urls", `{"article_id":7,"files":[{"client_id":"image-1","file_ext":"png"}]}`)
-	permissionCtx.Set("currentUser", &auth.UserContext{UserID: 200})
-	permissionHandler.GetImageUploadURLs(permissionCtx)
-	if len(permissionCtx.Errors) == 0 || !errors.Is(permissionCtx.Errors.Last().Err, apperrors.ErrArticlePermissionDenied) {
-		t.Fatalf("权限错误未传递: %v", permissionCtx.Errors)
+	// 2. 验证 Application 错误由 Handler 原样传递
+	uploadErr := errors.New("upload failed")
+	errorHandler := NewArticleHandler(&fakeArticleUsecase{uploadErr: uploadErr}, nil)
+	errorCtx, _ := newArticleHandlerContext(nethttp.MethodPost, "/article/image/upload-url", `{"file_ext":"png"}`)
+	errorHandler.GetImageUploadURL(errorCtx)
+	if len(errorCtx.Errors) == 0 || !errors.Is(errorCtx.Errors.Last().Err, uploadErr) {
+		t.Fatalf("Application 错误未传递: %v", errorCtx.Errors)
 	}
 }
 

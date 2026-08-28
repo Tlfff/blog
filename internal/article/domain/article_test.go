@@ -22,43 +22,6 @@ func TestNewArticle(t *testing.T) {
 	}
 }
 
-// TestNewDraftArticle 验证初始化草稿允许空内容且保持作者和状态约束。
-func TestNewDraftArticle(t *testing.T) {
-	// 1. 验证合法作者可以初始化空内容草稿
-	article, err := NewDraftArticle(100)
-	if err != nil {
-		t.Fatalf("初始化草稿失败: %v", err)
-	}
-	if article.AuthorID != 100 || !article.IsDraft() || article.Title != "" || article.Content != "" {
-		t.Fatalf("初始化草稿字段错误: %+v", article)
-	}
-
-	// 2. 验证无效作者被领域规则拒绝
-	if _, err := NewDraftArticle(0); !errors.Is(err, ErrArticlePermissionDenied) {
-		t.Fatalf("无效作者错误不正确: %v", err)
-	}
-}
-
-// TestArticleImageUploadPermission 验证文章图片上传权限和删除状态规则。
-func TestArticleImageUploadPermission(t *testing.T) {
-	// 1. 验证作者可以为活动文章上传图片
-	article := &Article{ID: 1, AuthorID: 100, Status: StatusDraft}
-	if err := article.EnsureCanUploadImageBy(100); err != nil {
-		t.Fatalf("作者应允许上传图片: %v", err)
-	}
-
-	// 2. 验证非作者被拒绝
-	if err := article.EnsureCanUploadImageBy(200); !errors.Is(err, ErrArticlePermissionDenied) {
-		t.Fatalf("非作者上传错误不正确: %v", err)
-	}
-
-	// 3. 验证已删除文章不能继续上传图片
-	article.Status = StatusDeleted
-	if err := article.EnsureCanUploadImageBy(100); !errors.Is(err, ErrArticleDeleted) {
-		t.Fatalf("已删除文章上传错误不正确: %v", err)
-	}
-}
-
 // TestArticleLifecycleRules 验证文章生命周期由聚合保护。
 func TestArticleLifecycleRules(t *testing.T) {
 	article := &Article{ID: 1, AuthorID: 100, Status: StatusDraft}

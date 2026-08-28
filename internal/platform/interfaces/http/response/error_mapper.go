@@ -29,7 +29,8 @@ func CodeByError(err error) int {
 		apperrors.ErrArticleTitleEmpty,
 		apperrors.ErrArticleContentEmpty,
 		apperrors.ErrArticleIDInvalid,
-		apperrors.ErrArticleStatusInvalid:
+		apperrors.ErrArticleStatusInvalid,
+		apperrors.ErrArticleImageInvalid:
 
 		return CodeInvalidParameter
 

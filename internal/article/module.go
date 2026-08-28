@@ -33,6 +33,17 @@ type Module struct {
 }
 
 // NewModule 创建 Article 上下文模块。
+//
+// 参数说明：
+//   - db：MySQL 数据库连接。
+//   - rdb：Redis 客户端。
+//   - kafkaClient：Kafka 客户端。
+//   - ossClient：MinIO 对象存储客户端。
+//   - cfg：应用配置。
+//   - users：User Application Facade。
+//   - likes：Like Application Facade。
+//   - statistics：文章统计服务，可以为空。
+//   - tx：本地数据库事务协调器。
 func NewModule(
 	db *gorm.DB,
 	rdb *redis.Client,
@@ -42,19 +53,23 @@ func NewModule(
 	users UserFacade,
 	likes LikeFacade,
 	statistics *articleapp.StatisticsService,
+	tx articleapp.TransactionManager,
 ) *Module {
 	repo := articleinfra.NewArticleRepository(db)
 	if statistics == nil {
 		statistics = articleapp.NewStatisticsService(articleinfra.NewArticleStatistics(db))
 	}
-	application := articleapp.NewService(
-		repo,
-		articleinfra.NewUserQuery(users),
-		articleinfra.NewArticleImageStorage(ossClient),
-		articleinfra.NewInteractionQuery(likes),
-		cfg.OSS.PublicDomain,
-		cfg.OSS.AllowedExts,
-	)
+	application := articleapp.NewService(articleapp.ServiceDependencies{
+		Articles:        repo,
+		ArticleImages:   articleinfra.NewArticleImageRepository(db),
+		ImageReferences: articleinfra.NewMarkdownImageReferenceParser(),
+		Users:           articleinfra.NewUserQuery(users),
+		ImageStorage:    articleinfra.NewArticleImageStorage(ossClient),
+		Interactions:    articleinfra.NewInteractionQuery(likes),
+		Transactions:    tx,
+		PublicDomain:    cfg.OSS.PublicDomain,
+		AllowedExts:     cfg.OSS.AllowedExts,
+	})
 	engagement := articleapp.NewEngagementService(
 		articleinfra.NewViewHistoryRepository(db),
 		articleinfra.NewHotRankStore(rdb),

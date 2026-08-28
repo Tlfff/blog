@@ -8,72 +8,58 @@ import (
 	apperrors "blog/internal/shared/apperrors"
 	"context"
 	"errors"
-	"fmt"
-	"path"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
 )
-
-const articleImageUploadURLTTL = 10 * time.Minute
 
 // Service 编排文章生命周期、查询与图片用例。
 type Service struct {
-	repo         domaincontent.ArticleRepository       // 文章持久化 Port
-	users        domaincontent.UserQuery               // 作者信息查询 Port，由 Identity 侧提供
-	images       domaincontent.ArticleImageStorage     // 文章图片对象存储 Port
-	interactions domaincontent.ArticleInteractionQuery // 文章互动统计查询 Port，由 Community 侧提供
-	publicDomain string                                // 对象存储对外访问域名
-	allowedExts  map[string]bool                       // 允许上传的图片扩展名集合
+	repo            domaincontent.ArticleRepository           // 文章持久化 Port
+	imageRepo       domaincontent.ArticleImageRepository      // 文章图片持久化 Port
+	imageReferences domaincontent.ArticleImageReferenceParser // 正文图片引用解析 Port
+	users           domaincontent.UserQuery                   // 作者信息查询 Port，由 Identity 侧提供
+	imageStorage    domaincontent.ArticleImageStorage         // 文章图片对象存储 Port
+	interactions    domaincontent.ArticleInteractionQuery     // 文章互动统计查询 Port，由 Community 侧提供
+	tx              TransactionManager                        // 本地数据库事务协调 Port
+	publicDomain    string                                    // 对象存储对外访问域名
+	allowedExts     map[string]bool                           // 允许上传的图片扩展名集合
+	now             func() time.Time                          // 当前时间函数，用于生成稳定可测的对象路径
+}
+
+// ServiceDependencies 汇总 Article Application 服务依赖。
+type ServiceDependencies struct {
+	Articles        domaincontent.ArticleRepository           // 文章持久化 Port
+	ArticleImages   domaincontent.ArticleImageRepository      // 文章图片持久化 Port
+	ImageReferences domaincontent.ArticleImageReferenceParser // 正文图片引用解析 Port
+	Users           domaincontent.UserQuery                   // 作者公开信息查询 Port
+	ImageStorage    domaincontent.ArticleImageStorage         // 文章图片对象存储 Port
+	Interactions    domaincontent.ArticleInteractionQuery     // 文章互动状态查询 Port
+	Transactions    TransactionManager                        // 本地数据库事务协调 Port
+	PublicDomain    string                                    // 对象存储公开访问域名
+	AllowedExts     []string                                  // 允许上传的图片扩展名列表
 }
 
 // NewService 创建 Article Application 服务。
-//
-// 参数说明：
-//   - repo：文章持久化 Port。
-//   - users：作者公开信息查询 Port。
-//   - images：文章图片对象存储 Port。
-//   - interactions：文章互动状态查询 Port。
-//   - publicDomain：对象存储公开访问域名。
-//   - allowedExts：允许上传的图片扩展名列表。
-func NewService(
-	repo domaincontent.ArticleRepository,
-	users domaincontent.UserQuery,
-	images domaincontent.ArticleImageStorage,
-	interactions domaincontent.ArticleInteractionQuery,
-	publicDomain string,
-	allowedExts []string,
-) *Service {
+func NewService(dependencies ServiceDependencies) *Service {
 	// 1. 把允许的扩展名统一转小写后放入集合，便于后续校验
-	extMap := make(map[string]bool, len(allowedExts))
-	for _, ext := range allowedExts {
-		extMap[strings.ToLower(ext)] = true
+	extensions := make(map[string]bool, len(dependencies.AllowedExts))
+	for _, extension := range dependencies.AllowedExts {
+		extensions[strings.ToLower(extension)] = true
 	}
+
 	// 2. 组装并返回应用服务实例
 	return &Service{
-		repo:         repo,
-		users:        users,
-		images:       images,
-		interactions: interactions,
-		publicDomain: publicDomain,
-		allowedExts:  extMap,
+		repo:            dependencies.Articles,
+		imageRepo:       dependencies.ArticleImages,
+		imageReferences: dependencies.ImageReferences,
+		users:           dependencies.Users,
+		imageStorage:    dependencies.ImageStorage,
+		interactions:    dependencies.Interactions,
+		tx:              dependencies.Transactions,
+		publicDomain:    dependencies.PublicDomain,
+		allowedExts:     extensions,
+		now:             time.Now,
 	}
-}
-
-// InitializeArticle 初始化空内容文章草稿并返回文章唯一标识。
-func (s *Service) InitializeArticle(ctx context.Context, authorID uint64) (*articledto.InitializeArticleResponse, error) {
-	// 1. 创建仅用于取得文章 ID 的初始化草稿
-	article, err := domaincontent.NewDraftArticle(authorID)
-	if err != nil {
-		return nil, mapArticleError(err)
-	}
-
-	// 2. 保存草稿并返回 Repository 回填的文章 ID
-	if err := s.repo.Create(ctx, article); err != nil {
-		return nil, err
-	}
-	return &articledto.InitializeArticleResponse{ArticleID: article.ID}, nil
 }
 
 // CreateArticle 创建文章。
@@ -86,13 +72,26 @@ func (s *Service) InitializeArticle(ctx context.Context, authorID uint64) (*arti
 //   - tags：文章标签列表。
 //   - status：文章状态：0-未指定；1-已删除；2-草稿；3-已发表。
 func (s *Service) CreateArticle(ctx context.Context, authorID uint64, title, content string, tags []string, status int8) error {
-	// 1. 通过领域构造函数创建文章聚合，标签仍以英文逗号拼接存储
-	art, err := domaincontent.NewArticle(authorID, title, content, strings.Join(tags, ","), status)
+	// 1. 创建文章聚合并提取正文中的系统图片引用
+	article, err := domaincontent.NewArticle(authorID, title, content, strings.Join(tags, ","), status)
 	if err != nil {
 		return mapArticleError(err)
 	}
-	// 2. 保存已经包含正式图片 URL 的文章正文
-	return s.repo.Create(ctx, art)
+	imageIDs, err := s.extractImageIDs(content)
+	if err != nil {
+		return err
+	}
+	if s.tx == nil {
+		return apperrors.ErrSystem
+	}
+
+	// 2. 在同一事务内创建文章并绑定全部未归属图片
+	return normalizeArticleTransactionError(s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.repo.Create(txCtx, article); err != nil {
+			return err
+		}
+		return s.bindArticleImages(txCtx, article.ID, imageIDs, false)
+	}))
 }
 
 // UpdateArticle 更新文章内容，仅作者本人可编辑且已删除文章不可编辑。
@@ -106,17 +105,37 @@ func (s *Service) CreateArticle(ctx context.Context, authorID uint64, title, con
 //   - tags：新文章标签列表。
 //   - status：新文章状态：0-未指定；1-已删除；2-草稿；3-已发表。
 func (s *Service) UpdateArticle(ctx context.Context, articleID, authorID uint64, title, content string, tags []string, status int8) error {
-	// 1. 查询文章并完成领域校验和内存状态更新
+	// 1. 查询文章并计算更新前后的图片引用差异
 	article, err := s.findArticle(ctx, articleID)
 	if err != nil {
 		return err
 	}
+	oldImageIDs, err := s.extractImageIDs(article.Content)
+	if err != nil {
+		return err
+	}
+	newImageIDs, err := s.extractImageIDs(content)
+	if err != nil {
+		return err
+	}
+	removedImageIDs := differenceImageIDs(oldImageIDs, newImageIDs)
 	if err := article.EditBy(authorID, title, content, strings.Join(tags, ","), status); err != nil {
 		return mapArticleError(err)
 	}
+	if s.tx == nil {
+		return apperrors.ErrSystem
+	}
 
-	// 2. 保存已经包含正式图片 URL 的文章正文
-	return s.repo.Update(ctx, article)
+	// 2. 在同一事务内更新文章、绑定正文图片并解绑已移除图片
+	return normalizeArticleTransactionError(s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.bindArticleImages(txCtx, article.ID, newImageIDs, true); err != nil {
+			return err
+		}
+		if err := s.unbindArticleImages(txCtx, article.ID, removedImageIDs); err != nil {
+			return err
+		}
+		return s.repo.Update(txCtx, article)
+	}))
 }
 
 // DeleteArticle 将作者文章软删除并移入垃圾箱。
@@ -144,17 +163,32 @@ func (s *Service) ClearArticle(ctx context.Context, articleID, userID uint64) er
 	if err := article.EnsureCanPermanentlyDeleteBy(userID); err != nil {
 		return mapArticleError(err)
 	}
-
-	// 2. 先清理文章正式目录，失败时保留数据库记录以便重试
-	if s.images == nil {
+	if s.imageRepo == nil || s.imageStorage == nil || s.tx == nil {
 		return apperrors.ErrSystem
 	}
-	if err := s.images.DeleteObjectsByPrefix(ctx, articleImageObjectPrefix(articleID)); err != nil {
+
+	// 2. 查询并逐个清理当前文章已绑定的图片对象
+	images, err := s.imageRepo.FindByArticleID(ctx, articleID)
+	if err != nil {
 		return err
 	}
+	for _, image := range images {
+		if err := s.imageStorage.DeleteObject(ctx, image.ObjectKey); err != nil {
+			return err
+		}
+	}
 
-	// 3. 图片清理成功后物理删除文章记录
-	return s.repo.Clear(ctx, articleID)
+	// 3. 对象清理成功后在同一事务内删除图片记录和文章记录
+	return normalizeArticleTransactionError(s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
+		rows, err := s.imageRepo.DeleteByArticleID(txCtx, articleID)
+		if err != nil {
+			return err
+		}
+		if rows != int64(len(images)) {
+			return apperrors.ErrArticleImageInvalid
+		}
+		return s.repo.Clear(txCtx, articleID)
+	}))
 }
 
 // PublishArticle 发表作者文章，已删除文章不可发表。
@@ -308,65 +342,6 @@ func (s *Service) GetArticleInfo(ctx context.Context, articleID uint64) (*domain
 	return s.findArticle(ctx, articleID)
 }
 
-// GetImageUploadURLs 批量生成直接写入文章正式目录的图片上传凭证。
-func (s *Service) GetImageUploadURLs(ctx context.Context, command GetImageUploadURLsCommand) (*articledto.ImageUploadCredentialsResponse, error) {
-	// 1. 校验对象存储与待上传文件列表
-	if s.images == nil {
-		return nil, apperrors.ErrSystem
-	}
-	if len(command.Files) == 0 {
-		return nil, apperrors.ErrInvalidRequestBody
-	}
-
-	// 2. 加载文章并执行 作者及删除状态校验
-	article, err := s.findArticle(ctx, command.ArticleID)
-	if err != nil {
-		return nil, err
-	}
-	if err := article.EnsureCanUploadImageBy(command.AuthorID); err != nil {
-		return nil, mapArticleError(err)
-	}
-
-	// 3. 在签发任何凭证前整体校验客户端标识和扩展名
-	extensions := make([]string, len(command.Files))
-	for index, file := range command.Files {
-		// 校验客户端标识是否为空
-		if strings.TrimSpace(file.ClientID) == "" {
-			return nil, apperrors.ErrInvalidRequestBody
-		}
-		// 检查扩展名是否在白名单内
-		extension := strings.ToLower(strings.TrimPrefix(file.FileExt, "."))
-		if !s.allowedExts[extension] {
-			return nil, apperrors.ErrInvalidRequestBody
-		}
-		extensions[index] = extension
-	}
-
-	// 4. 为每张图片生成正式对象 Key 和预签名上传地址
-	credentials := make([]articledto.ImageUploadCredential, 0, len(command.Files))
-	for index, file := range command.Files {
-		objectKey := path.Join(articleImageObjectPrefix(command.ArticleID), uuid.NewString()+"."+extensions[index])
-		uploadURL, err := s.images.PresignedPutURL(ctx, objectKey, articleImageUploadURLTTL)
-		if err != nil {
-			return nil, err
-		}
-		credentials = append(credentials, articledto.ImageUploadCredential{
-			ClientID:  file.ClientID,
-			UploadURL: uploadURL,
-			URL:       s.images.GetObjectURL(s.publicDomain, objectKey),
-		})
-	}
-
-	// 5. 返回与请求顺序一致的批量上传凭证
-	return &articledto.ImageUploadCredentialsResponse{Files: credentials}, nil
-}
-
-// articleImageObjectPrefix 返回文章图片正式目录前缀。
-func articleImageObjectPrefix(articleID uint64) string {
-	// 1. 使用尾部斜杠限制前缀只匹配目标文章目录
-	return path.Join("article", fmt.Sprint(articleID)) + "/"
-}
-
 // 组装文章详情响应，补齐作者信息与当前用户点赞状态
 func (s *Service) buildDetail(ctx context.Context, detail *domaincontent.ArticleWithAuthor, userID uint64) (*articledto.ArticleDetailResponse, error) {
 	// 1. 只读 JOIN 未返回作者时，通过 User Application Facade 补齐最小快照
@@ -382,8 +357,14 @@ func (s *Service) buildDetail(ctx context.Context, detail *domaincontent.Article
 	if userID > 0 && s.interactions != nil {
 		isLiked, _ = s.interactions.IsUserLikedArticle(ctx, userID, detail.ID)
 	}
-	// 3. 转换为详情响应 DTO
-	return newArticleDetailResponse(detail, isLiked), nil
+	// 3. 查询正文引用且属于当前文章的图片映射
+	images, err := s.buildArticleImageResponses(ctx, detail.ID, detail.Content)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. 转换为详情响应 DTO
+	return newArticleDetailResponse(detail, isLiked, images), nil
 }
 
 // mapArticleError 将领域错误映射为现有对外应用错误。
@@ -427,7 +408,8 @@ func (s *Service) findDetail(ctx context.Context, articleID uint64) (*domaincont
 }
 
 // 把文章详情领域模型转换为详情响应 DTO
-func newArticleDetailResponse(d *domaincontent.ArticleWithAuthor, isLiked bool) *articledto.ArticleDetailResponse {
+func newArticleDetailResponse(d *domaincontent.ArticleWithAuthor, isLiked bool, images []articledto.ArticleImageResponse) *articledto.ArticleDetailResponse {
+	// 1. 拆分标签并组装包含图片映射的详情响应
 	tags := splitTags(d.Tags)
 	return &articledto.ArticleDetailResponse{
 		ID:           d.ID,
@@ -442,6 +424,7 @@ func newArticleDetailResponse(d *domaincontent.ArticleWithAuthor, isLiked bool) 
 		UpdatedTime:  d.UpdatedTime.Unix(),
 		IsLiked:      isLiked,
 		LikeCount:    uint64(d.LikeCount),
+		Images:       images,
 	}
 }
 
