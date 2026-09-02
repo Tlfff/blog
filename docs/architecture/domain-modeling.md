@@ -28,9 +28,9 @@ Article 聚合负责：
 - 移入垃圾箱；
 - 从垃圾箱恢复为草稿；
 - 彻底删除前必须已在垃圾箱；
-- 图片转正后替换内存正文。
+- 保存正文图片占位符，并在文章生命周期内维护图片归属。
 
-Repository、MinIO 图片移动和失败清理仍由 Application 编排。
+Repository、图片关系事务和 MinIO 硬删除清理由 Application 编排。
 
 ### User
 

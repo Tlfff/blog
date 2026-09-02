@@ -87,7 +87,6 @@ Handler
 
 | Method | Path | Handler | 请求参数/DTO | 成功响应 |
 | --- | --- | --- | --- | --- |
-| POST | `/admin/article/init` | `ArticleHandler.InitializeArticle` | 无请求体；挂载 2 秒防重复 | `article_id`，消息“文章初始化成功” |
 | POST | `/admin/article/create` | `ArticleHandler.CreateArticle` | JSON：`title`、`content`、`tags`、`status`；挂载 2 秒防重复 | 空 Data，消息“文章创建成功” |
 | POST | `/admin/article/update` | `ArticleHandler.UpdateArticle` | JSON：`id`、`title`、`content`、`tags`、`status` | 空 Data，消息“文章更新成功” |
 | POST | `/admin/article/delete` | `ArticleHandler.DeleteArticle` | JSON：`id` | 空 Data，消息“文章删除成功” |
@@ -97,7 +96,7 @@ Handler
 | GET | `/admin/article/trash/list` | `ArticleHandler.GetTrashList` | Query：分页/游标参数 | `AdminListResponse` |
 | POST | `/admin/article/trash/recover` | `ArticleHandler.RecoverArticle` | JSON：`id` | 空 Data，消息“恢复文章成功” |
 | POST | `/admin/article/trash/clear` | `ArticleHandler.ClearArticle` | JSON：`id` | 空 Data，消息“删除文章成功” |
-| POST | `/admin/article/image/upload-urls` | `ArticleHandler.GetImageUploadURLs` | JSON：`article_id`、`files[].client_id`、`files[].file_ext` | 批量 `client_id`、`upload_url`、`url`，消息“获取成功” |
+| POST | `/admin/article/image/upload-url` | `ArticleHandler.GetImageUploadURL` | JSON：`file_ext` | `image_id`、`upload_url`、`url`，消息“获取成功” |
 | POST | `/admin/comment/delete` | `CommentHandler.DeleteAdminComment` | JSON：评论 ID | 空 Data，消息“管理员已成功处理违规评论” |
 
 ### 3.5 可选认证路由
@@ -106,7 +105,7 @@ Handler
 | --- | --- | --- | --- | --- |
 | GET | `/optional/article/detail` | `OptionalAuth` → `ViewHistoryMiddleware` → `ArticleHandler.GetArticleDetail` | Query：`id` | `ArticleDetailResponse`，消息“查询成功”；异步发送浏览历史消息 |
 
-`ArticleDetailResponse` 的关键字段为：`id`、`title`、`content`、`tags`、`status`、`author_nick`、`author_avatar`、`ip`、`created_time`、`updated_time`、`is_liked`、`like_count`。文章公开详情在游客场景以用户 ID 0 查询点赞状态；登录场景使用当前用户 ID。
+`ArticleDetailResponse` 的关键字段为：`id`、`title`、`content`、`tags`、`status`、`author_nick`、`author_avatar`、`ip`、`created_time`、`updated_time`、`is_liked`、`like_count`、`images`。`content` 保留 `image://<image_id>`，`images` 提供当前公开 URL 映射。文章公开详情在游客场景以用户 ID 0 查询点赞状态；登录场景使用当前用户 ID。
 
 ### 3.6 统一响应和主要错误映射
 
@@ -304,14 +303,15 @@ view_history → 解析 ViewHistoryMsg → 登录用户写浏览历史 → 原�
 
 ### 6.4 MinIO 对象路径
 
-- 新文章先通过初始化接口创建空内容草稿并取得文章 ID；初始化不新增数据库字段或文章状态。
-- 新批量上传凭证接口为每张图片生成 `article/<article_id>/<uuid>.<ext>` 正式对象路径，每个文件可以携带不同扩展名，预签名 PUT URL 有效期 10 分钟。
-- 前端并发上传图片并等待全部成功后，使用正式 URL 替换正文占位符，再调用文章更新接口保存草稿或发表文章。
-- 草稿、已发表、软删除和正文更新移除引用时均不删除文章图片；硬删除时先清理 `article/<article_id>/` 前缀下的全部对象，再物理删除文章记录。
-- 旧单张临时上传接口、`article/temp/` 路径和图片转正逻辑已移除，文章创建和更新只接受前端替换完成的正式图片 URL。
+- 文章图片通过 `POST /admin/article/image/upload-url` 按单张实时申请凭证，不要求预先创建文章。
+- 新图片对象路径为 `article/img/<year>/<month>/<uuid>.<ext>`，预签名 PUT URL 有效期 10 分钟。
+- 图片上传时创建 `article_id = NULL` 的图片记录；PUT 成功后前端在正文保存 `image://<image_id>`。
+- 创建和更新文章时在同一数据库事务中同步图片归属，移除引用时只解绑为 `NULL`，不立即删除对象。
+- 文章详情保留原始正文，并返回正文引用且属于当前文章的图片 ID—URL 映射。
+- 文章软删除和恢复保留图片关系；硬删除按 `article_id` 清理对象和图片记录，清理失败时保留文章以便重试。
+- 未绑定图片定时清理不属于当前实现范围。
 - 用户头像上传凭证生成：`avatar/<user_id>/<uuid>.<ext>`，预签名 PUT URL 有效期 10 分钟。
 - 确认头像时只接受当前用户目录前缀 `avatar/<user_id>/`，数据库保存对象 Key，响应返回公开域名拼接后的完整 URL。
-- 硬删除清理 MinIO 失败时保留垃圾箱文章记录并返回错误，后续重试可继续完成清理和物理删除。
 
 ### 6.5 Cron
 
@@ -459,7 +459,7 @@ Consumer 解析消息
 - Like 文章/评论点赞、Redis 冷启动、锁降级和事务回滚；
 - Notification MongoDB 列表、未读、清理和 Kafka Consumer；
 - Kafka Producer/Consumer 批量重试、offset 提交和关闭；
-- MinIO 文章图片转正、头像确认；
+- MinIO 文章图片关系同步与硬删除、头像确认；
 - Cron 热榜初始化与周期重建；
 - 完整 HTTP 路由注册和中间件顺序；
 - 完整 gRPC descriptor、JWT/HMAC 双路认证契约。

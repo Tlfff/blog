@@ -101,20 +101,6 @@ func NewArticle(authorID uint64, title, content, tags string, statusValue int8) 
 	}, nil
 }
 
-// NewDraftArticle 初始化等待填写内容的文章草稿。
-func NewDraftArticle(authorID uint64) (*Article, error) {
-	// 1. 校验草稿作者身份
-	if authorID == 0 {
-		return nil, ErrArticlePermissionDenied
-	}
-
-	// 2. 创建不要求标题和正文的初始化草稿
-	return &Article{
-		AuthorID: authorID,
-		Status:   StatusDraft,
-	}, nil
-}
-
 // IsDeleted 判断文章是否已被软删除。
 func (a *Article) IsDeleted() bool {
 	// 1. 委托状态值对象判断删除状态
@@ -137,20 +123,6 @@ func (a *Article) IsDraft() bool {
 func (a *Article) IsPubliclyVisible() bool {
 	// 1. 仅已发表文章允许公开访问
 	return a.IsPublished()
-}
-
-// EnsureCanUploadImageBy 校验操作者能否为文章上传图片。
-func (a *Article) EnsureCanUploadImageBy(operatorID uint64) error {
-	// 1. 已删除文章不允许继续写入图片
-	if a.IsDeleted() {
-		return ErrArticleDeleted
-	}
-
-	// 2. 仅文章作者可以上传图片
-	if a.AuthorID != operatorID {
-		return ErrArticlePermissionDenied
-	}
-	return nil
 }
 
 // EditBy 校验作者和文章状态后修改可编辑字段。

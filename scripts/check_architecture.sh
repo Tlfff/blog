@@ -4,7 +4,7 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
-contexts="user article comment like notification"
+contexts="user article comment like notification search"
 forbidden_domain_app="github.com/gin-gonic/gin github.com/gin-contrib gorm.io/gorm gorm.io/driver github.com/redis/go-redis go.mongodb.org/mongo-driver github.com/segmentio/kafka-go github.com/minio/minio-go google.golang.org/grpc"
 forbidden_context_interfaces="gorm.io/gorm gorm.io/driver github.com/redis/go-redis go.mongodb.org/mongo-driver github.com/segmentio/kafka-go github.com/minio/minio-go"
 status=0
@@ -24,7 +24,7 @@ check_imports() {
 	done
 }
 
-# 1. 检查五个上下文的层级依赖。
+# 1. 检查六个上下文的层级依赖。
 for context in $contexts; do
 	check_imports "internal/$context/domain" "$forbidden_domain_app"
 	check_imports "internal/$context/app" "$forbidden_domain_app"
@@ -46,7 +46,13 @@ for context in $contexts; do
 
 done
 
-# 2. 检查旧全局技术分层目录已经删除。
+# 2. 检查平台层 Canal Client 不依赖任何业务上下文。
+if grep -R -n --include='*.go' '"blog/internal/\(user\|article\|comment\|like\|notification\|search\)/' internal/platform/canal >/dev/null 2>&1; then
+	echo "架构违规: 平台层 Canal Client 依赖业务上下文"
+	status=1
+fi
+
+# 3. 检查旧全局技术分层目录已经删除。
 for legacy in auth common consts cron dto grpc handler middleware model mq repository routes service; do
 	if [ -d "internal/$legacy" ]; then
 		echo "架构违规: 旧全局目录 internal/$legacy 仍然存在"
@@ -54,7 +60,7 @@ for legacy in auth common consts cron dto grpc handler middleware model mq repos
 	fi
 done
 
-# 3. 检查内部技术代码不再通过旧 pkg 路径引用。
+# 4. 检查内部技术代码不再通过旧 pkg 路径引用。
 if [ -d pkg ]; then
 	echo "架构违规: 旧 pkg 目录仍然存在"
 	status=1

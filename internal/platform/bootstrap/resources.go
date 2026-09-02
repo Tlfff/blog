@@ -4,6 +4,7 @@ package bootstrap
 import (
 	platformconfig "blog/internal/platform/config"
 	platformdatabase "blog/internal/platform/database"
+	platformelasticsearch "blog/internal/platform/elasticsearch"
 	platformkafka "blog/internal/platform/kafka"
 	platformoss "blog/internal/platform/oss"
 	"context"
@@ -24,18 +25,20 @@ type ResourceOptions struct {
 	Redis                 bool // 是否初始化 Redis
 	Kafka                 bool // 是否初始化 Kafka
 	OSS                   bool // 是否初始化 MinIO
+	Elasticsearch         bool // 是否初始化 Elasticsearch
 	AllowMongoDBInitError bool // MongoDB 初始化失败时是否记录日志后继续
 }
 
 // Resources 保存当前进程共享的技术客户端。
 type Resources struct {
-	MySQL     *gorm.DB                 // MySQL GORM 客户端
-	MongoDB   *mongo.Database          // MongoDB 数据库客户端
-	Redis     *redis.Client            // Redis 客户端
-	Kafka     *platformkafka.Client    // Kafka 客户端
-	OSS       *platformoss.MinioClient // MinIO 客户端
-	closeOnce sync.Once                // 保证关闭逻辑只执行一次
-	closeErr  error                    // 关闭过程中记录的错误
+	MySQL         *gorm.DB                      // MySQL GORM 客户端
+	MongoDB       *mongo.Database               // MongoDB 数据库客户端
+	Redis         *redis.Client                 // Redis 客户端
+	Kafka         *platformkafka.Client         // Kafka 客户端
+	OSS           *platformoss.MinioClient      // MinIO 客户端
+	Elasticsearch *platformelasticsearch.Client // Elasticsearch 客户端
+	closeOnce     sync.Once                     // 保证关闭逻辑只执行一次
+	closeErr      error                         // 关闭过程中记录的错误
 }
 
 // NewResources 按固定顺序初始化当前进程所需的技术资源。
@@ -44,7 +47,7 @@ type Resources struct {
 //   - cfg：平台运行配置，不能为空。
 //   - options：当前进程需要初始化的资源集合。
 //
-// 初始化顺序固定为 MySQL、MongoDB、Redis、Kafka、MinIO；已初始化资源失败时会尝试回收。
+// 初始化顺序固定为 MySQL、MongoDB、Redis、Kafka、MinIO、Elasticsearch；已初始化资源失败时会尝试回收。
 func NewResources(cfg *platformconfig.Config, options ResourceOptions) (*Resources, error) {
 	if cfg == nil {
 		return nil, errors.New("平台配置不能为空")
@@ -126,6 +129,15 @@ func NewResources(cfg *platformconfig.Config, options ResourceOptions) (*Resourc
 		resources.OSS = client
 	}
 
+	// 6. 初始化 Elasticsearch
+	if options.Elasticsearch {
+		client, err := platformelasticsearch.NewClient(cfg.Elasticsearch)
+		if err != nil {
+			return cleanupOnError(fmt.Errorf("初始化 Elasticsearch 失败: %w", err))
+		}
+		resources.Elasticsearch = client
+	}
+
 	return resources, nil
 }
 
@@ -138,28 +150,35 @@ func (r *Resources) Close() error {
 	r.closeOnce.Do(func() {
 		var errs []error
 
-		// 1. 关闭 Kafka
+		// 1. 关闭 Elasticsearch
+		if r.Elasticsearch != nil {
+			if err := r.Elasticsearch.Close(); err != nil {
+				errs = append(errs, fmt.Errorf("关闭 Elasticsearch 失败: %w", err))
+			}
+		}
+
+		// 2. 关闭 Kafka
 		if r.Kafka != nil {
 			if err := r.Kafka.Close(); err != nil {
 				errs = append(errs, fmt.Errorf("关闭 Kafka 失败: %w", err))
 			}
 		}
 
-		// 2. 关闭 Redis
+		// 3. 关闭 Redis
 		if r.Redis != nil {
 			if err := r.Redis.Close(); err != nil {
 				errs = append(errs, fmt.Errorf("关闭 Redis 失败: %w", err))
 			}
 		}
 
-		// 3. 关闭 MongoDB 客户端
+		// 4. 关闭 MongoDB 客户端
 		if r.MongoDB != nil {
 			if err := r.MongoDB.Client().Disconnect(context.Background()); err != nil {
 				errs = append(errs, fmt.Errorf("关闭 MongoDB 失败: %w", err))
 			}
 		}
 
-		// 4. 关闭 MySQL 底层连接
+		// 5. 关闭 MySQL 底层连接
 		if r.MySQL != nil {
 			if sqlDB, err := r.MySQL.DB(); err != nil {
 				errs = append(errs, fmt.Errorf("获取 MySQL 底层连接失败: %w", err))

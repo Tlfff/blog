@@ -27,8 +27,8 @@ func (a *articleImageStorageAdapter) GetObjectURL(publicDomain, objectKey string
 	return a.oss.GetObjectURL(publicDomain, objectKey)
 }
 
-// DeleteObjectsByPrefix 删除指定对象前缀下的全部文章图片。
-func (a *articleImageStorageAdapter) DeleteObjectsByPrefix(ctx context.Context, prefix string) error {
-	// 1. 委托平台对象存储删除指定前缀下的全部对象
-	return a.oss.DeleteObjectsByPrefix(ctx, prefix)
+// DeleteObject 删除指定对象存储 Key 对应的文章图片。
+func (a *articleImageStorageAdapter) DeleteObject(ctx context.Context, objectKey string) error {
+	// 1. 委托平台对象存储删除单个对象
+	return a.oss.DeleteObject(ctx, objectKey)
 }

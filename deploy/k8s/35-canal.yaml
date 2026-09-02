@@ -1,0 +1,119 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: canal-user-init
+  namespace: lf-blog
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: canal-user-init
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: infra-secrets
+                  key: mysql-root-password
+            - name: CANAL_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: infra-secrets
+                  key: canal-username
+            - name: CANAL_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: infra-secrets
+                  key: canal-password
+          command:
+            - sh
+            - -ec
+            - |
+              until mysqladmin ping -h mysql -u root -p"$MYSQL_ROOT_PASSWORD" --silent; do sleep 2; done
+              mysql -h mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE USER IF NOT EXISTS '$CANAL_DB_USERNAME'@'%' IDENTIFIED BY '$CANAL_DB_PASSWORD'; ALTER USER '$CANAL_DB_USERNAME'@'%' IDENTIFIED BY '$CANAL_DB_PASSWORD'; GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$CANAL_DB_USERNAME'@'%'; FLUSH PRIVILEGES;"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canal
+  namespace: lf-blog
+spec:
+  selector:
+    app: canal
+  ports:
+    - name: client
+      port: 11111
+      targetPort: client
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canal
+  namespace: lf-blog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: canal
+  template:
+    metadata:
+      labels:
+        app: canal
+    spec:
+      initContainers:
+        - name: wait-canal-user
+          image: mysql:8.0
+          env:
+            - name: CANAL_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: infra-secrets
+                  key: canal-username
+            - name: CANAL_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: infra-secrets
+                  key: canal-password
+          command:
+            - sh
+            - -ec
+            - until mysqladmin ping -h mysql -u "$CANAL_DB_USERNAME" -p"$CANAL_DB_PASSWORD" --silent; do sleep 2; done
+      containers:
+        - name: canal
+          image: canal/canal-server:v1.1.8
+          env:
+            - name: canal.auto.scan
+              value: "false"
+            - name: canal.destinations
+              value: article_search
+            - name: canal.instance.master.address
+              value: mysql:3306
+            - name: canal.instance.mysql.slaveId
+              value: "1234"
+            - name: canal.instance.dbUsername
+              valueFrom:
+                secretKeyRef:
+                  name: infra-secrets
+                  key: canal-username
+            - name: canal.instance.dbPassword
+              valueFrom:
+                secretKeyRef:
+                  name: infra-secrets
+                  key: canal-password
+            - name: canal.instance.connectionCharset
+              value: UTF-8
+            - name: canal.instance.gtidon
+              value: "false"
+            - name: canal.instance.tsdb.enable
+              value: "true"
+            - name: canal.instance.filter.regex
+              value: 'blog\.articles'
+          ports:
+            - name: client
+              containerPort: 11111
+          readinessProbe:
+            tcpSocket:
+              port: client
+            periodSeconds: 10
+            failureThreshold: 6

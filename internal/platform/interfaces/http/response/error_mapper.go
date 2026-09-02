@@ -29,7 +29,8 @@ func CodeByError(err error) int {
 		apperrors.ErrArticleTitleEmpty,
 		apperrors.ErrArticleContentEmpty,
 		apperrors.ErrArticleIDInvalid,
-		apperrors.ErrArticleStatusInvalid:
+		apperrors.ErrArticleStatusInvalid,
+		apperrors.ErrArticleImageInvalid:
 
 		return CodeInvalidParameter
 
@@ -103,6 +104,9 @@ func CodeByError(err error) int {
 		return CodeKafkaClientClosed
 	case apperrors.ErrKafkaPingFailed:
 		return CodeKafkaPingFailed
+	// 搜索
+	case apperrors.ErrSearchUnavailable:
+		return CodeSearchUnavailable
 	// 2. 未登记的错误统一返回系统异常码，避免泄漏内部细节
 	default:
 		return CodeInternalServerError

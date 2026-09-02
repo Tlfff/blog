@@ -1,32 +1,33 @@
+# 工作流模式（固定必填，规范驱动模式）
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
+# 项目上下文（可选）
+# AI 在创建 OpenSpec 工件时会读取此处内容。
+# 可以填写项目技术栈、开发约定、代码风格、领域知识等信息。
+# 示例：
 #   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+#     技术栈：TypeScript、React、Node.js
+#     提交信息遵循 Conventional Commits 规范
+#     业务领域：电子商务平台
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
+# 各类工件的生成规则（可选）
+# 可以为不同类型的 OpenSpec 工件设置专属规则。
+# 示例：
 #   rules:
 #     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
+#       - 提案内容不超过 500 字
+#       - 必须包含“非目标”章节
 #     tasks:
-#       - Break tasks into chunks of max 2 hours
+#       - 每项任务的预计完成时间不超过 2 小时
 
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
+# 各类操作的执行指引（可选）
+# 可以为 apply、archive 等操作添加建议性的执行指引。
+# 此配置与上面的工件生成规则相互独立。
+# 示例：
 #   operations:
 #     apply:
 #       guidance:
-#         - Keep test summaries concise
+#         - 测试结果摘要应保持简洁
 #     archive:
 #       guidance:
-#         - Summarize the archive outcome before finishing
+#         - 完成归档前先概述归档结果

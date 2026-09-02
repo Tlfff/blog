@@ -40,7 +40,7 @@ type GetPublishListRequest struct {
 	IsDesc   bool   `form:"is_desc"`                           // 是否按时间倒序（默认false正序）
 }
 
-// GetAdminListRequest 是管理端按状态获取文章列表的请求 DTO。
+// n  是管理端按状态获取文章列表的请求 DTO。
 type GetAdminListRequest struct {
 	Status   int8   `form:"status" binding:"required"`         // 文章状态过滤：-2-全部 -1-除已删除 1-已删除 2-草稿 3-已发表
 	LastID   uint64 `form:"last_id" binding:"omitempty,min=0"` // 游标ID，用于游标分页，传0表示从头开始
@@ -54,14 +54,7 @@ type RecoverArticleRequest struct {
 	ID uint64 `json:"id" binding:"required,min=0"` // 待恢复的文章ID，必须大于0
 }
 
-// GetImageUploadURLsRequest 是批量获取文章图片上传凭证的请求 DTO。
-type GetImageUploadURLsRequest struct {
-	ArticleID uint64                      `json:"article_id" binding:"required,min=1"`         // 图片所属文章唯一标识
-	Files     []ImageUploadFileRequestDTO `json:"files" binding:"required,min=1,max=100,dive"` // 待上传图片列表，不能为空
-}
-
-// ImageUploadFileRequestDTO 是单张文章图片上传凭证请求项。
-type ImageUploadFileRequestDTO struct {
-	ClientID string `json:"client_id" binding:"required"` // 前端图片标识，用于关联上传结果
-	FileExt  string `json:"file_ext" binding:"required"`  // 图片文件扩展名，如 jpg、png
+// GetImageUploadURLRequest 是获取单张文章图片上传凭证的请求 DTO。
+type GetImageUploadURLRequest struct {
+	FileExt string `json:"file_ext" binding:"required"` // 图片文件扩展名，如 jpg、png
 }

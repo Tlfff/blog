@@ -18,11 +18,40 @@ type ArticleRepository interface {
 	CountByStatus(ctx context.Context, status int8) (int64, error)                                                 // 按状态统计文章总数
 }
 
+// ArticleImageRepository 定义文章图片持久化能力。
+type ArticleImageRepository interface {
+	// Create 创建图片记录并回填数据库生成字段。
+	Create(ctx context.Context, image *ArticleImage) error
+	// FindByIDs 按图片唯一标识集合批量查询图片。
+	FindByIDs(ctx context.Context, ids []uint64) ([]*ArticleImage, error)
+	// FindByIDsForUpdate 在事务中锁定并查询图片记录。
+	FindByIDsForUpdate(ctx context.Context, ids []uint64) ([]*ArticleImage, error)
+	// FindByArticleIDAndIDs 查询正文引用且属于指定文章的图片。
+	FindByArticleIDAndIDs(ctx context.Context, articleID uint64, ids []uint64) ([]*ArticleImage, error)
+	// FindByArticleID 查询指定文章已绑定的全部图片。
+	FindByArticleID(ctx context.Context, articleID uint64) ([]*ArticleImage, error)
+	// BindArticle 批量绑定未归属文章的图片并返回影响行数。
+	BindArticle(ctx context.Context, ids []uint64, articleID uint64) (int64, error)
+	// UnbindArticle 批量解绑属于指定文章的图片并返回影响行数。
+	UnbindArticle(ctx context.Context, ids []uint64, articleID uint64) (int64, error)
+	// DeleteByArticleID 删除指定文章的全部图片记录并返回影响行数。
+	DeleteByArticleID(ctx context.Context, articleID uint64) (int64, error)
+}
+
+// ArticleImageReferenceParser 定义正文图片引用提取能力。
+type ArticleImageReferenceParser interface {
+	// Extract 从 Markdown 图片节点中提取去重后的系统图片 ID。
+	Extract(markdown string) ([]uint64, error)
+}
+
 // ArticleImageStorage 是文章图片对象存储 Port，由 Infrastructure 层用 MinIO 实现。
 type ArticleImageStorage interface {
-	PresignedPutURL(ctx context.Context, objectKey string, ttl time.Duration) (string, error) // 生成带有效期的预签名上传URL
-	GetObjectURL(publicDomain, objectKey string) string                                       // 拼装对象的对外访问URL
-	DeleteObjectsByPrefix(ctx context.Context, prefix string) error                           // 删除指定对象前缀下的全部图片
+	// PresignedPutURL 生成带有效期的预签名上传 URL。
+	PresignedPutURL(ctx context.Context, objectKey string, ttl time.Duration) (string, error)
+	// GetObjectURL 拼装对象的对外访问 URL。
+	GetObjectURL(publicDomain, objectKey string) string
+	// DeleteObject 删除指定对象存储 Key 对应的图片。
+	DeleteObject(ctx context.Context, objectKey string) error
 }
 
 // ArticleInteractionQuery 是文章互动统计查询 Port，由 Community 侧提供。

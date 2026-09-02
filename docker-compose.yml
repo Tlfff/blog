@@ -8,10 +8,10 @@ services:
     container_name: blog-mysql # 容器名字
     restart: always # 重启策略，容器异常退出时总是自动重启
     environment:
-      MYSQL_ROOT_PASSWORD: "Tlf0614"            # root 超级管理员密码
-      MYSQL_DATABASE: "blog"                    # 容器启动时自动创建的数据库名
-      MYSQL_USER: "bloguser"                    # 额外创建的应用专用用户
-      MYSQL_PASSWORD: "20040614"                # 应用用户的密码
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"            # root 超级管理员密码
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"                    # 容器启动时自动创建的数据库名
+      MYSQL_USER: "${MYSQL_USER}"                    # 额外创建的应用专用用户
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                # 应用用户的密码
       TZ: Asia/Shanghai                         # 容器时区设置，影响时间函数
     ports:
       - "3306:3306" # 映射端口，外部访问端口：容器端口
@@ -21,6 +21,11 @@ services:
     command: 
       - "--character-set-server=utf8mb4"  # 设置字符集为 utf8mb4
       - "--collation-server=utf8mb4_unicode_ci"  # 设置排序规则为 utf8mb4_unicode_ci
+      - "--server-id=1"                     # 设置服务器 ID 为 1，为了 Canal 能伪装成从库读取 binlog
+      - "--log-bin=mysql-bin"               # 开启 binlog
+      - "--binlog-format=ROW"             # 记录行级变更（Canal 必须，否则解析不了）
+      - "--binlog-row-image=FULL"         # 记录完整行（Canal 拿到完整数据直接给 ES）
+      - "--binlog-expire-logs-seconds=604800"  # 7天自动清理（防止磁盘满）
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"] # 健康检查
       interval: 10s # 检查间隔，10 秒
@@ -29,6 +34,24 @@ services:
       start_period: 60s # 首次初始化要执行建表 SQL，给足宽限期
     networks:
       - blog-net # 加入自定义网络 blog-net
+  # Canal 账号初始化任务
+  canal-init:
+    image: mysql:8.0
+    container_name: blog-canal-init
+    restart: "no"     # 脚本执行完成后，容器不重启
+    env_file:         # 读取 .env 中的环境变量配置
+      - .env
+    environment:
+      MYSQL_HOST: "mysql"                                          # MySQL 服务地址
+    entrypoint: ["/bin/bash", "/usr/local/bin/canal_user.sh"]     # 入口脚本，执行 Canal 账号初始化脚本
+    volumes:
+      - ./scripts/mysql/canal_user.sh:/usr/local/bin/canal_user.sh:ro # 仅挂载 Canal 账号初始化脚本
+    depends_on:
+      mysql:
+        condition: service_healthy                               # MySQL 健康后再创建 Canal 账号
+    networks:
+      - blog-net
+
   # Redis 服务定义
   redis:  
     image: redis:7-alpine 
@@ -53,9 +76,9 @@ services:
     container_name: blog-mongodb
     restart: always
     environment:  # 环境变量配置
-      MONGO_INITDB_ROOT_USERNAME: "bloguser" # 初始化 MongoDB 的 root 用户名
-      MONGO_INITDB_ROOT_PASSWORD: "20040614" # 初始化 MongoDB 的 root 密码
-      MONGO_INITDB_DATABASE: "blog" # 初始化 MongoDB 的数据库名
+      MONGO_INITDB_ROOT_USERNAME: "${MONGODB_ROOT_USERNAME}" # 初始化 MongoDB 的 root 用户名
+      MONGO_INITDB_ROOT_PASSWORD: "${MONGODB_ROOT_PASSWORD}" # 初始化 MongoDB 的 root 密码
+      MONGO_INITDB_DATABASE: "${MONGODB_DATABASE}" # 初始化 MongoDB 的数据库名
       TZ: Asia/Shanghai # 容器时区设置，影响时间函数
     ports:
       - "27017:27017"
@@ -107,7 +130,10 @@ services:
 
   # Elasticsearch搜索引擎
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.20       # ES镜像版本，8.x稳定分支
+    build:
+      context: .                                                        # 以 当前 docker-compose.yml 文件所在的目录 作为构建上下文
+      dockerfile: docker/es/Dockerfile                       # 指定 Dockerfile 路径
+    image: blog-elasticsearch:8.19.20-ik-pinyin                         # ES镜像版本，8.x稳定分支，中文分词插件，拼音分词插件
     container_name: blog-es                                             # ES容器名称
     restart: always                                                     # 异常退出自动重启
     environment:
@@ -149,7 +175,7 @@ services:
     ports:
       - "5601:5601"                                                     # Kibana网页控制台端口
     healthcheck:
-      test: ["CMD-SHELL","curl -s http://127.0.0.1:5601/api/status | grep -q 'success'"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5601/api/status | grep -q available"]
       interval: 10s
       timeout: 10s
       retries: 8
@@ -158,8 +184,64 @@ services:
       - blog-net
 
   
+
+  # Canal binlog 订阅服务
+  canal:
+    image: canal/canal-server:v1.1.8
+    container_name: blog-canal
+    restart: unless-stopped
+    environment:
+      JAVA_OPTS: "-Xms256m -Xmx512m -Xmn128m"                      # 限制 Canal JVM 堆内存，适合本地单实例
+      canal.auto.scan: "false"                                      # 关闭自动扫描，仅启动文章搜索实例
+      canal.destinations: "article_search"                          # Canal destination 名称
+      canal.instance.master.address: "mysql:3306"                   # MySQL 服务地址
+      canal.instance.mysql.slaveId: "1234"                           # Canal 模拟从库的 server-id
+      canal.instance.dbUsername: "${CANAL_DB_USERNAME}"              # Canal 复制账号
+      canal.instance.dbPassword: "${CANAL_DB_PASSWORD}"              # Canal 复制密码
+      canal.instance.connectionCharset: "UTF-8"                      # binlog 字符集
+      canal.instance.gtidon: "false"                                 # 当前先使用 binlog file/position
+      canal.instance.tsdb.enable: "true"                             # 保存表结构历史，支持重启恢复
+      canal.instance.parser.parallel: "false"                        # 单机低资源环境关闭并行解析
+      canal.instance.filter.regex: 'blog\.articles'                    # 仅监听文章表
+    ports:
+      - "11111:11111"                                                # Canal Client 连接端口
+    volumes:
+      - canal_conf:/home/admin/canal-server/conf                    # 持久化 Canal 位点和实例配置
+      - canal_logs:/home/admin/canal-server/logs                    # 持久化 Canal 日志
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 11111 || exit 1"]        # 检查 Canal Client 端口是否可连接
+      interval: 10s                                                  # 健康检查间隔
+      timeout: 5s                                                    # 单次检查超时时间
+      retries: 6                                                     # 最大失败次数
+      start_period: 30s                                              # 等待 Canal 完成实例初始化
+    depends_on:
+      canal-init:
+        condition: service_completed_successfully                    # Canal 账号创建成功后启动 Canal
+    networks:
+      - blog-net
+
   # 后端服务
   blog-server:
+    env_file:
+      - .env
+    environment:
+      MYSQL_USER: "${MYSQL_USER}"                                      # MySQL 应用账号
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                              # MySQL 应用密码
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"                              # MySQL 数据库名
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"                              # Redis 密码
+      MONGODB_ROOT_USERNAME: "${MONGODB_ROOT_USERNAME}"                # MongoDB 账号
+      MONGODB_ROOT_PASSWORD: "${MONGODB_ROOT_PASSWORD}"                # MongoDB 密码
+      MONGODB_DATABASE: "${MONGODB_DATABASE}"                          # MongoDB 数据库名
+      JWT_SECRET: "${JWT_SECRET}"                                      # 用户 JWT 签名密钥
+      OPENJWT_SECRET: "${OPENJWT_SECRET}"                              # 开放 gRPC JWT 签名密钥
+      PARTNER_A_ACCESS_KEY_ID: "${PARTNER_A_ACCESS_KEY_ID}"            # 三方合作方访问凭证
+      PARTNER_A_SECRET_KEY: "${PARTNER_A_SECRET_KEY}"                  # 三方合作方共享密钥
+      OSS_ACCESS_KEY_ID: "${OSS_ACCESS_KEY_ID}"                        # OSS 访问凭证
+      OSS_SECRET_ACCESS_KEY: "${OSS_SECRET_ACCESS_KEY}"                # OSS 访问密钥
+      ELASTICSEARCH_USERNAME: "${ELASTICSEARCH_USERNAME:-}"             # 本地 ES 默认关闭认证
+      ELASTICSEARCH_PASSWORD: "${ELASTICSEARCH_PASSWORD:-}"             # 本地 ES 默认关闭认证
+      CANAL_SERVER_USERNAME: "${CANAL_SERVER_USERNAME:-}"               # Canal Server 默认不启用客户端认证
+      CANAL_SERVER_PASSWORD: "${CANAL_SERVER_PASSWORD:-}"               # Canal Server 默认不启用客户端认证
     image: blog-server:latest
     container_name: blog-server
     restart: always
@@ -186,6 +268,26 @@ services:
 
   # 对外服务（gRPC，二方/三方）
   blog-grpc:
+    env_file:
+      - .env
+    environment:
+      MYSQL_USER: "${MYSQL_USER}"                                      # MySQL 应用账号
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                              # MySQL 应用密码
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"                              # MySQL 数据库名
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"                              # Redis 密码
+      MONGODB_ROOT_USERNAME: "${MONGODB_ROOT_USERNAME}"                # MongoDB 账号
+      MONGODB_ROOT_PASSWORD: "${MONGODB_ROOT_PASSWORD}"                # MongoDB 密码
+      MONGODB_DATABASE: "${MONGODB_DATABASE}"                          # MongoDB 数据库名
+      JWT_SECRET: "${JWT_SECRET}"                                      # 用户 JWT 签名密钥
+      OPENJWT_SECRET: "${OPENJWT_SECRET}"                              # 开放 gRPC JWT 签名密钥
+      PARTNER_A_ACCESS_KEY_ID: "${PARTNER_A_ACCESS_KEY_ID}"            # 三方合作方访问凭证
+      PARTNER_A_SECRET_KEY: "${PARTNER_A_SECRET_KEY}"                  # 三方合作方共享密钥
+      OSS_ACCESS_KEY_ID: "${OSS_ACCESS_KEY_ID}"                        # OSS 访问凭证
+      OSS_SECRET_ACCESS_KEY: "${OSS_SECRET_ACCESS_KEY}"                # OSS 访问密钥
+      ELASTICSEARCH_USERNAME: "${ELASTICSEARCH_USERNAME:-}"
+      ELASTICSEARCH_PASSWORD: "${ELASTICSEARCH_PASSWORD:-}"
+      CANAL_SERVER_USERNAME: "${CANAL_SERVER_USERNAME:-}"
+      CANAL_SERVER_PASSWORD: "${CANAL_SERVER_PASSWORD:-}"
     image: blog-server:latest
     container_name: blog-grpc
     restart: always
@@ -204,6 +306,26 @@ services:
 
   # Kafka 消费者
   blog-consumer:
+    env_file:
+      - .env
+    environment:
+      MYSQL_USER: "${MYSQL_USER}"                                      # MySQL 应用账号
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                              # MySQL 应用密码
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"                              # MySQL 数据库名
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"                              # Redis 密码
+      MONGODB_ROOT_USERNAME: "${MONGODB_ROOT_USERNAME}"                # MongoDB 账号
+      MONGODB_ROOT_PASSWORD: "${MONGODB_ROOT_PASSWORD}"                # MongoDB 密码
+      MONGODB_DATABASE: "${MONGODB_DATABASE}"                          # MongoDB 数据库名
+      JWT_SECRET: "${JWT_SECRET}"                                      # 用户 JWT 签名密钥
+      OPENJWT_SECRET: "${OPENJWT_SECRET}"                              # 开放 gRPC JWT 签名密钥
+      PARTNER_A_ACCESS_KEY_ID: "${PARTNER_A_ACCESS_KEY_ID}"            # 三方合作方访问凭证
+      PARTNER_A_SECRET_KEY: "${PARTNER_A_SECRET_KEY}"                  # 三方合作方共享密钥
+      OSS_ACCESS_KEY_ID: "${OSS_ACCESS_KEY_ID}"                        # OSS 访问凭证
+      OSS_SECRET_ACCESS_KEY: "${OSS_SECRET_ACCESS_KEY}"                # OSS 访问密钥
+      ELASTICSEARCH_USERNAME: "${ELASTICSEARCH_USERNAME:-}"
+      ELASTICSEARCH_PASSWORD: "${ELASTICSEARCH_PASSWORD:-}"
+      CANAL_SERVER_USERNAME: "${CANAL_SERVER_USERNAME:-}"
+      CANAL_SERVER_PASSWORD: "${CANAL_SERVER_PASSWORD:-}"
     image: blog-server:latest
     container_name: blog-consumer
     restart: always
@@ -221,6 +343,32 @@ services:
         condition: service_healthy
     networks:
       - blog-net
+
+  # 文章搜索增量同步进程
+  search-sync:
+    image: blog-server:latest
+    container_name: blog-search-sync
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      ELASTICSEARCH_USERNAME: "${ELASTICSEARCH_USERNAME:-}"
+      ELASTICSEARCH_PASSWORD: "${ELASTICSEARCH_PASSWORD:-}"
+      CANAL_SERVER_USERNAME: "${CANAL_SERVER_USERNAME:-}"
+      CANAL_SERVER_PASSWORD: "${CANAL_SERVER_PASSWORD:-}"
+    command: ["search-sync"]
+    volumes:
+      - ./config/config.docker.yaml:/app/config/config.yaml:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      canal:
+        condition: service_healthy
+    networks:
+      - blog-net
 # 数据卷定义，把容器内部的数据目录，挂载到 Docker 管理的外部存储空间，这样数据就和容器本身分离了
 volumes:
   mysql_data:   # 创建一个名为 "mysql_data" 的数据卷
@@ -229,6 +377,8 @@ volumes:
   kafka_data:
   es_data:
   kibana_data:
+  canal_conf:
+  canal_logs:
 
 # 网络定义
 networks:

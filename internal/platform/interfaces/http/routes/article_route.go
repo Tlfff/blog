@@ -4,16 +4,20 @@ package routes
 import (
 	articlehttp "blog/internal/article/interfaces/http"
 	"blog/internal/platform/interfaces/http/middleware"
+	searchhttp "blog/internal/search/interfaces/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 // InitArticlePublicRoutes 注册文章公开路由。
-func InitArticlePublicRoutes(r *gin.RouterGroup, articleHandler *articlehttp.ArticleHandler) {
+func InitArticlePublicRoutes(r *gin.RouterGroup, articleHandler *articlehttp.ArticleHandler, searchHandler *searchhttp.Handler) {
 	// 获取已发表文章列表
 	r.GET("/article/list", articleHandler.GetPublishedList)
 	r.GET("/article/hot-rank", articleHandler.GetHotArticleRank)
+
+	// 搜索文章
+	r.GET("/article/search", searchHandler.SearchArticles)
 }
 
 // InitArticleOptionalRoutes 注册文章可选登录路由。
@@ -27,11 +31,6 @@ func InitArticleOptionalRoutes(r *gin.RouterGroup, articleHandler *articlehttp.A
 
 // InitArticlePrivateRoutes 注册文章管理路由。
 func InitArticlePrivateRoutes(r *gin.RouterGroup, articleHandler *articlehttp.ArticleHandler) {
-	// 初始化空内容文章草稿，用于提前取得文章 ID
-	r.POST("/article/init",
-		middleware.DuplicateMitigation(2*time.Second),
-		articleHandler.InitializeArticle,
-	)
 	//  创建文章,需要防重复
 	r.POST("/article/create",
 		middleware.DuplicateMitigation(2*time.Second),
@@ -56,6 +55,6 @@ func InitArticlePrivateRoutes(r *gin.RouterGroup, articleHandler *articlehttp.Ar
 	r.POST("/article/trash/recover", articleHandler.RecoverArticle)
 	// 硬删除文章
 	r.POST("/article/trash/clear", articleHandler.ClearArticle)
-	// 批量获取直接写入文章正式目录的图片上传凭证
-	r.POST("/article/image/upload-urls", articleHandler.GetImageUploadURLs)
+	// 获取单张文章图片实时上传凭证
+	r.POST("/article/image/upload-url", articleHandler.GetImageUploadURL)
 }

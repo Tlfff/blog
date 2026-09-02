@@ -3,6 +3,7 @@ package infra
 import (
 	domaincontent "blog/internal/article/domain"
 	"blog/internal/article/infra/model"
+	platformtransaction "blog/internal/platform/transaction"
 	"context"
 	"errors"
 
@@ -24,7 +25,7 @@ func (r *articleRepository) Create(ctx context.Context, article *domaincontent.A
 	// 1. 领域对象转换为数据库模型
 	m := toModelArticle(article)
 	// 2. 写入数据库
-	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+	if err := platformtransaction.DB(ctx, r.db).WithContext(ctx).Create(m).Error; err != nil {
 		return err
 	}
 	// 3. 回填自增ID与时间字段
@@ -37,7 +38,7 @@ func (r *articleRepository) Create(ctx context.Context, article *domaincontent.A
 // FindByID 按文章 ID 查询文章，查不到时返回文章不存在的领域错误。
 func (r *articleRepository) FindByID(ctx context.Context, id uint64) (*domaincontent.Article, error) {
 	var m model.Article
-	err := r.db.WithContext(ctx).Model(&model.Article{}).
+	err := platformtransaction.DB(ctx, r.db).WithContext(ctx).Model(&model.Article{}).
 		Select("id", "author_id", "title", "content", "tags", "status", "view_count", "like_count", "comment_count", "created_time", "updated_time").
 		Where("id=?", id).
 		Take(&m).Error
@@ -54,7 +55,7 @@ func (r *articleRepository) FindByID(ctx context.Context, id uint64) (*domaincon
 func (r *articleRepository) FindWithAuthorByID(ctx context.Context, id uint64) (*domaincontent.ArticleWithAuthor, error) {
 	// 1. 执行字段最小化的只读 JOIN，不复用 User Repository 或持久化模型
 	var row articleWithAuthorRow
-	err := r.db.WithContext(ctx).Table("articles a").
+	err := platformtransaction.DB(ctx, r.db).WithContext(ctx).Table("articles a").
 		Select(`a.id, a.author_id, a.title, a.content, a.tags, a.status, a.view_count, a.like_count, a.comment_count, a.created_time, a.updated_time,
 			u.nickname AS nickname, u.avatar AS avatar, u.last_login_ip AS last_login_ip`).
 		Joins("LEFT JOIN users u ON a.author_id = u.id").
@@ -84,7 +85,7 @@ type articleWithAuthorRow struct {
 
 // Update 更新文章，仅更新标题、正文、状态与标签字段。
 func (r *articleRepository) Update(ctx context.Context, article *domaincontent.Article) error {
-	return r.db.WithContext(ctx).Model(&model.Article{}).
+	return platformtransaction.DB(ctx, r.db).WithContext(ctx).Model(&model.Article{}).
 		Where("id=?", article.ID).
 		Select("title", "content", "status", "tags").
 		Updates(toModelArticle(article)).Error
@@ -92,14 +93,14 @@ func (r *articleRepository) Update(ctx context.Context, article *domaincontent.A
 
 // SoftDelete 软删除文章，只把状态改为已删除，数据仍保留在库中。
 func (r *articleRepository) SoftDelete(ctx context.Context, articleID uint64) error {
-	return r.db.WithContext(ctx).Model(&model.Article{}).
+	return platformtransaction.DB(ctx, r.db).WithContext(ctx).Model(&model.Article{}).
 		Where("id=?", articleID).
 		Updates(map[string]any{"status": model.Deleted}).Error
 }
 
 // Clear 物理删除文章，彻底清除数据库记录。
 func (r *articleRepository) Clear(ctx context.Context, articleID uint64) error {
-	return r.db.WithContext(ctx).Table("articles").
+	return platformtransaction.DB(ctx, r.db).WithContext(ctx).Table("articles").
 		Where("id=?", articleID).
 		Delete(nil).Error
 }
@@ -114,7 +115,7 @@ func (r *articleRepository) Clear(ctx context.Context, articleID uint64) error {
 //   - status：文章状态过滤值。
 func (r *articleRepository) ListWithCursor(ctx context.Context, lastID uint64, pageSize int, isDesc bool, status int8) ([]*domaincontent.Article, error) {
 	// 1. 限定查询字段
-	tx := r.db.WithContext(ctx).Model(&model.Article{}).
+	tx := platformtransaction.DB(ctx, r.db).WithContext(ctx).Model(&model.Article{}).
 		Select("id", "author_id", "title", "content", "tags", "status", "view_count", "like_count", "comment_count", "created_time", "updated_time")
 	// 2. 追加状态过滤条件
 	tx = applyStatusCondition(tx, status)
@@ -142,7 +143,7 @@ func (r *articleRepository) ListWithCursor(ctx context.Context, lastID uint64, p
 //   - status：文章状态过滤值。
 func (r *articleRepository) ListWithOffset(ctx context.Context, page, pageSize int, isDesc bool, status int8) ([]*domaincontent.Article, error) {
 	// 1. 限定查询字段
-	tx := r.db.WithContext(ctx).Model(&model.Article{}).
+	tx := platformtransaction.DB(ctx, r.db).WithContext(ctx).Model(&model.Article{}).
 		Select("id", "author_id", "title", "content", "tags", "status", "view_count", "like_count", "comment_count", "created_time", "updated_time")
 	// 2. 追加状态过滤条件
 	tx = applyStatusCondition(tx, status)
@@ -163,7 +164,7 @@ func (r *articleRepository) ListWithOffset(ctx context.Context, page, pageSize i
 // CountByStatus 按状态统计文章总数。
 func (r *articleRepository) CountByStatus(ctx context.Context, status int8) (int64, error) {
 	var count int64
-	tx := r.db.WithContext(ctx).Model(&model.Article{})
+	tx := platformtransaction.DB(ctx, r.db).WithContext(ctx).Model(&model.Article{})
 	tx = applyStatusCondition(tx, status)
 	if err := tx.Count(&count).Error; err != nil {
 		return 0, err
