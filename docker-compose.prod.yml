@@ -14,7 +14,7 @@ services:
       MYSQL_PASSWORD: "${MYSQL_PASSWORD}"                # 应用用户的密码
       TZ: Asia/Shanghai                         # 容器时区设置，影响时间函数
     ports:
-      - "3306:3306" # 映射端口，外部访问端口：容器端口
+      - "127.0.0.1:3306:3306" # 仅允许宿主机访问，避免数据库端口暴露到公网
     volumes:
       - mysql_data:/var/lib/mysql # 映射数据卷，将容器内的数据持久化到主机
       - ./scripts/mysql:/docker-entrypoint-initdb.d:ro # 映射初始化脚本，仅数据目录为空时执行一次，自动建库建表
@@ -41,7 +41,7 @@ services:
     container_name: blog-redis
     restart: always
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data  # 映射数据卷，将容器内的数据持久化到主机
     command: redis-server --appendonly yes --aof-use-rdb-preamble yes # 开启混合持久化
@@ -65,7 +65,7 @@ services:
       MONGO_INITDB_DATABASE: "${MONGODB_DATABASE}" # 初始化 MongoDB 的数据库名
       TZ: Asia/Shanghai # 容器时区设置，影响时间函数
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo_data:/data/db # 映射数据卷，将容器内的数据持久化到主机
       - ./scripts/mongodb:/docker-entrypoint-initdb.d:ro # 映射初始化脚本，仅数据目录为空时执行一次
@@ -99,8 +99,8 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"  # 消费者启动时，等待多久开始分配任务
       TZ: Asia/Shanghai
     ports:
-      - "9092:9092"      # 容器间内部通信
-      - "29092:29092"    # 宿主机外部访问（Kafka 工具连接用）
+      - "127.0.0.1:9092:9092"      # 仅供宿主机 Kafka 工具访问
+      - "127.0.0.1:29092:29092"    # 避免 Kafka 明文端口暴露到公网
     volumes:
       - kafka_data:/bitnami/kafka   # 映射数据卷，将容器内的数据持久化到主机
     healthcheck:
@@ -217,7 +217,7 @@ services:
     restart: always
     command: ["server"] # 启动容器内的命令
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - ./config/config.docker.yaml:/app/config/config.yaml:ro  # 用 docker 专用配置覆盖容器内默认的 config.yaml
       - ./internal/platform/ip/resource:/app/internal/platform/ip/resource:ro  # Platform IP 地理位置数据库（只读挂载，方便更新）
@@ -260,7 +260,7 @@ services:
     restart: always
     command: ["grpc"] # 启动容器内的命令
     ports:
-      - "9100:9100"
+      - "127.0.0.1:9100:9100"
     volumes:
       - ./config/config.docker.yaml:/app/config/config.yaml:ro  # 用 docker 专用配置覆盖容器内默认的 config.yaml
     depends_on:   # 依赖的其他服务
